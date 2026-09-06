@@ -464,13 +464,19 @@
           </div>
           <div class="shopee-preview-thumbs" id="preview-thumbs"></div>
           <div class="shopee-preview-body">
+            <div class="shopee-price-toggle" id="preview-price-toggle">
+              <button type="button" class="price-toggle-btn is-active" data-channel="offline">Harga Offline</button>
+              <button type="button" class="price-toggle-btn" data-channel="online">Harga Online</button>
+            </div>
             <p class="shopee-preview-title" id="preview-title">Nama produk akan tampil di sini</p>
+            <p class="shopee-preview-desc" id="preview-desc"></p>
             <p class="shopee-preview-price" id="preview-price">Rp 0</p>
             <div class="shopee-preview-actions">
               <button type="button" class="shopee-btn shopee-btn--chat" disabled>💬 Chat</button>
               <button type="button" class="shopee-btn shopee-btn--cart" disabled>🛒 Keranjang</button>
               <button type="button" class="shopee-btn shopee-btn--buy" disabled>Beli Sekarang</button>
             </div>
+            <p class="shopee-catalog-note">Catatan: Harga katalog berlaku khusus pembelian langsung di toko/WhatsApp. Pembelian melalui marketplace mengikuti harga aplikasi terkait.</p>
           </div>
         </div>
         <p class="field-hint" style="margin-top:10px;">Pratinjau ini hanya simulasi tampilan, tidak fungsional.</p>
@@ -646,18 +652,8 @@
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast" hidden></div>
 
-<!-- SDK Firebase -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-
-<!-- Konfigurasi Firebase -->
 <script src="firebase-config.js"></script>
-
-<!-- Library Excel SheetJS -->
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-
-<!-- Skrip Utama Aplikasi -->
 <script type="module" src="app.js"></script>
 </body>
 </html>

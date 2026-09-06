@@ -46,6 +46,7 @@ const state = {
   dashCustomDate: "", // "YYYY-MM-DD", dipakai saat dashPeriod === "custom"
   variantRows: [],
   previewSelectedIndex: null,
+  previewPriceChannel: "offline",
   orderItemRows: [],
   openOrderId: null,
   editingProductId: null,
@@ -1698,6 +1699,8 @@ function resetProductForm() {
   state.variantRows = [];
   state.editingProductId = null;
   state.previewSelectedIndex = null;
+  state.previewPriceChannel = "offline";
+  els.previewPriceToggle.querySelectorAll(".price-toggle-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.channel === "offline"));
   els.productModalTitle.textContent = "Tambah produk baru";
   els.productSubmitBtn.textContent = "Simpan produk";
   renderVariantRowsTable();
@@ -1811,14 +1814,22 @@ function renderVariantRowsTable() {
 function updatePreview() {
   const f = els.productForm.elements;
   const name = f["name"].value.trim();
-  const baseOnlinePrice = Number(f["priceOnline"].value) || 0;
+  const description = f["description"].value.trim();
   const mainPhotoUrl = f["photoUrl"].value.trim();
 
   els.previewTitle.textContent = name || "Nama produk akan tampil di sini";
+  els.previewDesc.textContent = description;
+  els.previewDesc.hidden = !description;
 
-  const prices = state.variantRows.map((r) => (r.priceOnline === null || r.priceOnline === undefined || r.priceOnline === "" ? baseOnlinePrice : Number(r.priceOnline)));
+  // Sumber harga preview mengikuti channel yang dipilih di toggle (default: Offline).
+  const channel = state.previewPriceChannel; // "offline" | "online"
+  const priceField = channel === "online" ? "priceOnline" : "priceOffline";
+  const variantField = channel === "online" ? "priceOnline" : "priceOffline";
+  const basePrice = Number(f[priceField].value) || 0;
+
+  const prices = state.variantRows.map((r) => (r[variantField] === null || r[variantField] === undefined || r[variantField] === "" ? basePrice : Number(r[variantField])));
   if (prices.length === 0) {
-    els.previewPrice.textContent = formatRupiah(baseOnlinePrice);
+    els.previewPrice.textContent = formatRupiah(basePrice);
   } else {
     const min = Math.min(...prices);
     const max = Math.max(...prices);
@@ -2001,8 +2012,15 @@ function bindEvents() {
   });
 
   els.btnAddVariantRow.addEventListener("click", () => addVariantRow());
-  ["name", "priceOnline", "photoUrl"].forEach((fieldName) => {
+  ["name", "description", "priceOffline", "priceOnline", "photoUrl"].forEach((fieldName) => {
     els.productForm.elements[fieldName].addEventListener("input", updatePreview);
+  });
+  els.previewPriceToggle.querySelectorAll(".price-toggle-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.previewPriceChannel = btn.dataset.channel;
+      els.previewPriceToggle.querySelectorAll(".price-toggle-btn").forEach((b) => b.classList.toggle("is-active", b === btn));
+      updatePreview();
+    });
   });
 
   els.productForm.addEventListener("submit", async (e) => {
@@ -2197,6 +2215,8 @@ function cacheEls() {
   els.previewThumbs = document.getElementById("preview-thumbs");
   els.previewTitle = document.getElementById("preview-title");
   els.previewPrice = document.getElementById("preview-price");
+  els.previewDesc = document.getElementById("preview-desc");
+  els.previewPriceToggle = document.getElementById("preview-price-toggle");
 
   els.customerSearch = document.getElementById("customer-search");
   els.btnAddCustomer = document.getElementById("btn-add-customer");
