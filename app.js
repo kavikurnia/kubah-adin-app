@@ -661,7 +661,7 @@ function buildInvoiceHtml(o) {
       <div style="text-align:right;">
         <h4>Status pesanan</h4>
         <span class="status-badge">${escapeHtml(STATUS_META[o.status]?.label || o.status)}</span>
-        ${o.status === "dikirim" || o.status === "selesai" ? `<p style="margin-top:8px;">${escapeHtml(o.courier || "-")} — ${escapeHtml(o.trackingNumber || "-")}</p>` : ""}
+        ${(o.status === "dikirim" || o.status === "selesai") && o.courier ? `<p style="margin-top:8px;">${escapeHtml(o.courier)}${o.trackingNumber ? " — " + escapeHtml(o.trackingNumber) : ""}</p>` : ""}
       </div>
     </div>
 
@@ -1255,15 +1255,19 @@ function renderOrderModalBody(orderId) {
       <div class="od-action-block">
         <h3>Input pengiriman</h3>
         <div class="od-action-row">
-          <select id="od-courier" class="stock-input" style="width:130px;">
+          <select id="od-courier" class="stock-input" style="width:170px;">
             <option value="JNE">JNE</option>
             <option value="SiCepat">SiCepat</option>
             <option value="J&T">J&T</option>
+            <option value="J&T KARGO">J&T KARGO</option>
             <option value="AnterAja">AnterAja</option>
+            <option value="Kurir Toko">Kurir Toko</option>
+            <option value="Diambil di Tempat">Diambil di Tempat</option>
           </select>
-          <input id="od-tracking" class="stock-input" style="width:170px;" placeholder="Nomor resi" />
-          <button class="btn btn--primary" data-act="ship">Simpan &amp; tandai dikirim</button>
+          <input id="od-tracking" class="stock-input" style="width:200px;" placeholder="Nomor resi" />
+          <button class="btn btn--primary" id="od-ship-btn" data-act="ship">Simpan &amp; tandai dikirim</button>
         </div>
+        <p id="od-courier-hint" class="field-hint" style="margin-top:8px;"></p>
       </div>`;
   } else if (o.status === "menunggu_pembayaran") {
     actionHtml = `
@@ -1277,7 +1281,7 @@ function renderOrderModalBody(orderId) {
     actionHtml = `
       <div class="od-action-block">
         <h3>Dalam pengiriman</h3>
-        <p style="font-size:13px;margin:0 0 12px;">${o.courier} — ${o.trackingNumber}</p>
+        <p style="font-size:13px;margin:0 0 12px;">${escapeHtml(o.courier || "-")}${o.trackingNumber ? " — " + escapeHtml(o.trackingNumber) : ""}</p>
         <div class="od-action-row">
           <button class="btn btn--primary" data-act="complete">Tandai selesai</button>
         </div>
@@ -1286,6 +1290,10 @@ function renderOrderModalBody(orderId) {
   if (["menunggu_pembayaran", "perlu_verifikasi", "diproses"].includes(o.status)) {
     actionHtml += `<div class="od-action-row" style="margin-top:10px;"><button class="btn btn--ghost" data-act="cancel">Batalkan pesanan</button></div>`;
   }
+
+  const shippingInfoHtml = o.courier && o.status !== "dikirim"
+    ? `<div class="od-block" style="margin-bottom:16px;"><h3>Metode pengiriman</h3><p>${escapeHtml(o.courier)}${o.trackingNumber ? " — " + escapeHtml(o.trackingNumber) : o.courier === "Diambil di Tempat" ? " (tanpa resi)" : ""}</p></div>`
+    : "";
 
   const historyHtml = (o.statusHistory || []).map((h) => `<li>${STATUS_META[h.status]?.label || h.status} — ${formatDate(h.at)}</li>`).join("");
 
@@ -1310,6 +1318,7 @@ function renderOrderModalBody(orderId) {
         <div class="od-total-row"><span>Total</span><span>${formatRupiah(o.total)}</span></div>
       </div>
     </div>
+    ${shippingInfoHtml}
     ${actionHtml}
     <div class="od-history">
       <strong>Riwayat status</strong>
@@ -1320,6 +1329,38 @@ function renderOrderModalBody(orderId) {
   els.orderModalBody.querySelectorAll("[data-act]").forEach((btn) => {
     btn.addEventListener("click", () => handleOrderAction(o, btn.dataset.act));
   });
+
+  const courierSelect = document.getElementById("od-courier");
+  if (courierSelect) {
+    courierSelect.addEventListener("change", () => updateShippingFieldsForCourier(courierSelect.value));
+    updateShippingFieldsForCourier(courierSelect.value);
+  }
+}
+
+/** Sesuaikan kolom resi & label tombol berdasarkan kurir yang dipilih. */
+function updateShippingFieldsForCourier(courier) {
+  const trackingInput = document.getElementById("od-tracking");
+  const shipBtn = document.getElementById("od-ship-btn");
+  const hint = document.getElementById("od-courier-hint");
+  if (!trackingInput || !shipBtn) return;
+
+  if (courier === "Diambil di Tempat") {
+    trackingInput.value = "";
+    trackingInput.disabled = true;
+    trackingInput.placeholder = "Tanpa resi";
+    shipBtn.textContent = "Tandai diambil";
+    if (hint) hint.textContent = "Pesanan akan langsung ditandai Selesai — tidak perlu nomor resi.";
+  } else if (courier === "Kurir Toko") {
+    trackingInput.disabled = false;
+    trackingInput.placeholder = "Nama kurir internal / no. kontak (opsional)";
+    shipBtn.textContent = "Simpan & tandai dikirim";
+    if (hint) hint.textContent = "Nomor resi opsional untuk kurir toko sendiri.";
+  } else {
+    trackingInput.disabled = false;
+    trackingInput.placeholder = "Nomor resi";
+    shipBtn.textContent = "Simpan & tandai dikirim";
+    if (hint) hint.textContent = "";
+  }
 }
 
 async function handleOrderAction(order, act) {
@@ -1331,10 +1372,20 @@ async function handleOrderAction(order, act) {
     showToast(`Pelanggan diminta upload ulang bukti transfer.`);
   } else if (act === "ship") {
     const courier = document.getElementById("od-courier").value;
-    const tracking = document.getElementById("od-tracking").value.trim();
-    if (!tracking) { showToast("Nomor resi wajib diisi."); return; }
-    await updateOrder(order.id, { status: "dikirim", courier, trackingNumber: tracking });
-    showToast(`${order.invoiceNo} ditandai dikirim.`);
+    const trackingInput = document.getElementById("od-tracking");
+    const tracking = trackingInput.disabled ? "" : trackingInput.value.trim();
+
+    if (courier === "Diambil di Tempat") {
+      await updateOrder(order.id, { status: "selesai", courier, trackingNumber: "" });
+      showToast(`${order.invoiceNo} ditandai diambil & selesai.`);
+    } else {
+      if (courier !== "Kurir Toko" && !tracking) {
+        showToast("Nomor resi wajib diisi untuk kurir ini.");
+        return;
+      }
+      await updateOrder(order.id, { status: "dikirim", courier, trackingNumber: tracking });
+      showToast(`${order.invoiceNo} ditandai dikirim.`);
+    }
   } else if (act === "complete") {
     await updateOrder(order.id, { status: "selesai" });
     showToast(`${order.invoiceNo} ditandai selesai.`);
