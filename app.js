@@ -276,15 +276,40 @@ async function updateProduct(productId, patch) {
 }
 
 /** Tambah pelanggan baru (manual ATAU otomatis dari sinkronisasi pesanan). */
-async function addCustomer(customer) {
+/**
+ * Tambah pelanggan BARU, atau perbarui data yang sudah ada jika no. HP/WhatsApp
+ * sudah terdaftar. No. HP jadi kunci unik agar tidak ada data ganda.
+ * Di mode Firebase, pengecekan dilakukan lewat query langsung ke Firestore
+ * (bukan hanya cache lokal) supaya aman dari race condition saat data baru dimuat.
+ */
+async function upsertCustomer(customerData) {
+  const phone = (customerData.phone || "").trim();
+
   if (state.mode === "firebase") {
-    const { addDoc, collection, serverTimestamp } = fb;
-    await addDoc(collection(fb.db, "customers"), { ...customer, createdAt: serverTimestamp() });
+    const { collection, query, where, limit, getDocs, addDoc, updateDoc, doc, serverTimestamp } = fb;
+    if (phone) {
+      const existingSnap = await getDocs(query(collection(fb.db, "customers"), where("phone", "==", phone), limit(1)));
+      if (!existingSnap.empty) {
+        const existingId = existingSnap.docs[0].id;
+        await updateDoc(doc(fb.db, "customers", existingId), customerData);
+        return { id: existingId, updated: true };
+      }
+    }
+    const ref = await addDoc(collection(fb.db, "customers"), { ...customerData, createdAt: serverTimestamp() });
+    return { id: ref.id, updated: false };
   } else {
-    const newCustomer = { ...customer, id: "demo-customer-" + Date.now() + Math.random().toString(36).slice(2, 6), createdAt: new Date().toISOString() };
+    const existing = phone ? state.customers.find((c) => (c.phone || "").trim() === phone) : null;
+    if (existing) {
+      Object.assign(existing, customerData);
+      saveDemoData();
+      renderAll();
+      return { id: existing.id, updated: true };
+    }
+    const newCustomer = { ...customerData, id: "demo-customer-" + Date.now() + Math.random().toString(36).slice(2, 6), createdAt: new Date().toISOString() };
     state.customers.push(newCustomer);
     saveDemoData();
     renderAll();
+    return { id: newCustomer.id, updated: false };
   }
 }
 
@@ -295,6 +320,18 @@ async function updateCustomer(customerId, patch) {
   } else {
     const customer = state.customers.find((c) => c.id === customerId);
     Object.assign(customer, patch);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+/** Hapus data pelanggan dari koleksi customers. */
+async function deleteCustomer(customerId) {
+  if (state.mode === "firebase") {
+    const { doc, deleteDoc } = fb;
+    await deleteDoc(doc(fb.db, "customers", customerId));
+  } else {
+    state.customers = state.customers.filter((c) => c.id !== customerId);
     saveDemoData();
     renderAll();
   }
@@ -349,7 +386,7 @@ async function syncCustomersFromOrders() {
     if (alreadyExists || customerSyncInFlight.has(phone)) continue;
     customerSyncInFlight.add(phone);
     try {
-      await addCustomer({ name: o.customerName, phone, address: o.address || "" });
+      await upsertCustomer({ name: o.customerName, phone, address: o.address || "" });
     } finally {
       customerSyncInFlight.delete(phone);
     }
@@ -825,9 +862,22 @@ function renderPelangganView() {
       editBtn.className = "btn btn--ghost";
       editBtn.style.padding = "5px 10px";
       editBtn.style.fontSize = "12px";
+      editBtn.style.marginRight = "6px";
       editBtn.textContent = "Detail/Edit";
       editBtn.addEventListener("click", () => openCustomerModal(c));
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn btn--danger";
+      delBtn.style.padding = "5px 10px";
+      delBtn.style.fontSize = "12px";
+      delBtn.textContent = "Hapus";
+      delBtn.addEventListener("click", async () => {
+        if (confirm(`Yakin ingin menghapus data pelanggan "${c.name}"?`)) {
+          await deleteCustomer(c.id);
+          showToast(`Data pelanggan "${c.name}" dihapus.`);
+        }
+      });
       actionTd.appendChild(editBtn);
+      actionTd.appendChild(delBtn);
       tbody.appendChild(tr);
     });
 }
@@ -1621,8 +1671,8 @@ function bindEvents() {
       await updateCustomer(state.editingCustomerId, customer);
       showToast(`Pelanggan "${customer.name}" diperbarui.`);
     } else {
-      await addCustomer(customer);
-      showToast(`Pelanggan "${customer.name}" ditambahkan.`);
+      const result = await upsertCustomer(customer);
+      showToast(result.updated ? `No. HP sudah terdaftar — data "${customer.name}" diperbarui.` : `Pelanggan "${customer.name}" ditambahkan.`);
     }
     closeModals();
     navigateTo("pelanggan");
