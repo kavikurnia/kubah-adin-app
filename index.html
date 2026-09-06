@@ -119,9 +119,12 @@
 
       <div class="tabs" id="order-tabs"></div>
 
-      <div class="toolbar">
-        <input type="search" id="order-search" placeholder="Cari no. invoice atau nama pelanggan" />
-        <span class="toolbar-count" id="order-count"></span>
+      <div class="toolbar toolbar--between">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <input type="search" id="order-search" placeholder="Cari no. invoice atau nama pelanggan" />
+          <span class="toolbar-count" id="order-count"></span>
+        </div>
+        <button class="btn btn--primary" id="btn-add-order">+ Buat pesanan</button>
       </div>
 
       <table class="table" id="table-orders">
@@ -336,6 +339,76 @@
       <div class="form-actions">
         <button type="button" class="btn btn--ghost" data-close-modal>Batal</button>
         <button type="submit" class="btn btn--primary" id="product-submit-btn">Simpan produk</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ CREATE ORDER MODAL ============ -->
+<div class="overlay" id="create-order-modal" hidden>
+  <div class="modal modal--wide">
+    <button class="modal-close" data-close-modal>&times;</button>
+    <h2>Buat pesanan manual</h2>
+
+    <form id="create-order-form">
+      <div class="form-grid">
+        <label class="field">
+          <span>Nama pelanggan *</span>
+          <input type="text" name="customerName" required />
+        </label>
+        <label class="field">
+          <span>No. WhatsApp/HP *</span>
+          <input type="text" name="phone" required />
+        </label>
+        <label class="field field--wide">
+          <span>Alamat lengkap pengiriman *</span>
+          <textarea name="address" rows="2" required></textarea>
+        </label>
+      </div>
+
+      <hr class="divider" />
+
+      <div class="panel-head-row">
+        <span style="font-size:13px;font-weight:600;">Item pesanan *</span>
+        <button type="button" class="btn btn--secondary" id="btn-add-order-item">Tambah item</button>
+      </div>
+      <table class="table table--compact" id="order-item-rows-table">
+        <thead>
+          <tr><th>Produk</th><th>Varian</th><th>Qty</th><th>Harga</th><th>Subtotal</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p class="field-hint" id="order-item-empty-hint">Belum ada item. Klik &quot;Tambah item&quot;.</p>
+
+      <hr class="divider" />
+
+      <div class="form-grid">
+        <label class="field">
+          <span>Ongkos kirim (Rp) *</span>
+          <input type="number" name="shippingCost" min="0" value="0" required />
+        </label>
+        <label class="field">
+          <span>Status pesanan *</span>
+          <select name="status" required>
+            <option value="menunggu_pembayaran">Menunggu Pembayaran</option>
+            <option value="diproses">Diproses</option>
+            <option value="selesai">Selesai</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="od-action-block" style="margin-top:16px;">
+        <div class="od-action-row" style="justify-content:space-between;">
+          <span>Subtotal</span><span id="create-order-subtotal">Rp 0</span>
+        </div>
+        <div class="od-action-row" style="justify-content:space-between;font-weight:700;font-size:15px;margin-top:6px;">
+          <span>Total</span><span id="create-order-total">Rp 0</span>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn--ghost" data-close-modal>Batal</button>
+        <button type="submit" class="btn btn--primary">Simpan pesanan</button>
       </div>
     </form>
   </div>

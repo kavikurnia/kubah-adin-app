@@ -43,6 +43,7 @@ const state = {
   customerSearch: "",
   financeTab: "semua",
   variantRows: [],
+  orderItemRows: [],
   openOrderId: null,
   editingProductId: null,
   editingCustomerId: null,
@@ -198,6 +199,43 @@ async function updateOrder(orderId, patch, historyLabel) {
     await syncIncomeFromOrders();
     renderAll();
   }
+}
+
+/** Buat pesanan baru secara manual (dipakai form "Buat pesanan"). */
+async function addOrder(order) {
+  if (state.mode === "firebase") {
+    const { addDoc, collection, serverTimestamp } = fb;
+    await addDoc(collection(fb.db, "orders"), { ...order, createdAt: serverTimestamp() });
+  } else {
+    const newOrder = { ...order, id: "demo-order-manual-" + Date.now(), createdAt: new Date().toISOString() };
+    state.orders.unshift(newOrder);
+    saveDemoData();
+    await syncCustomersFromOrders();
+    await syncIncomeFromOrders();
+    renderAll();
+  }
+}
+
+/** Hapus pesanan — dipakai untuk membersihkan data contoh/dummy setelah ada pesanan asli. */
+async function deleteOrder(orderId) {
+  if (state.mode === "firebase") {
+    const { doc, deleteDoc } = fb;
+    await deleteDoc(doc(fb.db, "orders", orderId));
+  } else {
+    state.orders = state.orders.filter((o) => o.id !== orderId);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+/** No. invoice otomatis, lanjutan dari nomor terbesar yang sudah ada. */
+function generateInvoiceNo() {
+  const nums = state.orders.map((o) => {
+    const m = /INV-(\d+)/.exec(o.invoiceNo || "");
+    return m ? Number(m[1]) : 0;
+  });
+  const next = (nums.length ? Math.max(...nums) : 1000) + 1;
+  return `INV-${next}`;
 }
 
 /** Tambah produk baru. */
@@ -515,8 +553,18 @@ function renderOrderRows(tbody, orders, withAction) {
       printBtn.className = "mini-btn mini-btn--outline";
       printBtn.textContent = "Cetak nota";
       printBtn.addEventListener("click", () => printInvoice(o));
+      const delBtn = document.createElement("button");
+      delBtn.className = "mini-btn mini-btn--outline";
+      delBtn.textContent = "Hapus";
+      delBtn.addEventListener("click", async () => {
+        if (confirm(`Hapus pesanan ${o.invoiceNo}? Tindakan ini tidak bisa dibatalkan.`)) {
+          await deleteOrder(o.id);
+          showToast(`${o.invoiceNo} dihapus.`);
+        }
+      });
       actionTd.appendChild(btn);
       actionTd.appendChild(printBtn);
+      actionTd.appendChild(delBtn);
     }
     tbody.appendChild(tr);
   });
@@ -1065,6 +1113,108 @@ async function handleImportExcel(file) {
 }
 
 // ------------------------------------------------------------
+// Buat pesanan manual
+// ------------------------------------------------------------
+function addOrderItemRow() {
+  state.orderItemRows.push({ productId: "", productName: "", variantIndex: "", variantName: "", variantSku: "", price: 0, qty: 1 });
+  renderOrderItemRowsTable();
+}
+
+function removeOrderItemRow(idx) {
+  state.orderItemRows.splice(idx, 1);
+  renderOrderItemRowsTable();
+  updateCreateOrderTotals();
+}
+
+function renderOrderItemRowsTable() {
+  const tbody = els.orderItemRowsTable.querySelector("tbody");
+  tbody.innerHTML = "";
+  els.orderItemEmptyHint.hidden = state.orderItemRows.length > 0;
+
+  state.orderItemRows.forEach((row, i) => {
+    const tr = document.createElement("tr");
+    const selectedProduct = state.products.find((p) => p.id === row.productId);
+
+    const productOptions = state.products.map((p) => `<option value="${p.id}" ${row.productId === p.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
+    const variantOptions = selectedProduct
+      ? selectedProduct.variants.map((v, vi) => `<option value="${vi}" ${Number(row.variantIndex) === vi ? "selected" : ""}>${escapeHtml(v.name)} (stok ${v.stock})</option>`).join("")
+      : "";
+
+    tr.innerHTML = `
+      <td>
+        <select class="stock-input" style="width:170px;" data-field="product">
+          <option value="">Pilih produk</option>
+          ${productOptions}
+        </select>
+      </td>
+      <td>
+        <select class="stock-input" style="width:160px;" data-field="variant" ${selectedProduct ? "" : "disabled"}>
+          <option value="">Pilih varian</option>
+          ${variantOptions}
+        </select>
+      </td>
+      <td><input type="number" min="1" class="stock-input" style="width:60px;" value="${row.qty}" data-field="qty" /></td>
+      <td class="oi-price">${formatRupiah(row.price)}</td>
+      <td class="oi-subtotal">${formatRupiah(row.price * row.qty)}</td>
+      <td><button type="button" class="btn btn--ghost" style="padding:5px 9px;font-size:12px;" aria-label="Hapus item">&times;</button></td>
+    `;
+
+    tr.querySelector('[data-field="product"]').addEventListener("change", (e) => {
+      const product = state.products.find((p) => p.id === e.target.value);
+      row.productId = e.target.value;
+      row.productName = product ? product.name : "";
+      row.variantIndex = "";
+      row.variantName = "";
+      row.variantSku = "";
+      row.price = 0;
+      row.qty = row.qty || 1;
+      renderOrderItemRowsTable();
+      updateCreateOrderTotals();
+    });
+
+    tr.querySelector('[data-field="variant"]').addEventListener("change", (e) => {
+      const product = state.products.find((p) => p.id === row.productId);
+      const variant = product?.variants[Number(e.target.value)];
+      row.variantIndex = e.target.value;
+      row.variantName = variant ? variant.name : "";
+      row.variantSku = variant ? variant.sku : "";
+      row.price = variant ? Number(variant.price ?? product.price) : 0;
+      renderOrderItemRowsTable();
+      updateCreateOrderTotals();
+    });
+
+    tr.querySelector('[data-field="qty"]').addEventListener("input", (e) => {
+      row.qty = Math.max(1, Number(e.target.value) || 1);
+      tr.querySelector(".oi-subtotal").textContent = formatRupiah(row.price * row.qty);
+      updateCreateOrderTotals();
+    });
+
+    tr.querySelector("button[aria-label='Hapus item']").addEventListener("click", () => removeOrderItemRow(i));
+
+    tbody.appendChild(tr);
+  });
+}
+
+function updateCreateOrderTotals() {
+  const subtotal = state.orderItemRows.reduce((s, r) => s + r.price * r.qty, 0);
+  const shipping = Number(els.createOrderForm.elements["shippingCost"].value) || 0;
+  els.createOrderSubtotal.textContent = formatRupiah(subtotal);
+  els.createOrderTotal.textContent = formatRupiah(subtotal + shipping);
+}
+
+function resetCreateOrderForm() {
+  els.createOrderForm.reset();
+  state.orderItemRows = [];
+  renderOrderItemRowsTable();
+  updateCreateOrderTotals();
+}
+
+function openCreateOrderModal() {
+  resetCreateOrderForm();
+  els.createOrderModal.hidden = false;
+}
+
+// ------------------------------------------------------------
 // Order detail modal
 // ------------------------------------------------------------
 function openOrderModal(orderId) {
@@ -1077,9 +1227,11 @@ function closeModals() {
   els.productModal.hidden = true;
   els.customerModal.hidden = true;
   els.transactionModal.hidden = true;
+  els.createOrderModal.hidden = true;
   state.openOrderId = null;
   resetProductForm();
   resetCustomerForm();
+  resetCreateOrderForm();
 }
 
 function renderOrderModalBody(orderId) {
@@ -1293,10 +1445,51 @@ function bindEvents() {
   });
 
   els.orderSearch.addEventListener("input", (e) => { state.orderSearch = e.target.value; renderOrdersView(); });
+
+  els.btnAddOrder.addEventListener("click", openCreateOrderModal);
+  els.btnAddOrderItem.addEventListener("click", addOrderItemRow);
+  els.createOrderForm.elements["shippingCost"].addEventListener("input", updateCreateOrderTotals);
+
+  els.createOrderForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(els.createOrderForm);
+
+    const items = state.orderItemRows
+      .filter((r) => r.productId && r.variantIndex !== "")
+      .map((r) => ({ productName: r.productName, variant: r.variantName, qty: r.qty, price: r.price }));
+
+    if (items.length === 0) {
+      showToast("Tambahkan minimal 1 item dengan produk & varian yang valid.");
+      return;
+    }
+
+    const shippingCost = Number(f.get("shippingCost")) || 0;
+    const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+    const status = f.get("status");
+
+    const order = {
+      invoiceNo: generateInvoiceNo(),
+      customerName: f.get("customerName").trim(),
+      phone: f.get("phone").trim(),
+      address: f.get("address").trim(),
+      items,
+      shippingCost,
+      total: subtotal + shippingCost,
+      status,
+      courier: "",
+      trackingNumber: "",
+      statusHistory: [{ status, at: new Date().toISOString() }],
+    };
+
+    await addOrder(order);
+    closeModals();
+    navigateTo("pesanan");
+    showToast(`Pesanan ${order.invoiceNo} tersimpan.`);
+  });
   els.productSearch.addEventListener("input", (e) => { state.productSearch = e.target.value; renderProductsView(); });
 
   document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", closeModals));
-  [els.orderModal, els.productModal, els.customerModal, els.transactionModal].forEach((overlay) => {
+  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal].forEach((overlay) => {
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModals(); });
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModals(); });
@@ -1444,6 +1637,14 @@ function cacheEls() {
   els.orderSearch = document.getElementById("order-search");
   els.orderCount = document.getElementById("order-count");
   els.tableOrders = document.getElementById("table-orders");
+  els.btnAddOrder = document.getElementById("btn-add-order");
+  els.createOrderModal = document.getElementById("create-order-modal");
+  els.createOrderForm = document.getElementById("create-order-form");
+  els.btnAddOrderItem = document.getElementById("btn-add-order-item");
+  els.orderItemRowsTable = document.getElementById("order-item-rows-table");
+  els.orderItemEmptyHint = document.getElementById("order-item-empty-hint");
+  els.createOrderSubtotal = document.getElementById("create-order-subtotal");
+  els.createOrderTotal = document.getElementById("create-order-total");
 
   els.productSearch = document.getElementById("product-search");
   els.tableProducts = document.getElementById("table-products");
