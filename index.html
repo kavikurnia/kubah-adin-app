@@ -11,7 +11,33 @@
 </head>
 <body>
 
-<div class="app">
+<!-- ============ AUTH / LOGIN SCREEN ============ -->
+<div class="auth-screen" id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="brand-mark">A</span>
+      <span class="auth-brand-name" id="auth-store-name">Atelier Admin</span>
+    </div>
+    <p class="auth-sub">Masuk untuk mengelola toko</p>
+
+    <p class="auth-checking" id="auth-checking">Memeriksa sesi…</p>
+
+    <form id="login-form" hidden>
+      <label class="field">
+        <span>Email</span>
+        <input type="email" name="email" required autocomplete="username" />
+      </label>
+      <label class="field" style="margin-top:14px;">
+        <span>Password</span>
+        <input type="password" name="password" required autocomplete="current-password" />
+      </label>
+      <p class="auth-error" id="login-error" hidden></p>
+      <button type="submit" class="btn btn--primary auth-submit" id="login-submit-btn">Masuk</button>
+    </form>
+  </div>
+</div>
+
+<div class="app" id="app-root" hidden>
 
   <!-- ============ SIDEBAR ============ -->
   <aside class="sidebar">
@@ -48,6 +74,9 @@
     </nav>
 
     <div class="sidebar-foot">
+      <button class="nav-item" id="btn-logout" style="margin-bottom:10px;">
+        <span class="nav-dot"></span> Keluar
+      </button>
       <div class="conn-badge" id="conn-badge">
         <span class="conn-dot"></span>
         <span id="conn-label">Memeriksa koneksi…</span>

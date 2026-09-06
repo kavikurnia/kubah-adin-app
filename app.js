@@ -65,34 +65,102 @@ const LOCAL_KEY_TRANSACTIONS = "atelier_demo_transactions";
 const LOCAL_KEY_SETTINGS = "atelier_demo_settings";
 
 let fb = null; // { db, addDoc, updateDoc, collection, doc, onSnapshot, serverTimestamp, query, orderBy, deleteDoc }
+let authInstance = null;
+let authFns = null; // { signInWithEmailAndPassword, signOut, onAuthStateChanged, ... }
+let firestoreUnsubscribers = [];
 
 async function initDataLayer() {
   const cfg = window.FIREBASE_CONFIG || {};
   const isPlaceholder = !cfg.apiKey || cfg.apiKey === "YOUR_API_KEY";
 
   if (isPlaceholder) {
+    // Tidak ada project Firebase asli terhubung — tidak ada yang perlu dilindungi,
+    // jadi lewati layar login sepenuhnya dan langsung masuk ke mode demo.
     state.mode = "demo";
     setConnectionBadge("demo", "Mode demo (localStorage)");
+    els.btnLogout.hidden = true;
+    enterApp();
     await loadDemoData();
     return;
   }
 
   try {
-    const [{ initializeApp }, firestore] = await Promise.all([
+    const [{ initializeApp }, firestore, authModule] = await Promise.all([
       import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
       import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),
     ]);
     const app = initializeApp(cfg);
     const db = firestore.getFirestore(app);
     fb = { db, ...firestore };
     state.mode = "firebase";
-    setConnectionBadge("connected", "Terhubung ke Firebase");
-    subscribeFirestore();
+
+    authInstance = authModule.getAuth(app);
+    authFns = authModule;
+
+    authFns.onAuthStateChanged(authInstance, (user) => {
+      if (user) {
+        setConnectionBadge("connected", "Terhubung ke Firebase");
+        showLoginError("");
+        enterApp();
+        if (firestoreUnsubscribers.length === 0) subscribeFirestore();
+      } else {
+        firestoreUnsubscribers.forEach((unsub) => unsub());
+        firestoreUnsubscribers = [];
+        showLoginScreen();
+      }
+    });
   } catch (err) {
     console.warn("Gagal konek Firebase, memakai mode demo.", err);
     state.mode = "demo";
     setConnectionBadge("demo", "Mode demo (Firebase gagal konek)");
+    els.btnLogout.hidden = true;
+    enterApp();
     await loadDemoData();
+  }
+}
+
+/** Tampilkan dashboard, sembunyikan layar login. */
+function enterApp() {
+  els.authScreen.hidden = true;
+  els.appRoot.hidden = false;
+}
+
+/** Tampilkan layar login, sembunyikan dashboard. */
+function showLoginScreen() {
+  els.appRoot.hidden = true;
+  els.authScreen.hidden = false;
+  els.authChecking.hidden = true;
+  els.loginForm.hidden = false;
+}
+
+function showLoginError(message) {
+  if (!message) {
+    els.loginError.hidden = true;
+    els.loginError.textContent = "";
+    return;
+  }
+  els.loginError.textContent = message;
+  els.loginError.hidden = false;
+}
+
+/** Terjemahkan kode error Firebase Auth ke pesan yang mudah dipahami. */
+function mapAuthErrorMessage(code) {
+  switch (code) {
+    case "auth/invalid-email":
+      return "Format email tidak valid.";
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+    case "auth/invalid-credential":
+      return "Email atau password salah.";
+    case "auth/user-disabled":
+      return "Akun ini telah dinonaktifkan.";
+    case "auth/too-many-requests":
+      return "Terlalu banyak percobaan gagal. Coba lagi beberapa saat lagi.";
+    case "auth/network-request-failed":
+      return "Gagal terhubung ke server. Periksa koneksi internet kamu.";
+    default:
+      return "Gagal masuk. Periksa kembali email dan password kamu.";
   }
 }
 
@@ -104,7 +172,7 @@ function setConnectionBadge(kind, label) {
 function subscribeFirestore() {
   const { collection, doc, onSnapshot, setDoc, query, orderBy } = fb;
 
-  onSnapshot(query(collection(fb.db, "orders"), orderBy("createdAt", "desc")), (snap) => {
+  firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "orders"), orderBy("createdAt", "desc")), (snap) => {
     state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     if (snap.empty) {
       seedFirestore();
@@ -113,24 +181,24 @@ function subscribeFirestore() {
       syncIncomeFromOrders();
     }
     renderAll();
-  });
+  }));
 
-  onSnapshot(query(collection(fb.db, "products"), orderBy("createdAt", "desc")), (snap) => {
+  firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "products"), orderBy("createdAt", "desc")), (snap) => {
     state.products = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAll();
-  });
+  }));
 
-  onSnapshot(query(collection(fb.db, "customers"), orderBy("name")), (snap) => {
+  firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "customers"), orderBy("name")), (snap) => {
     state.customers = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAll();
-  });
+  }));
 
-  onSnapshot(query(collection(fb.db, "transactions"), orderBy("date", "desc")), (snap) => {
+  firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "transactions"), orderBy("date", "desc")), (snap) => {
     state.transactions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAll();
-  });
+  }));
 
-  onSnapshot(doc(fb.db, "settings", "store"), (snap) => {
+  firestoreUnsubscribers.push(onSnapshot(doc(fb.db, "settings", "store"), (snap) => {
     if (snap.exists()) {
       state.settings = snap.data();
     } else {
@@ -139,7 +207,7 @@ function subscribeFirestore() {
     }
     if (state.view === "pengaturan") applySettingsToForm();
     renderAll();
-  });
+  }));
 }
 
 async function seedFirestore() {
@@ -1592,6 +1660,32 @@ function navigateTo(view) {
 }
 
 function bindEvents() {
+  els.loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showLoginError("");
+    const f = new FormData(els.loginForm);
+    const email = f.get("email").trim();
+    const password = f.get("password");
+
+    els.loginSubmitBtn.disabled = true;
+    els.loginSubmitBtn.textContent = "Memproses…";
+    try {
+      await authFns.signInWithEmailAndPassword(authInstance, email, password);
+      // onAuthStateChanged yang akan menangani transisi ke dashboard.
+    } catch (err) {
+      showLoginError(mapAuthErrorMessage(err.code));
+    } finally {
+      els.loginSubmitBtn.disabled = false;
+      els.loginSubmitBtn.textContent = "Masuk";
+    }
+  });
+
+  els.btnLogout.addEventListener("click", async () => {
+    if (!authInstance || !authFns) return;
+    await authFns.signOut(authInstance);
+    // onAuthStateChanged yang akan menampilkan kembali layar login.
+  });
+
   document.querySelectorAll(".nav-item[data-view]:not(.is-disabled)").forEach((btn) => {
     btn.addEventListener("click", () => navigateTo(btn.dataset.view));
   });
@@ -1798,6 +1892,14 @@ function bindEvents() {
 // INIT
 // ============================================================
 function cacheEls() {
+  els.authScreen = document.getElementById("auth-screen");
+  els.authChecking = document.getElementById("auth-checking");
+  els.loginForm = document.getElementById("login-form");
+  els.loginError = document.getElementById("login-error");
+  els.loginSubmitBtn = document.getElementById("login-submit-btn");
+  els.appRoot = document.getElementById("app-root");
+  els.btnLogout = document.getElementById("btn-logout");
+
   els.connBadge = document.getElementById("conn-badge");
   els.connLabel = document.getElementById("conn-label");
   els.navBadgePesanan = document.getElementById("nav-badge-pesanan");
