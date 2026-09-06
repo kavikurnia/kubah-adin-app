@@ -30,6 +30,7 @@ const state = {
   productSearch: "",
   variantRows: [],
   openOrderId: null,
+  editingProductId: null,
   mode: "demo", // "demo" | "firebase"
 };
 
@@ -156,6 +157,19 @@ async function deleteProduct(productId) {
     await deleteDoc(doc(fb.db, "products", productId));
   } else {
     state.products = state.products.filter((p) => p.id !== productId);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+/** Update produk yang sudah ada (dipakai oleh form Edit). */
+async function updateProduct(productId, patch) {
+  if (state.mode === "firebase") {
+    const { doc, updateDoc } = fb;
+    await updateDoc(doc(fb.db, "products", productId), patch);
+  } else {
+    const product = state.products.find((p) => p.id === productId);
+    Object.assign(product, patch);
     saveDemoData();
     renderAll();
   }
@@ -397,6 +411,13 @@ function renderProductsView() {
       <td></td>
     `;
     const actionTd = tr.querySelector("td:last-child");
+    const editBtn = document.createElement("button");
+    editBtn.className = "btn btn--ghost";
+    editBtn.style.padding = "5px 10px";
+    editBtn.style.fontSize = "12px";
+    editBtn.style.marginRight = "6px";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => openProductModal(p));
     const delBtn = document.createElement("button");
     delBtn.className = "btn btn--danger";
     delBtn.style.padding = "5px 10px";
@@ -408,6 +429,7 @@ function renderProductsView() {
         showToast("Produk dihapus.");
       }
     });
+    actionTd.appendChild(editBtn);
     actionTd.appendChild(delBtn);
     tbody.appendChild(tr);
   });
@@ -546,7 +568,34 @@ async function handleOrderAction(order, act) {
 function resetProductForm() {
   els.productForm.reset();
   state.variantRows = [];
+  state.editingProductId = null;
+  els.productModalTitle.textContent = "Tambah produk baru";
+  els.productSubmitBtn.textContent = "Simpan produk";
   renderVariantRowsTable();
+}
+
+/** Buka modal produk. Tanpa argumen = mode tambah baru. Dengan argumen produk = mode edit, form terisi otomatis. */
+function openProductModal(product) {
+  resetProductForm();
+  if (product) {
+    state.editingProductId = product.id;
+    els.productModalTitle.textContent = `Edit produk — ${product.name}`;
+    els.productSubmitBtn.textContent = "Simpan perubahan";
+
+    const f = els.productForm.elements;
+    f["name"].value = product.name || "";
+    f["category"].value = product.category || "";
+    f["description"].value = product.description || "";
+    f["price"].value = product.price ?? "";
+    f["weight"].value = product.weight ?? "";
+    f["sku"].value = product.sku || "";
+    f["status"].value = product.status || "aktif";
+    f["photoUrl"].value = product.photoUrl || "";
+
+    state.variantRows = (product.variants || []).map((v) => ({ ...v }));
+    renderVariantRowsTable();
+  }
+  els.productModal.hidden = false;
 }
 
 function slug(str) {
@@ -619,7 +668,7 @@ function bindEvents() {
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModals(); });
 
-  els.btnAddProduct.addEventListener("click", () => { resetProductForm(); els.productModal.hidden = false; });
+  els.btnAddProduct.addEventListener("click", () => openProductModal());
 
   els.btnAddVariantRow.addEventListener("click", () => addVariantRow());
 
@@ -656,10 +705,18 @@ function bindEvents() {
       variants,
       totalStock,
     };
-    await addProduct(product);
-    closeModals();
-    navigateTo("produk");
-    showToast(`Produk "${product.name}" tersimpan.`);
+
+    if (state.editingProductId) {
+      await updateProduct(state.editingProductId, product);
+      closeModals();
+      navigateTo("produk");
+      showToast(`Produk "${product.name}" diperbarui.`);
+    } else {
+      await addProduct(product);
+      closeModals();
+      navigateTo("produk");
+      showToast(`Produk "${product.name}" tersimpan.`);
+    }
   });
 }
 
@@ -693,6 +750,8 @@ function cacheEls() {
   els.orderModalBody = document.getElementById("order-modal-body");
 
   els.productModal = document.getElementById("product-modal");
+  els.productModalTitle = document.getElementById("product-modal-title");
+  els.productSubmitBtn = document.getElementById("product-submit-btn");
   els.productForm = document.getElementById("product-form");
   els.variantRowsTable = document.getElementById("variant-rows-table");
   els.btnAddVariantRow = document.getElementById("btn-add-variant-row");
