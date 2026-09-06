@@ -141,6 +141,9 @@
 
       <div class="toolbar">
         <input type="search" id="product-search" placeholder="Cari nama produk" />
+        <button class="btn btn--ghost" id="btn-download-template">Download template Excel</button>
+        <label class="btn btn--ghost" for="import-excel-input">Import Excel</label>
+        <input type="file" id="import-excel-input" accept=".xlsx,.xls,.csv" hidden />
         <button class="btn btn--primary" id="btn-add-product">Tambah produk</button>
       </div>
 
@@ -419,10 +422,24 @@
   </div>
 </div>
 
+<!-- ============ IMPORT PRODUK MODAL ============ -->
+<div class="overlay" id="import-modal" hidden>
+  <div class="modal">
+    <button class="modal-close" id="import-modal-close" hidden>&times;</button>
+    <h2>Import produk dari Excel</h2>
+    <p id="import-status-text" style="font-size:13.5px;">Membaca file…</p>
+    <div class="import-progress-track">
+      <div class="import-progress-bar" id="import-progress-bar"></div>
+    </div>
+    <div id="import-log"></div>
+  </div>
+</div>
+
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast" hidden></div>
 
 <script src="firebase-config.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

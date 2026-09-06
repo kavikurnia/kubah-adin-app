@@ -892,6 +892,179 @@ function applySettingsToForm() {
 }
 
 // ------------------------------------------------------------
+// Import produk massal via Excel/CSV
+// ------------------------------------------------------------
+const IMPORT_TEMPLATE_HEADERS = ["Nama Produk", "Kategori", "SKU Induk", "Berat (gram)", "URL Foto", "Nama Varian", "SKU Varian", "Harga Varian", "Stok Varian"];
+
+function downloadProductTemplate() {
+  if (typeof XLSX === "undefined") {
+    showToast("Library Excel belum termuat — cek koneksi internet lalu coba lagi.");
+    return;
+  }
+  const sampleRows = [
+    ["Kemeja Flanel", "Atasan", "KMJ-FLN", 300, "https://picsum.photos/seed/kmjfln/120", "M - Hitam", "KMJ-FLN-M-HTM", 235000, 8],
+    ["Kemeja Flanel", "Atasan", "KMJ-FLN", 300, "https://picsum.photos/seed/kmjfln/120", "L - Hitam", "KMJ-FLN-L-HTM", 235000, 3],
+    ["Blouse Katun", "Atasan", "BLS-KTN", 150, "", "S - Putih", "BLS-KTN-S-PTH", 90000, 12],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([IMPORT_TEMPLATE_HEADERS, ...sampleRows]);
+  ws["!cols"] = IMPORT_TEMPLATE_HEADERS.map(() => ({ wch: 18 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Produk");
+  XLSX.writeFile(wb, "template-import-produk.xlsx");
+}
+
+/** Baris mentah dari sheet → produk yang sudah dikelompokkan (baris varian dengan Nama Produk + SKU Induk sama digabung jadi 1 dokumen). */
+function groupImportRows(rows) {
+  const groups = new Map();
+  const errors = [];
+
+  rows.forEach((row, idx) => {
+    const rowNum = idx + 2; // baris 1 di file = header
+    const name = String(row["Nama Produk"] || "").trim();
+    const variantName = String(row["Nama Varian"] || "").trim();
+
+    if (!name) {
+      errors.push({ row: rowNum, reason: "Kolom Nama Produk kosong — baris dilewati." });
+      return;
+    }
+    if (!variantName) {
+      errors.push({ row: rowNum, reason: `"${name}": kolom Nama Varian kosong — baris dilewati.` });
+      return;
+    }
+
+    const category = String(row["Kategori"] || "").trim() || "Umum";
+    const sku = String(row["SKU Induk"] || "").trim() || slug(name);
+    const weight = Number(row["Berat (gram)"]) || 0;
+    const photoUrl = String(row["URL Foto"] || "").trim();
+    const variantSku = String(row["SKU Varian"] || "").trim() || `${sku}-${slug(variantName)}`;
+    const variantPrice = Number(row["Harga Varian"]) || 0;
+    const variantStock = Number(row["Stok Varian"]) || 0;
+
+    const key = `${name.toLowerCase()}|${sku.toLowerCase()}`;
+    if (!groups.has(key)) {
+      groups.set(key, { name, category, description: "", price: variantPrice, weight, sku, status: "aktif", photoUrl, variants: [] });
+    }
+    const product = groups.get(key);
+    if (!product.photoUrl && photoUrl) product.photoUrl = photoUrl;
+    product.variants.push({ name: variantName, sku: variantSku, price: variantPrice, stock: variantStock });
+  });
+
+  const products = Array.from(groups.values()).map((p) => ({ ...p, totalStock: p.variants.reduce((s, v) => s + v.stock, 0) }));
+  return { products, errors };
+}
+
+/** Simpan produk hasil import. Firebase: writeBatch berkelompok (maks. 400/batch, aman di bawah limit 500 Firestore). */
+async function saveImportedProducts(products, onProgress) {
+  if (state.mode === "firebase") {
+    const { writeBatch, collection, doc, serverTimestamp } = fb;
+    const chunkSize = 400;
+    let done = 0;
+    for (let i = 0; i < products.length; i += chunkSize) {
+      const chunk = products.slice(i, i + chunkSize);
+      const batch = writeBatch(fb.db);
+      chunk.forEach((p) => {
+        const ref = doc(collection(fb.db, "products"));
+        batch.set(ref, { ...p, createdAt: serverTimestamp() });
+      });
+      await batch.commit();
+      done += chunk.length;
+      onProgress({ done, total: products.length });
+    }
+  } else {
+    products.forEach((p, i) => {
+      state.products.unshift({ ...p, id: `demo-product-import-${Date.now()}-${i}`, createdAt: new Date().toISOString() });
+    });
+    saveDemoData();
+    renderAll();
+    onProgress({ done: products.length, total: products.length });
+  }
+}
+
+function openImportModal() {
+  els.importLog.innerHTML = "";
+  els.importModalClose.hidden = true;
+  setImportStatus("Membaca file…", 5);
+  els.importModal.hidden = false;
+}
+function setImportStatus(text, percent) {
+  els.importStatusText.textContent = text;
+  els.importProgressBar.style.width = Math.max(0, Math.min(100, percent)) + "%";
+}
+function showImportDone(products, errors) {
+  const summary = document.createElement("p");
+  summary.style.cssText = "margin-top:14px;font-size:13.5px;";
+  summary.innerHTML = `<strong>${products.length}</strong> produk berhasil diimpor` + (errors.length ? `, <strong>${errors.length}</strong> baris dilewati.` : ".");
+  els.importLog.appendChild(summary);
+
+  if (errors.length > 0) {
+    const list = document.createElement("ul");
+    list.className = "import-error-list";
+    errors.slice(0, 20).forEach((e) => {
+      const li = document.createElement("li");
+      li.textContent = `Baris ${e.row}: ${e.reason}`;
+      list.appendChild(li);
+    });
+    if (errors.length > 20) {
+      const li = document.createElement("li");
+      li.textContent = `…dan ${errors.length - 20} baris lainnya dilewati.`;
+      list.appendChild(li);
+    }
+    els.importLog.appendChild(list);
+  }
+  els.importModalClose.hidden = false;
+}
+
+async function handleImportExcel(file) {
+  if (typeof XLSX === "undefined") {
+    showToast("Library Excel belum termuat — cek koneksi internet lalu coba lagi.");
+    return;
+  }
+  openImportModal();
+
+  let rows;
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+  } catch (err) {
+    setImportStatus("Gagal membaca file. Pastikan formatnya .xlsx/.csv sesuai template.", 0);
+    showImportDone([], [{ row: "-", reason: "File tidak terbaca: " + err.message }]);
+    return;
+  }
+
+  if (rows.length === 0) {
+    setImportStatus("File kosong — tidak ada baris data.", 0);
+    showImportDone([], []);
+    return;
+  }
+
+  setImportStatus(`Mengelompokkan ${rows.length} baris menjadi produk…`, 20);
+  const { products, errors } = groupImportRows(rows);
+
+  if (products.length === 0) {
+    setImportStatus("Tidak ada produk valid untuk diimpor.", 0);
+    showImportDone([], errors);
+    return;
+  }
+
+  setImportStatus(`Menyimpan 0/${products.length} produk…`, 40);
+  try {
+    await saveImportedProducts(products, (p) => {
+      setImportStatus(`Menyimpan ${p.done}/${p.total} produk…`, 40 + Math.round((p.done / p.total) * 55));
+    });
+  } catch (err) {
+    setImportStatus("Terjadi kesalahan saat menyimpan ke database.", 0);
+    showImportDone([], [...errors, { row: "-", reason: err.message }]);
+    return;
+  }
+
+  setImportStatus("Selesai.", 100);
+  showImportDone(products, errors);
+  navigateTo("produk");
+}
+
+// ------------------------------------------------------------
 // Order detail modal
 // ------------------------------------------------------------
 function openOrderModal(orderId) {
@@ -1130,6 +1303,15 @@ function bindEvents() {
 
   els.btnAddProduct.addEventListener("click", () => openProductModal());
 
+  els.btnDownloadTemplate.addEventListener("click", downloadProductTemplate);
+  els.importExcelInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = ""; // reset supaya file yang sama bisa dipilih lagi nanti
+    await handleImportExcel(file);
+  });
+  els.importModalClose.addEventListener("click", () => { els.importModal.hidden = true; });
+
   els.btnAddVariantRow.addEventListener("click", () => addVariantRow());
 
   els.productForm.addEventListener("submit", async (e) => {
@@ -1266,6 +1448,13 @@ function cacheEls() {
   els.productSearch = document.getElementById("product-search");
   els.tableProducts = document.getElementById("table-products");
   els.btnAddProduct = document.getElementById("btn-add-product");
+  els.btnDownloadTemplate = document.getElementById("btn-download-template");
+  els.importExcelInput = document.getElementById("import-excel-input");
+  els.importModal = document.getElementById("import-modal");
+  els.importModalClose = document.getElementById("import-modal-close");
+  els.importStatusText = document.getElementById("import-status-text");
+  els.importProgressBar = document.getElementById("import-progress-bar");
+  els.importLog = document.getElementById("import-log");
 
   els.orderModal = document.getElementById("order-modal");
   els.orderModalBody = document.getElementById("order-modal-body");
