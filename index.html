@@ -144,12 +144,14 @@
         <button class="btn btn--primary" id="btn-add-product">Tambah produk</button>
       </div>
 
-      <table class="table" id="table-products">
-        <thead>
-          <tr><th>Produk</th><th>Kategori</th><th>Harga dasar</th><th>Total stok</th><th>Status</th><th></th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div class="table-scroll">
+        <table class="table" id="table-products">
+          <thead>
+            <tr><th></th><th>Produk</th><th>SKU</th><th>Kategori</th><th>Harga dasar</th><th>Berat</th><th>Total stok</th><th>Rincian varian</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </section>
 
   </main>
@@ -210,44 +212,27 @@
           </select>
         </label>
         <label class="field field--wide">
-          <span>Foto produk</span>
-          <input type="file" name="photo" accept="image/*" multiple />
-          <small class="field-hint">Prototipe ini belum mengunggah file ke server — sambungkan Firebase Storage untuk fitur ini.</small>
+          <span>URL foto produk</span>
+          <input type="url" name="photoUrl" placeholder="https://…/foto-produk.jpg" />
+          <small class="field-hint">Tempel link gambar (mis. dari Firebase Storage, Imgur, atau CDN lain). Kosongkan jika belum ada.</small>
         </label>
       </div>
 
       <hr class="divider" />
 
       <div class="variant-builder">
-        <div class="variant-builder-cols">
-          <div class="field">
-            <span>Ukuran</span>
-            <div class="chip-input" id="size-chips">
-              <button type="button" class="chip-opt" data-size="S">S</button>
-              <button type="button" class="chip-opt" data-size="M">M</button>
-              <button type="button" class="chip-opt" data-size="L">L</button>
-              <button type="button" class="chip-opt" data-size="XL">XL</button>
-              <button type="button" class="chip-opt" data-size="XXL">XXL</button>
-            </div>
-          </div>
-          <div class="field">
-            <span>Warna</span>
-            <div class="color-input-row">
-              <input type="text" id="color-input" placeholder="mis. Hitam, lalu Enter" />
-              <button type="button" class="btn btn--ghost" id="btn-add-color">Tambah</button>
-            </div>
-            <div class="chip-list" id="color-chips"></div>
-          </div>
+        <div class="panel-head-row">
+          <span style="font-size:13px;font-weight:600;">Varian produk *</span>
+          <button type="button" class="btn btn--secondary" id="btn-add-variant-row">Tambah varian</button>
         </div>
 
-        <button type="button" class="btn btn--secondary" id="btn-generate-matrix">Buat tabel varian</button>
-
-        <table class="table table--compact" id="variant-matrix-table" hidden>
+        <table class="table table--compact" id="variant-rows-table">
           <thead>
-            <tr><th>Ukuran</th><th>Warna</th><th>SKU varian</th><th>Stok</th></tr>
+            <tr><th>Nama varian</th><th>SKU varian</th><th>Harga (Rp)</th><th>Stok</th><th></th></tr>
           </thead>
           <tbody></tbody>
         </table>
+        <p class="field-hint" id="variant-empty-hint">Belum ada varian. Klik &quot;Tambah varian&quot; — mis. nama "M - Hitam".</p>
       </div>
 
       <div class="form-actions">

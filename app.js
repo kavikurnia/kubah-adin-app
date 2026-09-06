@@ -28,8 +28,6 @@ const state = {
   orderTab: "semua",
   orderSearch: "",
   productSearch: "",
-  selectedSizes: [],
-  colors: [],
   variantRows: [],
   openOrderId: null,
   mode: "demo", // "demo" | "firebase"
@@ -180,12 +178,12 @@ function buildSeedData() {
   ];
 
   const products = [
-    { name: "Kemeja Flanel", category: "Atasan", description: "Kemeja flanel lengan panjang, bahan katun tebal.", price: 235000, weight: 300, sku: "KMJ-FLN", status: "aktif", variants: [{ size: "M", color: "Hitam", sku: "KMJ-FLN-M-HTM", stock: 8 }, { size: "L", color: "Hitam", sku: "KMJ-FLN-L-HTM", stock: 3 }, { size: "L", color: "Merah", sku: "KMJ-FLN-L-MRH", stock: 2 }], totalStock: 13, createdAt: daysAgo(20) },
-    { name: "Blouse Katun", category: "Atasan", description: "Blouse katun ringan untuk sehari-hari.", price: 90000, weight: 150, sku: "BLS-KTN", status: "aktif", variants: [{ size: "S", color: "Putih", sku: "BLS-KTN-S-PTH", stock: 12 }, { size: "M", color: "Dusty Pink", sku: "BLS-KTN-M-DPK", stock: 4 }], totalStock: 16, createdAt: daysAgo(18) },
-    { name: "Celana Chino", category: "Bawahan", description: "Celana chino slim fit, bahan twill.", price: 175000, weight: 350, sku: "CLN-CHN", status: "aktif", variants: [{ size: "30", color: "Hitam", sku: "CLN-CHN-30-HTM", stock: 1 }, { size: "32", color: "Krem", sku: "CLN-CHN-32-KRM", stock: 6 }], totalStock: 7, createdAt: daysAgo(15) },
-    { name: "Dress Linen", category: "Dress", description: "Dress linen midi, cocok untuk acara santai.", price: 310000, weight: 280, sku: "DRS-LNN", status: "aktif", variants: [{ size: "M", color: "Sage", sku: "DRS-LNN-M-SAG", stock: 2 }], totalStock: 2, createdAt: daysAgo(10) },
-    { name: "Jaket Denim", category: "Outer", description: "Jaket denim washed, unisex.", price: 420000, weight: 500, sku: "JKT-DNM", status: "aktif", variants: [{ size: "L", color: "Biru", sku: "JKT-DNM-L-BIR", stock: 5 }], totalStock: 5, createdAt: daysAgo(9) },
-    { name: "Kaos Polos", category: "Atasan", description: "Kaos polos cotton combed 24s.", price: 85000, weight: 140, sku: "KOS-PLS", status: "draft", variants: [{ size: "L", color: "Putih", sku: "KOS-PLS-L-PTH", stock: 20 }], totalStock: 20, createdAt: daysAgo(5) },
+    { name: "Kemeja Flanel", category: "Atasan", description: "Kemeja flanel lengan panjang, bahan katun tebal.", price: 235000, weight: 300, sku: "KMJ-FLN", status: "aktif", photoUrl: "https://picsum.photos/seed/kmjfln/120", variants: [{ name: "M - Hitam", sku: "KMJ-FLN-M-HTM", price: 235000, stock: 8 }, { name: "L - Hitam", sku: "KMJ-FLN-L-HTM", price: 235000, stock: 3 }, { name: "L - Merah", sku: "KMJ-FLN-L-MRH", price: 245000, stock: 2 }], totalStock: 13, createdAt: daysAgo(20) },
+    { name: "Blouse Katun", category: "Atasan", description: "Blouse katun ringan untuk sehari-hari.", price: 90000, weight: 150, sku: "BLS-KTN", status: "aktif", photoUrl: "https://picsum.photos/seed/blsktn/120", variants: [{ name: "S - Putih", sku: "BLS-KTN-S-PTH", price: 90000, stock: 12 }, { name: "M - Dusty Pink", sku: "BLS-KTN-M-DPK", price: 95000, stock: 4 }], totalStock: 16, createdAt: daysAgo(18) },
+    { name: "Celana Chino", category: "Bawahan", description: "Celana chino slim fit, bahan twill.", price: 175000, weight: 350, sku: "CLN-CHN", status: "aktif", photoUrl: "", variants: [{ name: "30 - Hitam", sku: "CLN-CHN-30-HTM", price: 175000, stock: 1 }, { name: "32 - Krem", sku: "CLN-CHN-32-KRM", price: 175000, stock: 6 }], totalStock: 7, createdAt: daysAgo(15) },
+    { name: "Dress Linen", category: "Dress", description: "Dress linen midi, cocok untuk acara santai.", price: 310000, weight: 280, sku: "DRS-LNN", status: "aktif", photoUrl: "https://picsum.photos/seed/drslnn/120", variants: [{ name: "M - Sage", sku: "DRS-LNN-M-SAG", price: 310000, stock: 2 }], totalStock: 2, createdAt: daysAgo(10) },
+    { name: "Jaket Denim", category: "Outer", description: "Jaket denim washed, unisex.", price: 420000, weight: 500, sku: "JKT-DNM", status: "aktif", photoUrl: "", variants: [{ name: "L - Biru", sku: "JKT-DNM-L-BIR", price: 420000, stock: 5 }], totalStock: 5, createdAt: daysAgo(9) },
+    { name: "Kaos Polos", category: "Atasan", description: "Kaos polos cotton combed 24s.", price: 85000, weight: 140, sku: "KOS-PLS", status: "draft", photoUrl: "", variants: [{ name: "L - Putih", sku: "KOS-PLS-L-PTH", price: 85000, stock: 20 }], totalStock: 20, createdAt: daysAgo(5) },
   ];
 
   return { orders, products };
@@ -206,6 +204,9 @@ const isToday = (iso) => {
   const now = new Date();
   return d.toDateString() === now.toDateString();
 };
+function escapeHtml(str) {
+  return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c]));
+}
 function showToast(msg) {
   els.toast.textContent = msg;
   els.toast.hidden = false;
@@ -367,17 +368,31 @@ function renderProductsView() {
   const tbody = els.tableProducts.querySelector("tbody");
   tbody.innerHTML = "";
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="table-empty">Belum ada produk.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="table-empty">Belum ada produk.</td></tr>`;
     return;
   }
   filtered.forEach((p) => {
     const tr = document.createElement("tr");
     const lowStock = p.totalStock <= 5;
+    const initials = escapeHtml((p.name || "?").charAt(0).toUpperCase());
+    const thumbHtml = `
+      <div class="table-thumb-wrap">
+        <span class="table-thumb-fallback">${initials}</span>
+        ${p.photoUrl ? `<img src="${escapeHtml(p.photoUrl)}" alt="${escapeHtml(p.name)}" class="table-thumb-img" onerror="this.style.display='none'" />` : ""}
+      </div>`;
+    const variantDetailHtml = (p.variants || [])
+      .map((v) => `<div class="variant-mini-row"><strong>${escapeHtml(v.name)}</strong> <span class="text-muted">(${escapeHtml(v.sku || "-")})</span><br/><span class="text-muted">${formatRupiah(v.price ?? p.price)} · stok ${v.stock}</span></div>`)
+      .join("");
+
     tr.innerHTML = `
-      <td><strong>${p.name}</strong><br/><span style="color:var(--text-muted);font-size:12px;">${p.variants.length} varian</span></td>
-      <td>${p.category}</td>
+      <td>${thumbHtml}</td>
+      <td><strong>${escapeHtml(p.name)}</strong><br/><span style="color:var(--text-muted);font-size:12px;">${(p.variants || []).length} varian</span></td>
+      <td>${escapeHtml(p.sku || "-")}</td>
+      <td>${escapeHtml(p.category)}</td>
       <td>${formatRupiah(p.price)}</td>
+      <td>${Number(p.weight || 0)} g</td>
       <td>${lowStock ? `<span class="tag tag--dibatalkan">${p.totalStock} unit</span>` : `${p.totalStock} unit`}</td>
+      <td class="variant-detail-cell">${variantDetailHtml}</td>
       <td><span class="tag tag--${p.status === "aktif" ? "selesai" : p.status === "draft" ? "menunggu_pembayaran" : "dibatalkan"}">${p.status}</span></td>
       <td></td>
     `;
@@ -530,68 +545,50 @@ async function handleOrderAction(order, act) {
 // ------------------------------------------------------------
 function resetProductForm() {
   els.productForm.reset();
-  state.selectedSizes = [];
-  state.colors = [];
   state.variantRows = [];
-  els.sizeChips.querySelectorAll(".chip-opt").forEach((c) => c.classList.remove("is-selected"));
-  els.colorChips.innerHTML = "";
-  els.variantMatrixTable.hidden = true;
-  els.variantMatrixTable.querySelector("tbody").innerHTML = "";
-}
-
-function renderColorChips() {
-  els.colorChips.innerHTML = "";
-  state.colors.forEach((c, i) => {
-    const chip = document.createElement("span");
-    chip.className = "chip";
-    chip.innerHTML = `${c} <button type="button" aria-label="Hapus ${c}">&times;</button>`;
-    chip.querySelector("button").addEventListener("click", () => {
-      state.colors.splice(i, 1);
-      renderColorChips();
-    });
-    els.colorChips.appendChild(chip);
-  });
+  renderVariantRowsTable();
 }
 
 function slug(str) {
   return (str || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3) || "GEN";
 }
 
-function generateVariantMatrix() {
-  if (state.selectedSizes.length === 0 || state.colors.length === 0) {
-    showToast("Pilih minimal 1 ukuran dan 1 warna dulu.");
-    return;
-  }
-  const nameInput = els.productForm.elements["name"].value.trim();
-  const skuInput = els.productForm.elements["sku"].value.trim();
-  const baseSku = skuInput || slug(nameInput) || "PRD";
-
-  state.variantRows = [];
-  state.selectedSizes.forEach((size) => {
-    state.colors.forEach((color) => {
-      state.variantRows.push({ size, color, sku: `${baseSku}-${size}-${slug(color)}`, stock: 0 });
-    });
-  });
-  renderVariantMatrixTable();
+/** Tambah satu baris varian kosong (atau terisi, jika dipanggil dengan data awal). */
+function addVariantRow(initial) {
+  state.variantRows.push({ name: "", sku: "", price: null, stock: 0, ...initial });
+  renderVariantRowsTable();
 }
 
-function renderVariantMatrixTable() {
-  const tbody = els.variantMatrixTable.querySelector("tbody");
+function removeVariantRow(idx) {
+  state.variantRows.splice(idx, 1);
+  renderVariantRowsTable();
+}
+
+function renderVariantRowsTable() {
+  const tbody = els.variantRowsTable.querySelector("tbody");
   tbody.innerHTML = "";
+  els.variantEmptyHint.hidden = state.variantRows.length > 0;
+
   state.variantRows.forEach((row, i) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${row.size}</td>
-      <td>${row.color}</td>
-      <td>${row.sku}</td>
-      <td><input type="number" min="0" class="stock-input" value="${row.stock}" data-idx="${i}" /></td>
+      <td><input type="text" class="stock-input" style="width:150px;" placeholder="mis. M - Hitam" value="${escapeHtml(row.name)}" data-field="name" /></td>
+      <td><input type="text" class="stock-input" style="width:130px;" placeholder="mis. KMJ-FLN-M-HTM" value="${escapeHtml(row.sku)}" data-field="sku" /></td>
+      <td><input type="number" min="0" class="stock-input" style="width:100px;" placeholder="Ikut harga dasar" value="${row.price ?? ""}" data-field="price" /></td>
+      <td><input type="number" min="0" class="stock-input" style="width:80px;" value="${row.stock}" data-field="stock" /></td>
+      <td><button type="button" class="btn btn--ghost" style="padding:5px 9px;font-size:12px;" aria-label="Hapus varian">&times;</button></td>
     `;
-    tr.querySelector("input").addEventListener("input", (e) => {
-      state.variantRows[i].stock = Number(e.target.value) || 0;
+    tr.querySelectorAll("input").forEach((input) => {
+      input.addEventListener("input", (e) => {
+        const field = e.target.dataset.field;
+        if (field === "price") row.price = e.target.value === "" ? null : Number(e.target.value);
+        else if (field === "stock") row.stock = Number(e.target.value) || 0;
+        else row[field] = e.target.value;
+      });
     });
+    tr.querySelector("button").addEventListener("click", () => removeVariantRow(i));
     tbody.appendChild(tr);
   });
-  els.variantMatrixTable.hidden = false;
 }
 
 // ============================================================
@@ -624,44 +621,39 @@ function bindEvents() {
 
   els.btnAddProduct.addEventListener("click", () => { resetProductForm(); els.productModal.hidden = false; });
 
-  els.sizeChips.querySelectorAll(".chip-opt").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      const size = chip.dataset.size;
-      chip.classList.toggle("is-selected");
-      if (chip.classList.contains("is-selected")) state.selectedSizes.push(size);
-      else state.selectedSizes = state.selectedSizes.filter((s) => s !== size);
-    });
-  });
-
-  const addColor = () => {
-    const val = els.colorInput.value.trim();
-    if (!val) return;
-    if (!state.colors.includes(val)) state.colors.push(val);
-    els.colorInput.value = "";
-    renderColorChips();
-  };
-  els.btnAddColor.addEventListener("click", addColor);
-  els.colorInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addColor(); } });
-
-  els.btnGenerateMatrix.addEventListener("click", generateVariantMatrix);
+  els.btnAddVariantRow.addEventListener("click", () => addVariantRow());
 
   els.productForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = new FormData(els.productForm);
-    if (state.variantRows.length === 0) {
-      showToast("Buat tabel varian dulu sebelum menyimpan.");
+    const basePrice = Number(f.get("price")) || 0;
+
+    // Baris kosong (belum diisi nama) diabaikan, bukan dianggap error.
+    const variants = state.variantRows
+      .filter((r) => r.name.trim() !== "")
+      .map((r) => ({
+        name: r.name.trim(),
+        sku: r.sku.trim(),
+        price: r.price === null || r.price === "" ? basePrice : Number(r.price),
+        stock: Number(r.stock) || 0,
+      }));
+
+    if (variants.length === 0) {
+      showToast("Tambahkan minimal 1 varian sebelum menyimpan.");
       return;
     }
-    const totalStock = state.variantRows.reduce((s, r) => s + r.stock, 0);
+
+    const totalStock = variants.reduce((s, v) => s + v.stock, 0);
     const product = {
       name: f.get("name").trim(),
       category: f.get("category").trim(),
       description: f.get("description").trim(),
-      price: Number(f.get("price")) || 0,
+      price: basePrice,
       weight: Number(f.get("weight")) || 0,
       sku: f.get("sku").trim() || slug(f.get("name")),
       status: f.get("status"),
-      variants: state.variantRows.map(({ size, color, sku, stock }) => ({ size, color, sku, stock })),
+      photoUrl: f.get("photoUrl").trim(),
+      variants,
       totalStock,
     };
     await addProduct(product);
@@ -702,12 +694,9 @@ function cacheEls() {
 
   els.productModal = document.getElementById("product-modal");
   els.productForm = document.getElementById("product-form");
-  els.sizeChips = document.getElementById("size-chips");
-  els.colorInput = document.getElementById("color-input");
-  els.btnAddColor = document.getElementById("btn-add-color");
-  els.colorChips = document.getElementById("color-chips");
-  els.btnGenerateMatrix = document.getElementById("btn-generate-matrix");
-  els.variantMatrixTable = document.getElementById("variant-matrix-table");
+  els.variantRowsTable = document.getElementById("variant-rows-table");
+  els.btnAddVariantRow = document.getElementById("btn-add-variant-row");
+  els.variantEmptyHint = document.getElementById("variant-empty-hint");
 
   els.toast = document.getElementById("toast");
 }
