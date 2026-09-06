@@ -62,6 +62,10 @@
         <span class="nav-dot"></span> Produk
       </button>
 
+      <button class="nav-item" data-view="kalkulator">
+        <span class="nav-dot"></span> Kalkulator Pintar
+      </button>
+
       <button class="nav-item" data-view="pelanggan">
         <span class="nav-dot"></span> Pelanggan
       </button>
@@ -191,10 +195,68 @@
       <div class="table-scroll">
         <table class="table" id="table-products">
           <thead>
-            <tr><th></th><th>Produk</th><th>SKU</th><th>Kategori</th><th>Harga dasar</th><th>Berat</th><th>Total stok</th><th>Rincian varian</th><th>Status</th><th></th></tr>
+            <tr><th></th><th>Produk</th><th>SKU</th><th>Kategori</th><th>HPP</th><th>Offline</th><th>Online</th><th>Berat</th><th>Total stok</th><th>Rincian varian</th><th>Status</th><th></th></tr>
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- ---------- KALKULATOR PINTAR ---------- -->
+    <section class="view" id="view-kalkulator" hidden>
+      <header class="view-head">
+        <h1>Kalkulator Pintar</h1>
+        <p class="view-sub">Hitung harga jual & margin bersih Offline vs Online dari HPP</p>
+      </header>
+
+      <div class="calc-layout">
+        <div class="panel calc-input-panel">
+          <div class="form-grid">
+            <label class="field">
+              <span>HPP / Modal (Rp) *</span>
+              <input type="number" min="0" id="calc-hpp" placeholder="0" />
+            </label>
+            <label class="field">
+              <span>Potongan platform online (%)</span>
+              <input type="number" min="0" max="100" step="0.5" id="calc-cut-pct" value="30" />
+            </label>
+          </div>
+
+          <div class="calc-preset-row">
+            <span class="field-hint" style="display:block;margin-bottom:8px;">Preset cepat markup dari HPP</span>
+            <div class="calc-preset-buttons">
+              <button type="button" class="btn btn--ghost calc-preset-btn" data-multiplier="1.6" data-label="Ecer Best Seller (+60%)">Ecer Best Seller<br /><small>+60%</small></button>
+              <button type="button" class="btn btn--ghost calc-preset-btn" data-multiplier="1.8" data-label="Ecer Reguler (+80%)">Ecer Reguler<br /><small>+80%</small></button>
+              <button type="button" class="btn btn--ghost calc-preset-btn" data-multiplier="1.6" data-label="Grosir 10 Pcs Standar (+60%)">Grosir 10 Pcs Standar<br /><small>+60%</small></button>
+              <button type="button" class="btn btn--ghost calc-preset-btn" data-multiplier="1.7" data-label="Grosir 10 Pcs Aman (+70%)">Grosir 10 Pcs Aman<br /><small>+70%</small></button>
+            </div>
+          </div>
+
+          <hr class="divider" />
+
+          <div class="form-grid">
+            <label class="field">
+              <span>Harga Offline (Rp)</span>
+              <input type="number" min="0" id="calc-price-offline" placeholder="0" />
+            </label>
+            <label class="field">
+              <span>Harga Online (Rp)</span>
+              <input type="number" min="0" id="calc-price-online" placeholder="0" />
+            </label>
+          </div>
+
+          <div id="calc-margin-badge"></div>
+        </div>
+
+        <div class="panel calc-result-panel">
+          <h2>Perbandingan Bersih: Offline vs Online</h2>
+          <table class="table table--compact" id="calc-compare-table">
+            <thead>
+              <tr><th></th><th>Offline</th><th>Online</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -333,8 +395,17 @@
               <textarea name="description" rows="2" required></textarea>
             </label>
             <label class="field">
-              <span>Harga dasar (Rp) *</span>
-              <input type="number" name="price" min="0" required />
+              <span>HPP / Modal dasar (Rp) *</span>
+              <input type="number" name="hpp" min="0" required />
+            </label>
+            <label class="field">
+              <span>Harga Offline dasar (Rp) *</span>
+              <input type="number" name="priceOffline" min="0" required />
+            </label>
+            <label class="field">
+              <span>Harga Online dasar (Rp) *</span>
+              <input type="number" name="priceOnline" min="0" required />
+              <small class="field-hint">Sudah memperhitungkan harga tayang marketplace (sebelum potongan platform).</small>
             </label>
             <label class="field">
               <span>Berat (gram) *</span>
@@ -370,7 +441,7 @@
             <div class="table-scroll">
               <table class="table table--compact" id="variant-rows-table">
                 <thead>
-                  <tr><th>Foto</th><th>Warna / Nama Varian</th><th>Ukuran</th><th>Harga</th><th>Stok</th><th>SKU</th><th></th></tr>
+                  <tr><th>Foto</th><th>Warna / Nama Varian</th><th>Ukuran</th><th>HPP</th><th>Offline</th><th>Online</th><th>Stok</th><th>SKU</th><th></th></tr>
                 </thead>
                 <tbody></tbody>
               </table>

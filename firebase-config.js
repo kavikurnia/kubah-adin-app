@@ -25,12 +25,12 @@
 // ============================================================
 
 window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyC6ea0-3QFnFR3ZUfv4fKYSIX4vTD-ZCwA",
-  authDomain: "kubah-admin-app.firebaseapp.com",
-  projectId: "kubah-admin-app",
-  storageBucket: "kubah-admin-app.firebasestorage.app",
-  messagingSenderId: "477747088600",
-  appId: "1:477747088600:web:9d6d6e6e3fc56bfbab9bad"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID",
 };
 
 // ------------------------------------------------------------
@@ -61,12 +61,14 @@ window.FIREBASE_CONFIG = {
 //     name: string,
 //     category: string,
 //     description: string,
-//     price: number,           // harga dasar
+//     hpp: number,             // HPP / modal dasar
+//     priceOffline: number,    // harga offline dasar (untung 100%, tanpa potongan)
+//     priceOnline: number,     // harga online dasar (sebelum potongan platform)
 //     weight: number,          // gram
 //     sku: string,             // SKU induk
 //     status: "aktif" | "draft" | "nonaktif",
 //     photoUrl: string,        // URL foto produk
-//     variants: [{ image, color, size, sku, price, stock }],
+//     variants: [{ image, color, size, sku, hpp, priceOffline, priceOnline, stock }],
 //     totalStock: number,      // = jumlah stock semua varian
 //     createdAt: timestamp
 //   }

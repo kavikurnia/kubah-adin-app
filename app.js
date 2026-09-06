@@ -504,12 +504,12 @@ function buildSeedData() {
   ];
 
   const products = [
-    { name: "Kemeja Flanel", category: "Atasan", description: "Kemeja flanel lengan panjang, bahan katun tebal.", price: 235000, weight: 300, sku: "KMJ-FLN", status: "aktif", photoUrl: "https://picsum.photos/seed/kmjfln/120", variants: [{ image: "", color: "Hitam", size: "M", sku: "KMJ-FLN-M-HTM", price: 235000, stock: 8 }, { image: "", color: "Hitam", size: "L", sku: "KMJ-FLN-L-HTM", price: 235000, stock: 3 }, { image: "", color: "Merah", size: "L", sku: "KMJ-FLN-L-MRH", price: 245000, stock: 2 }], totalStock: 13, createdAt: daysAgo(20) },
-    { name: "Blouse Katun", category: "Atasan", description: "Blouse katun ringan untuk sehari-hari.", price: 90000, weight: 150, sku: "BLS-KTN", status: "aktif", photoUrl: "https://picsum.photos/seed/blsktn/120", variants: [{ image: "", color: "Putih", size: "S", sku: "BLS-KTN-S-PTH", price: 90000, stock: 12 }, { image: "", color: "Dusty Pink", size: "M", sku: "BLS-KTN-M-DPK", price: 95000, stock: 4 }], totalStock: 16, createdAt: daysAgo(18) },
-    { name: "Celana Chino", category: "Bawahan", description: "Celana chino slim fit, bahan twill.", price: 175000, weight: 350, sku: "CLN-CHN", status: "aktif", photoUrl: "", variants: [{ image: "", color: "Hitam", size: "30", sku: "CLN-CHN-30-HTM", price: 175000, stock: 1 }, { image: "", color: "Krem", size: "32", sku: "CLN-CHN-32-KRM", price: 175000, stock: 6 }], totalStock: 7, createdAt: daysAgo(15) },
-    { name: "Dress Linen", category: "Dress", description: "Dress linen midi, cocok untuk acara santai.", price: 310000, weight: 280, sku: "DRS-LNN", status: "aktif", photoUrl: "https://picsum.photos/seed/drslnn/120", variants: [{ image: "", color: "Sage", size: "M", sku: "DRS-LNN-M-SAG", price: 310000, stock: 2 }], totalStock: 2, createdAt: daysAgo(10) },
-    { name: "Jaket Denim", category: "Outer", description: "Jaket denim washed, unisex.", price: 420000, weight: 500, sku: "JKT-DNM", status: "aktif", photoUrl: "", variants: [{ image: "", color: "Biru", size: "L", sku: "JKT-DNM-L-BIR", price: 420000, stock: 5 }], totalStock: 5, createdAt: daysAgo(9) },
-    { name: "Kaos Polos", category: "Atasan", description: "Kaos polos cotton combed 24s.", price: 85000, weight: 140, sku: "KOS-PLS", status: "draft", photoUrl: "", variants: [{ image: "", color: "Putih", size: "L", sku: "KOS-PLS-L-PTH", price: 85000, stock: 20 }], totalStock: 20, createdAt: daysAgo(5) },
+    { name: "Kemeja Flanel", category: "Atasan", description: "Kemeja flanel lengan panjang, bahan katun tebal.", hpp: 147000, priceOffline: 235000, priceOnline: 235000, weight: 300, sku: "KMJ-FLN", status: "aktif", photoUrl: "https://picsum.photos/seed/kmjfln/120", variants: [{ image: "", color: "Hitam", size: "M", sku: "KMJ-FLN-M-HTM", hpp: 147000, priceOffline: 235000, priceOnline: 235000, stock: 8 }, { image: "", color: "Hitam", size: "L", sku: "KMJ-FLN-L-HTM", hpp: 147000, priceOffline: 235000, priceOnline: 235000, stock: 3 }, { image: "", color: "Merah", size: "L", sku: "KMJ-FLN-L-MRH", hpp: 153000, priceOffline: 245000, priceOnline: 245000, stock: 2 }], totalStock: 13, createdAt: daysAgo(20) },
+    { name: "Blouse Katun", category: "Atasan", description: "Blouse katun ringan untuk sehari-hari.", hpp: 56000, priceOffline: 90000, priceOnline: 90000, weight: 150, sku: "BLS-KTN", status: "aktif", photoUrl: "https://picsum.photos/seed/blsktn/120", variants: [{ image: "", color: "Putih", size: "S", sku: "BLS-KTN-S-PTH", hpp: 56000, priceOffline: 90000, priceOnline: 90000, stock: 12 }, { image: "", color: "Dusty Pink", size: "M", sku: "BLS-KTN-M-DPK", hpp: 59000, priceOffline: 95000, priceOnline: 95000, stock: 4 }], totalStock: 16, createdAt: daysAgo(18) },
+    { name: "Celana Chino", category: "Bawahan", description: "Celana chino slim fit, bahan twill.", hpp: 109000, priceOffline: 175000, priceOnline: 175000, weight: 350, sku: "CLN-CHN", status: "aktif", photoUrl: "", variants: [{ image: "", color: "Hitam", size: "30", sku: "CLN-CHN-30-HTM", hpp: 109000, priceOffline: 175000, priceOnline: 175000, stock: 1 }, { image: "", color: "Krem", size: "32", sku: "CLN-CHN-32-KRM", hpp: 109000, priceOffline: 175000, priceOnline: 175000, stock: 6 }], totalStock: 7, createdAt: daysAgo(15) },
+    { name: "Dress Linen", category: "Dress", description: "Dress linen midi, cocok untuk acara santai.", hpp: 194000, priceOffline: 310000, priceOnline: 310000, weight: 280, sku: "DRS-LNN", status: "aktif", photoUrl: "https://picsum.photos/seed/drslnn/120", variants: [{ image: "", color: "Sage", size: "M", sku: "DRS-LNN-M-SAG", hpp: 194000, priceOffline: 310000, priceOnline: 310000, stock: 2 }], totalStock: 2, createdAt: daysAgo(10) },
+    { name: "Jaket Denim", category: "Outer", description: "Jaket denim washed, unisex.", hpp: 262000, priceOffline: 420000, priceOnline: 420000, weight: 500, sku: "JKT-DNM", status: "aktif", photoUrl: "", variants: [{ image: "", color: "Biru", size: "L", sku: "JKT-DNM-L-BIR", hpp: 262000, priceOffline: 420000, priceOnline: 420000, stock: 5 }], totalStock: 5, createdAt: daysAgo(9) },
+    { name: "Kaos Polos", category: "Atasan", description: "Kaos polos cotton combed 24s.", hpp: 53000, priceOffline: 85000, priceOnline: 85000, weight: 140, sku: "KOS-PLS", status: "draft", photoUrl: "", variants: [{ image: "", color: "Putih", size: "L", sku: "KOS-PLS-L-PTH", hpp: 53000, priceOffline: 85000, priceOnline: 85000, stock: 20 }], totalStock: 20, createdAt: daysAgo(5) },
   ];
 
   return { orders, products };
@@ -539,12 +539,33 @@ function variantLabel(v) {
 }
 
 /** Normalisasi satu varian (dari Firestore, format lama ATAU baru) ke bentuk baris form yang baru. */
+/** Normalisasi harga varian (HPP/Offline/Online). Kompatibel mundur dengan skema lama {price}. */
+function normalizeVariantPricing(v) {
+  return {
+    hpp: v.hpp ?? 0,
+    priceOffline: v.priceOffline ?? v.price ?? 0,
+    priceOnline: v.priceOnline ?? v.price ?? 0,
+  };
+}
+
+/** Normalisasi harga dasar produk (HPP/Offline/Online). Kompatibel mundur dengan skema lama {price}. */
+function getProductBasePricing(p) {
+  return {
+    hpp: p.hpp ?? 0,
+    priceOffline: p.priceOffline ?? p.price ?? 0,
+    priceOnline: p.priceOnline ?? p.price ?? 0,
+  };
+}
+
 function normalizeVariantForEdit(v) {
+  const pricing = normalizeVariantPricing(v);
   return {
     image: v.image || "",
     color: v.color !== undefined ? v.color : (v.name || ""),
     size: v.size || "",
-    price: v.price ?? null,
+    hpp: pricing.hpp || null,
+    priceOffline: pricing.priceOffline || null,
+    priceOnline: pricing.priceOnline || null,
     stock: v.stock ?? 0,
     sku: v.sku || "",
   };
@@ -901,7 +922,7 @@ function renderOrdersView() {
   const q = state.orderSearch.trim().toLowerCase();
   let filtered = state.orders;
   if (state.orderTab !== "semua") filtered = filtered.filter((o) => o.status === state.orderTab);
-  if (q) filtered = filtered.filter((o) => o.invoiceNo.toLowerCase().includes(q) || o.customerName.toLowerCase().includes(q));
+  if (q) filtered = filtered.filter((o) => (o.invoiceNo || "").toLowerCase().includes(q) || (o.customerName || "").toLowerCase().includes(q));
 
   els.orderCount.textContent = `${filtered.length} pesanan`;
   renderOrderRows(els.tableOrders.querySelector("tbody"), filtered, true);
@@ -909,62 +930,77 @@ function renderOrdersView() {
 
 function renderProductsView() {
   const q = state.productSearch.trim().toLowerCase();
-  const filtered = state.products.filter((p) => p.name.toLowerCase().includes(q));
+  const filtered = state.products.filter((p) => (p.name || "").toLowerCase().includes(q));
   const tbody = els.tableProducts.querySelector("tbody");
   tbody.innerHTML = "";
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" class="table-empty">Belum ada produk.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="table-empty">Belum ada produk.</td></tr>`;
     return;
   }
   filtered.forEach((p) => {
-    const tr = document.createElement("tr");
-    const lowStock = p.totalStock <= 5;
-    const initials = escapeHtml((p.name || "?").charAt(0).toUpperCase());
-    const thumbHtml = `
-      <div class="table-thumb-wrap">
-        <span class="table-thumb-fallback">${initials}</span>
-        ${p.photoUrl ? `<img src="${escapeHtml(p.photoUrl)}" alt="${escapeHtml(p.name)}" class="table-thumb-img" onerror="this.style.display='none'" />` : ""}
-      </div>`;
-    const variantDetailHtml = (p.variants || [])
-      .map(
-        (v) => `<div class="variant-mini-row">${v.image ? `<img src="${escapeHtml(v.image)}" class="variant-mini-thumb" onerror="this.style.display='none'" />` : ""}<strong>${escapeHtml(variantLabel(v))}</strong> <span class="text-muted">(${escapeHtml(v.sku || "-")})</span><br/><span class="text-muted">${formatRupiah(v.price ?? p.price)} · stok ${v.stock}</span></div>`
-      )
-      .join("");
+    try {
+      const tr = document.createElement("tr");
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      // Fallback: kalau dokumen lama tidak punya totalStock, hitung ulang dari varian.
+      const totalStock = p.totalStock ?? variants.reduce((s, v) => s + (v.stock ?? 0), 0);
+      const status = p.status || "aktif";
+      const lowStock = totalStock <= 5;
+      const initials = escapeHtml((p.name || "?").charAt(0).toUpperCase());
+      const thumbHtml = `
+        <div class="table-thumb-wrap">
+          <span class="table-thumb-fallback">${initials}</span>
+          ${p.photoUrl ? `<img src="${escapeHtml(p.photoUrl)}" alt="${escapeHtml(p.name)}" class="table-thumb-img" onerror="this.style.display='none'" />` : ""}
+        </div>`;
+      const basePricing = getProductBasePricing(p);
+      const variantDetailHtml = variants.length
+        ? variants
+            .map((v) => {
+              const vp = normalizeVariantPricing(v);
+              return `<div class="variant-mini-row">${v.image ? `<img src="${escapeHtml(v.image)}" class="variant-mini-thumb" onerror="this.style.display='none'" />` : ""}<strong>${escapeHtml(variantLabel(v))}</strong> <span class="text-muted">(${escapeHtml(v.sku || "-")})</span><br/><span class="text-muted">HPP ${formatRupiah(vp.hpp)} · Off ${formatRupiah(vp.priceOffline)} · On ${formatRupiah(vp.priceOnline)} · stok ${v.stock ?? 0}</span></div>`;
+            })
+            .join("")
+        : `<span class="text-muted">Belum ada varian</span>`;
 
-    tr.innerHTML = `
-      <td>${thumbHtml}</td>
-      <td><strong>${escapeHtml(p.name)}</strong><br/><span style="color:var(--text-muted);font-size:12px;">${(p.variants || []).length} varian</span></td>
-      <td>${escapeHtml(p.sku || "-")}</td>
-      <td>${escapeHtml(p.category)}</td>
-      <td>${formatRupiah(p.price)}</td>
-      <td>${Number(p.weight || 0)} g</td>
-      <td>${lowStock ? `<span class="tag tag--dibatalkan">${p.totalStock} unit</span>` : `${p.totalStock} unit`}</td>
-      <td class="variant-detail-cell">${variantDetailHtml}</td>
-      <td><span class="tag tag--${p.status === "aktif" ? "selesai" : p.status === "draft" ? "menunggu_pembayaran" : "dibatalkan"}">${p.status}</span></td>
-      <td></td>
-    `;
-    const actionTd = tr.querySelector("td:last-child");
-    const editBtn = document.createElement("button");
-    editBtn.className = "btn btn--ghost";
-    editBtn.style.padding = "5px 10px";
-    editBtn.style.fontSize = "12px";
-    editBtn.style.marginRight = "6px";
-    editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () => openProductModal(p));
-    const delBtn = document.createElement("button");
-    delBtn.className = "btn btn--danger";
-    delBtn.style.padding = "5px 10px";
-    delBtn.style.fontSize = "12px";
-    delBtn.textContent = "Hapus";
-    delBtn.addEventListener("click", async () => {
-      if (confirm(`Hapus produk "${p.name}"?`)) {
-        await deleteProduct(p.id);
-        showToast("Produk dihapus.");
-      }
-    });
-    actionTd.appendChild(editBtn);
-    actionTd.appendChild(delBtn);
-    tbody.appendChild(tr);
+      tr.innerHTML = `
+        <td>${thumbHtml}</td>
+        <td><strong>${escapeHtml(p.name || "(tanpa nama)")}</strong><br/><span style="color:var(--text-muted);font-size:12px;">${variants.length} varian</span></td>
+        <td>${escapeHtml(p.sku || "-")}</td>
+        <td>${escapeHtml(p.category || "-")}</td>
+        <td>${formatRupiah(basePricing.hpp)}</td>
+        <td>${formatRupiah(basePricing.priceOffline)}</td>
+        <td>${formatRupiah(basePricing.priceOnline)}</td>
+        <td>${Number(p.weight || 0)} g</td>
+        <td>${lowStock ? `<span class="tag tag--dibatalkan">${totalStock} unit</span>` : `${totalStock} unit`}</td>
+        <td class="variant-detail-cell">${variantDetailHtml}</td>
+        <td><span class="tag tag--${status === "aktif" ? "selesai" : status === "draft" ? "menunggu_pembayaran" : "dibatalkan"}">${escapeHtml(status)}</span></td>
+        <td></td>
+      `;
+      const actionTd = tr.querySelector("td:last-child");
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn btn--ghost";
+      editBtn.style.padding = "5px 10px";
+      editBtn.style.fontSize = "12px";
+      editBtn.style.marginRight = "6px";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => openProductModal(p));
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn btn--danger";
+      delBtn.style.padding = "5px 10px";
+      delBtn.style.fontSize = "12px";
+      delBtn.textContent = "Hapus";
+      delBtn.addEventListener("click", async () => {
+        if (confirm(`Hapus produk "${p.name}"?`)) {
+          await deleteProduct(p.id);
+          showToast("Produk dihapus.");
+        }
+      });
+      actionTd.appendChild(editBtn);
+      actionTd.appendChild(delBtn);
+      tbody.appendChild(tr);
+    } catch (err) {
+      // Satu dokumen bermasalah tidak boleh membuat seluruh tabel kosong — lewati baris ini saja.
+      console.warn("Gagal render produk, dilewati:", p?.id, err);
+    }
   });
 }
 
@@ -980,7 +1016,7 @@ function customerStatsFor(customer) {
 
 function renderPelangganView() {
   const q = state.customerSearch.trim().toLowerCase();
-  const filtered = state.customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone || "").toLowerCase().includes(q));
+  const filtered = state.customers.filter((c) => (c.name || "").toLowerCase().includes(q) || (c.phone || "").toLowerCase().includes(q));
   const tbody = els.tableCustomers.querySelector("tbody");
   tbody.innerHTML = "";
   if (filtered.length === 0) {
@@ -989,7 +1025,7 @@ function renderPelangganView() {
   }
   filtered
     .slice()
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
     .forEach((c) => {
       const { totalOrders, totalSpent } = customerStatsFor(c);
       const tr = document.createElement("tr");
@@ -1136,7 +1172,7 @@ function applySettingsToForm() {
 // ------------------------------------------------------------
 // Import produk massal via Excel/CSV
 // ------------------------------------------------------------
-const IMPORT_TEMPLATE_HEADERS = ["Nama Produk", "Kategori", "SKU Induk", "Berat (gram)", "URL Foto Produk", "Warna/Nama Varian", "Ukuran", "URL Foto Varian", "SKU Varian", "Harga Varian", "Stok Varian"];
+const IMPORT_TEMPLATE_HEADERS = ["Nama Produk", "Kategori", "SKU Induk", "Berat (gram)", "URL Foto Produk", "Warna/Nama Varian", "Ukuran", "URL Foto Varian", "SKU Varian", "HPP Varian", "Harga Offline Varian", "Harga Online Varian", "Stok Varian"];
 
 function downloadProductTemplate() {
   if (typeof XLSX === "undefined") {
@@ -1144,9 +1180,10 @@ function downloadProductTemplate() {
     return;
   }
   const sampleRows = [
-    ["Kemeja Flanel", "Atasan", "KMJ-FLN", 300, "https://picsum.photos/seed/kmjfln/120", "Hitam", "M", "", "KMJ-FLN-M-HTM", 235000, 8],
-    ["Kemeja Flanel", "Atasan", "KMJ-FLN", 300, "https://picsum.photos/seed/kmjfln/120", "Hitam", "L", "", "KMJ-FLN-L-HTM", 235000, 3],
-    ["Blouse Katun", "Atasan", "BLS-KTN", 150, "", "Putih", "S", "", "BLS-KTN-S-PTH", 90000, 12],
+    ["Kemeja Flanel", "Atasan", "KMJ-FLN", 300, "https://picsum.photos/seed/kmjfln/120", "Hitam", "M", "", "KMJ-FLN-M-HTM", 147000, 235000, 235000, 8],
+    ["Kemeja Flanel", "Atasan", "KMJ-FLN", 300, "https://picsum.photos/seed/kmjfln/120", "Hitam", "L", "", "KMJ-FLN-L-HTM", 147000, 235000, 235000, 3],
+    ["Blouse Katun", "Atasan", "BLS-KTN", 150, "", "Putih", "S", "", "BLS-KTN-S-PTH", 56000, 90000, 90000, 12],
+    ["Aksesoris Bros", "Aksesoris", "AKS-BRS", 50, "", "", "", "", "AKS-BRS-001", 15000, 25000, 25000, 15],
   ];
   const ws = XLSX.utils.aoa_to_sheet([IMPORT_TEMPLATE_HEADERS, ...sampleRows]);
   ws["!cols"] = IMPORT_TEMPLATE_HEADERS.map(() => ({ wch: 18 }));
@@ -1159,38 +1196,41 @@ function downloadProductTemplate() {
 function groupImportRows(rows) {
   const groups = new Map();
   const errors = [];
+  const DEFAULT_COLOR = "Standar";
+  const DEFAULT_SIZE = "All Size";
 
   rows.forEach((row, idx) => {
     const rowNum = idx + 2; // baris 1 di file = header
     const name = String(row["Nama Produk"] || "").trim();
-    const variantColor = String(row["Warna/Nama Varian"] || "").trim();
-    const variantSize = String(row["Ukuran"] || "").trim();
 
     if (!name) {
       errors.push({ row: rowNum, reason: "Kolom Nama Produk kosong — baris dilewati." });
       return;
     }
-    if (!variantColor && !variantSize) {
-      errors.push({ row: rowNum, reason: `"${name}": kolom Warna/Nama Varian dan Ukuran kosong dua-duanya — baris dilewati.` });
-      return;
-    }
+
+    // Kolom Warna/Nama Varian atau Ukuran yang kosong TIDAK membuat baris dilewati —
+    // otomatis diisi nilai default supaya data tetap masuk.
+    const variantColor = String(row["Warna/Nama Varian"] || "").trim() || DEFAULT_COLOR;
+    const variantSize = String(row["Ukuran"] || "").trim() || DEFAULT_SIZE;
 
     const category = String(row["Kategori"] || "").trim() || "Umum";
     const sku = String(row["SKU Induk"] || "").trim() || slug(name);
     const weight = Number(row["Berat (gram)"]) || 0;
     const photoUrl = String(row["URL Foto Produk"] || "").trim();
     const variantImage = String(row["URL Foto Varian"] || "").trim();
-    const variantSku = String(row["SKU Varian"] || "").trim() || `${sku}-${slug(variantColor || variantSize)}`;
-    const variantPrice = Number(row["Harga Varian"]) || 0;
+    const variantSku = String(row["SKU Varian"] || "").trim() || `${sku}-${slug(variantColor)}-${slug(variantSize)}`;
+    const variantHpp = Number(row["HPP Varian"]) || 0;
+    const variantPriceOffline = Number(row["Harga Offline Varian"]) || 0;
+    const variantPriceOnline = Number(row["Harga Online Varian"]) || 0;
     const variantStock = Number(row["Stok Varian"]) || 0;
 
     const key = `${name.toLowerCase()}|${sku.toLowerCase()}`;
     if (!groups.has(key)) {
-      groups.set(key, { name, category, description: "", price: variantPrice, weight, sku, status: "aktif", photoUrl, variants: [] });
+      groups.set(key, { name, category, description: "", hpp: variantHpp, priceOffline: variantPriceOffline, priceOnline: variantPriceOnline, weight, sku, status: "aktif", photoUrl, variants: [] });
     }
     const product = groups.get(key);
     if (!product.photoUrl && photoUrl) product.photoUrl = photoUrl;
-    product.variants.push({ image: variantImage, color: variantColor, size: variantSize, sku: variantSku, price: variantPrice, stock: variantStock });
+    product.variants.push({ image: variantImage, color: variantColor, size: variantSize, sku: variantSku, hpp: variantHpp, priceOffline: variantPriceOffline, priceOnline: variantPriceOnline, stock: variantStock });
   });
 
   const products = Array.from(groups.values()).map((p) => ({ ...p, totalStock: p.variants.reduce((s, v) => s + v.stock, 0) }));
@@ -1333,7 +1373,7 @@ function renderOrderItemRowsTable() {
 
     const productOptions = state.products.map((p) => `<option value="${p.id}" ${row.productId === p.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
     const variantOptions = selectedProduct
-      ? selectedProduct.variants.map((v, vi) => `<option value="${vi}" ${Number(row.variantIndex) === vi ? "selected" : ""}>${escapeHtml(variantLabel(v))} (stok ${v.stock})</option>`).join("")
+      ? (selectedProduct.variants || []).map((v, vi) => `<option value="${vi}" ${Number(row.variantIndex) === vi ? "selected" : ""}>${escapeHtml(variantLabel(v))} (stok ${v.stock ?? 0})</option>`).join("")
       : "";
 
     tr.innerHTML = `
@@ -1370,11 +1410,11 @@ function renderOrderItemRowsTable() {
 
     tr.querySelector('[data-field="variant"]').addEventListener("change", (e) => {
       const product = state.products.find((p) => p.id === row.productId);
-      const variant = product?.variants[Number(e.target.value)];
+      const variant = product?.variants?.[Number(e.target.value)];
       row.variantIndex = e.target.value;
       row.variantName = variant ? variantLabel(variant) : "";
       row.variantSku = variant ? variant.sku : "";
-      row.price = variant ? Number(variant.price ?? product.price) : 0;
+      row.price = variant ? Number(variant.priceOffline ?? variant.priceOnline ?? variant.price ?? product.priceOffline ?? product.price ?? 0) : 0;
       renderOrderItemRowsTable();
       updateCreateOrderTotals();
     });
@@ -1408,6 +1448,63 @@ function resetCreateOrderForm() {
 function openCreateOrderModal() {
   resetCreateOrderForm();
   els.createOrderModal.hidden = false;
+}
+
+// ------------------------------------------------------------
+// Kalkulator Pintar
+// ------------------------------------------------------------
+const CALC_MARKUP_SAFE_THRESHOLD = 60; // % — sesuai ketentuan: markup >= 60% dianggap aman
+
+/** Hitung semua angka turunan kalkulator dari HPP, harga offline/online, dan % potongan platform. */
+function computeCalc() {
+  const hpp = Number(els.calcHpp.value) || 0;
+  const cutPct = Number(els.calcCutPct.value) || 0;
+  const priceOffline = Number(els.calcPriceOffline.value) || 0;
+  const priceOnline = Number(els.calcPriceOnline.value) || 0;
+
+  const platformFee = priceOnline * (cutPct / 100);
+  const netOnlineRevenue = priceOnline - platformFee;
+  const netProfitOnline = netOnlineRevenue - hpp;
+  const netProfitOffline = priceOffline - hpp;
+
+  const markupOnlinePct = hpp > 0 ? ((priceOnline - hpp) / hpp) * 100 : 0;
+  const marginOnlinePctOfHpp = hpp > 0 ? (netProfitOnline / hpp) * 100 : 0;
+  const marginOfflinePctOfHpp = hpp > 0 ? (netProfitOffline / hpp) * 100 : 0;
+
+  return { hpp, cutPct, priceOffline, priceOnline, platformFee, netOnlineRevenue, netProfitOnline, netProfitOffline, markupOnlinePct, marginOnlinePctOfHpp, marginOfflinePctOfHpp };
+}
+
+function renderKalkulatorCompare() {
+  const c = computeCalc();
+
+  els.calcCompareTable.querySelector("tbody").innerHTML = `
+    <tr><td>Harga jual</td><td>${formatRupiah(c.priceOffline)}</td><td>${formatRupiah(c.priceOnline)}</td></tr>
+    <tr><td>Potongan platform (${c.cutPct}%)</td><td>—</td><td>- ${formatRupiah(c.platformFee)}</td></tr>
+    <tr><td>Dana diterima</td><td>${formatRupiah(c.priceOffline)}</td><td>${formatRupiah(c.netOnlineRevenue)}</td></tr>
+    <tr><td>HPP / Modal</td><td>- ${formatRupiah(c.hpp)}</td><td>- ${formatRupiah(c.hpp)}</td></tr>
+    <tr class="calc-result-row-highlight"><td>Laba bersih</td><td>${formatRupiah(c.netProfitOffline)}</td><td>${formatRupiah(c.netProfitOnline)}</td></tr>
+    <tr><td>Margin dari HPP</td><td>${c.marginOfflinePctOfHpp.toFixed(1)}%</td><td>${c.marginOnlinePctOfHpp.toFixed(1)}%</td></tr>
+  `;
+
+  const isSafe = c.markupOnlinePct >= CALC_MARKUP_SAFE_THRESHOLD;
+  els.calcMarginBadge.innerHTML = c.hpp > 0
+    ? `<span class="calc-margin-badge ${isSafe ? "is-safe" : "is-risky"}">
+        ${isSafe ? "✓ Margin Aman" : "⚠ Perhatian: Margin Rentan"}
+        <span class="badge-sub">Markup online ${c.markupOnlinePct.toFixed(1)}% dari HPP · laba bersih online ${c.marginOnlinePctOfHpp.toFixed(1)}% dari HPP</span>
+      </span>`
+    : "";
+}
+
+function applyCalcPreset(multiplier) {
+  const hpp = Number(els.calcHpp.value) || 0;
+  if (hpp <= 0) {
+    showToast("Isi HPP / Modal dulu sebelum pakai preset.");
+    return;
+  }
+  const suggestedPrice = Math.round(hpp * multiplier);
+  els.calcPriceOnline.value = suggestedPrice;
+  els.calcPriceOffline.value = suggestedPrice;
+  renderKalkulatorCompare();
 }
 
 // ------------------------------------------------------------
@@ -1618,7 +1715,10 @@ function openProductModal(product) {
     f["name"].value = product.name || "";
     f["category"].value = product.category || "";
     f["description"].value = product.description || "";
-    f["price"].value = product.price ?? "";
+    const basePricing = getProductBasePricing(product);
+    f["hpp"].value = basePricing.hpp || "";
+    f["priceOffline"].value = basePricing.priceOffline || "";
+    f["priceOnline"].value = basePricing.priceOnline || "";
     f["weight"].value = product.weight ?? "";
     f["sku"].value = product.sku || "";
     f["status"].value = product.status || "aktif";
@@ -1636,7 +1736,7 @@ function slug(str) {
 
 /** Tambah satu baris varian kosong (atau terisi, jika dipanggil dengan data awal). */
 function addVariantRow(initial) {
-  state.variantRows.push({ image: "", color: "", size: "", price: null, stock: 0, sku: "", ...initial });
+  state.variantRows.push({ image: "", color: "", size: "", hpp: null, priceOffline: null, priceOnline: null, stock: 0, sku: "", ...initial });
   renderVariantRowsTable();
 }
 
@@ -1665,7 +1765,9 @@ function renderVariantRowsTable() {
       </td>
       <td><input type="text" class="stock-input" style="width:120px;" placeholder="mis. Hitam" value="${escapeHtml(row.color)}" data-field="color" /></td>
       <td><input type="text" class="stock-input" style="width:100px;" placeholder="mis. M" value="${escapeHtml(row.size)}" data-field="size" /></td>
-      <td><input type="number" min="0" class="stock-input" style="width:95px;" placeholder="Ikut dasar" value="${row.price ?? ""}" data-field="price" /></td>
+      <td><input type="number" min="0" class="stock-input" style="width:85px;" placeholder="Dasar" value="${row.hpp ?? ""}" data-field="hpp" /></td>
+      <td><input type="number" min="0" class="stock-input" style="width:85px;" placeholder="Dasar" value="${row.priceOffline ?? ""}" data-field="priceOffline" /></td>
+      <td><input type="number" min="0" class="stock-input" style="width:85px;" placeholder="Dasar" value="${row.priceOnline ?? ""}" data-field="priceOnline" /></td>
       <td><input type="number" min="0" class="stock-input" style="width:70px;" value="${row.stock}" data-field="stock" /></td>
       <td><input type="text" class="stock-input" style="width:110px;" placeholder="SKU" value="${escapeHtml(row.sku)}" data-field="sku" /></td>
       <td><button type="button" class="btn btn--ghost" style="padding:5px 9px;font-size:12px;" aria-label="Hapus varian">&times;</button></td>
@@ -1690,7 +1792,7 @@ function renderVariantRowsTable() {
     tr.querySelectorAll("input").forEach((input) => {
       input.addEventListener("input", (e) => {
         const field = e.target.dataset.field;
-        if (field === "price") row.price = e.target.value === "" ? null : Number(e.target.value);
+        if (["hpp", "priceOffline", "priceOnline"].includes(field)) row[field] = e.target.value === "" ? null : Number(e.target.value);
         else if (field === "stock") row.stock = Number(e.target.value) || 0;
         else row[field] = e.target.value;
 
@@ -1709,14 +1811,14 @@ function renderVariantRowsTable() {
 function updatePreview() {
   const f = els.productForm.elements;
   const name = f["name"].value.trim();
-  const basePrice = Number(f["price"].value) || 0;
+  const baseOnlinePrice = Number(f["priceOnline"].value) || 0;
   const mainPhotoUrl = f["photoUrl"].value.trim();
 
   els.previewTitle.textContent = name || "Nama produk akan tampil di sini";
 
-  const prices = state.variantRows.map((r) => (r.price === null || r.price === undefined || r.price === "" ? basePrice : Number(r.price)));
+  const prices = state.variantRows.map((r) => (r.priceOnline === null || r.priceOnline === undefined || r.priceOnline === "" ? baseOnlinePrice : Number(r.priceOnline)));
   if (prices.length === 0) {
-    els.previewPrice.textContent = formatRupiah(basePrice);
+    els.previewPrice.textContent = formatRupiah(baseOnlinePrice);
   } else {
     const min = Math.min(...prices);
     const max = Math.max(...prices);
@@ -1768,6 +1870,7 @@ function navigateTo(view) {
   document.getElementById("view-" + view).hidden = false;
   document.querySelectorAll(".nav-item[data-view]").forEach((btn) => btn.classList.toggle("is-active", btn.dataset.view === view));
   if (view === "pengaturan") applySettingsToForm();
+  if (view === "kalkulator") renderKalkulatorCompare();
   renderAll();
 }
 
@@ -1889,15 +1992,25 @@ function bindEvents() {
   });
   els.importModalClose.addEventListener("click", () => { els.importModal.hidden = true; });
 
+  // ---- Kalkulator Pintar ----
+  [els.calcHpp, els.calcCutPct, els.calcPriceOffline, els.calcPriceOnline].forEach((input) => {
+    input.addEventListener("input", renderKalkulatorCompare);
+  });
+  document.querySelectorAll(".calc-preset-btn").forEach((btn) => {
+    btn.addEventListener("click", () => applyCalcPreset(Number(btn.dataset.multiplier)));
+  });
+
   els.btnAddVariantRow.addEventListener("click", () => addVariantRow());
-  ["name", "price", "photoUrl"].forEach((fieldName) => {
+  ["name", "priceOnline", "photoUrl"].forEach((fieldName) => {
     els.productForm.elements[fieldName].addEventListener("input", updatePreview);
   });
 
   els.productForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = new FormData(els.productForm);
-    const basePrice = Number(f.get("price")) || 0;
+    const baseHpp = Number(f.get("hpp")) || 0;
+    const basePriceOffline = Number(f.get("priceOffline")) || 0;
+    const basePriceOnline = Number(f.get("priceOnline")) || 0;
 
     // Baris tanpa Warna maupun Ukuran diabaikan, bukan dianggap error.
     const variants = state.variantRows
@@ -1907,7 +2020,9 @@ function bindEvents() {
         color: r.color.trim(),
         size: r.size.trim(),
         sku: r.sku.trim(),
-        price: r.price === null || r.price === "" ? basePrice : Number(r.price),
+        hpp: r.hpp === null || r.hpp === "" ? baseHpp : Number(r.hpp),
+        priceOffline: r.priceOffline === null || r.priceOffline === "" ? basePriceOffline : Number(r.priceOffline),
+        priceOnline: r.priceOnline === null || r.priceOnline === "" ? basePriceOnline : Number(r.priceOnline),
         stock: Number(r.stock) || 0,
       }));
 
@@ -1921,7 +2036,9 @@ function bindEvents() {
       name: f.get("name").trim(),
       category: f.get("category").trim(),
       description: f.get("description").trim(),
-      price: basePrice,
+      hpp: baseHpp,
+      priceOffline: basePriceOffline,
+      priceOnline: basePriceOnline,
       weight: Number(f.get("weight")) || 0,
       sku: f.get("sku").trim() || slug(f.get("name")),
       status: f.get("status"),
@@ -2056,6 +2173,13 @@ function cacheEls() {
   els.importStatusText = document.getElementById("import-status-text");
   els.importProgressBar = document.getElementById("import-progress-bar");
   els.importLog = document.getElementById("import-log");
+
+  els.calcHpp = document.getElementById("calc-hpp");
+  els.calcCutPct = document.getElementById("calc-cut-pct");
+  els.calcPriceOffline = document.getElementById("calc-price-offline");
+  els.calcPriceOnline = document.getElementById("calc-price-online");
+  els.calcMarginBadge = document.getElementById("calc-margin-badge");
+  els.calcCompareTable = document.getElementById("calc-compare-table");
 
   els.orderModal = document.getElementById("order-modal");
   els.orderModalBody = document.getElementById("order-modal-body");
