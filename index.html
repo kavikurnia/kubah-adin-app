@@ -306,79 +306,105 @@
 
 <!-- ============ ADD PRODUCT MODAL ============ -->
 <div class="overlay" id="product-modal" hidden>
-  <div class="modal modal--wide">
+  <div class="modal modal--shopee">
     <button class="modal-close" data-close-modal>&times;</button>
     <h2 id="product-modal-title">Tambah produk baru</h2>
 
-    <form id="product-form">
-      <div class="form-grid">
-        <label class="field">
-          <span>Nama produk *</span>
-          <input type="text" name="name" required />
-        </label>
-        <label class="field">
-          <span>Kategori *</span>
-          <input type="text" name="category" list="category-options" required />
-          <datalist id="category-options">
-            <option value="Atasan"></option>
-            <option value="Bawahan"></option>
-            <option value="Outer"></option>
-            <option value="Dress"></option>
-          </datalist>
-        </label>
-        <label class="field field--wide">
-          <span>Deskripsi *</span>
-          <textarea name="description" rows="2" required></textarea>
-        </label>
-        <label class="field">
-          <span>Harga dasar (Rp) *</span>
-          <input type="number" name="price" min="0" required />
-        </label>
-        <label class="field">
-          <span>Berat (gram) *</span>
-          <input type="number" name="weight" min="0" required />
-        </label>
-        <label class="field">
-          <span>SKU induk</span>
-          <input type="text" name="sku" placeholder="mis. KMJ-FLN" />
-        </label>
-        <label class="field">
-          <span>Status</span>
-          <select name="status">
-            <option value="aktif">Aktif</option>
-            <option value="draft">Draft</option>
-            <option value="nonaktif">Nonaktif</option>
-          </select>
-        </label>
-        <label class="field field--wide">
-          <span>URL foto produk</span>
-          <input type="url" name="photoUrl" placeholder="https://…/foto-produk.jpg" />
-          <small class="field-hint">Tempel link gambar (mis. dari Firebase Storage, Imgur, atau CDN lain). Kosongkan jika belum ada.</small>
-        </label>
+    <div class="shopee-layout">
+      <div class="shopee-form-col">
+        <form id="product-form">
+          <div class="form-grid">
+            <label class="field">
+              <span>Nama produk *</span>
+              <input type="text" name="name" required />
+            </label>
+            <label class="field">
+              <span>Kategori *</span>
+              <input type="text" name="category" list="category-options" required />
+              <datalist id="category-options">
+                <option value="Atasan"></option>
+                <option value="Bawahan"></option>
+                <option value="Outer"></option>
+                <option value="Dress"></option>
+              </datalist>
+            </label>
+            <label class="field field--wide">
+              <span>Deskripsi *</span>
+              <textarea name="description" rows="2" required></textarea>
+            </label>
+            <label class="field">
+              <span>Harga dasar (Rp) *</span>
+              <input type="number" name="price" min="0" required />
+            </label>
+            <label class="field">
+              <span>Berat (gram) *</span>
+              <input type="number" name="weight" min="0" required />
+            </label>
+            <label class="field">
+              <span>SKU induk</span>
+              <input type="text" name="sku" placeholder="mis. KMJ-FLN" />
+            </label>
+            <label class="field">
+              <span>Status</span>
+              <select name="status">
+                <option value="aktif">Aktif</option>
+                <option value="draft">Draft</option>
+                <option value="nonaktif">Nonaktif</option>
+              </select>
+            </label>
+            <label class="field field--wide">
+              <span>URL foto utama produk</span>
+              <input type="url" name="photoUrl" placeholder="https://…/foto-produk.jpg" />
+              <small class="field-hint">Dipakai sebagai foto utama jika belum ada varian dengan foto sendiri.</small>
+            </label>
+          </div>
+
+          <hr class="divider" />
+
+          <div class="variant-builder">
+            <div class="panel-head-row">
+              <span style="font-size:13px;font-weight:600;">Variasi produk *</span>
+              <button type="button" class="btn btn--secondary" id="btn-add-variant-row">+ Tambah varian</button>
+            </div>
+
+            <div class="table-scroll">
+              <table class="table table--compact" id="variant-rows-table">
+                <thead>
+                  <tr><th>Foto</th><th>Warna / Nama Varian</th><th>Ukuran</th><th>Harga</th><th>Stok</th><th>SKU</th><th></th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p class="field-hint" id="variant-empty-hint">Belum ada varian. Klik &quot;+ Tambah varian&quot; — isi minimal Warna atau Ukuran.</p>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn--ghost" data-close-modal>Batal</button>
+            <button type="submit" class="btn btn--primary" id="product-submit-btn">Simpan produk</button>
+          </div>
+        </form>
       </div>
 
-      <hr class="divider" />
-
-      <div class="variant-builder">
-        <div class="panel-head-row">
-          <span style="font-size:13px;font-weight:600;">Varian produk *</span>
-          <button type="button" class="btn btn--secondary" id="btn-add-variant-row">Tambah varian</button>
+      <aside class="shopee-preview-col">
+        <div class="shopee-preview-card">
+          <div class="shopee-preview-photo" id="preview-main-photo">
+            <span class="shopee-preview-fallback" id="preview-main-fallback">Belum ada foto</span>
+            <img id="preview-main-img" alt="" hidden />
+          </div>
+          <div class="shopee-preview-thumbs" id="preview-thumbs"></div>
+          <div class="shopee-preview-body">
+            <p class="shopee-preview-title" id="preview-title">Nama produk akan tampil di sini</p>
+            <p class="shopee-preview-price" id="preview-price">Rp 0</p>
+            <div class="shopee-preview-actions">
+              <button type="button" class="shopee-btn shopee-btn--chat" disabled>💬 Chat</button>
+              <button type="button" class="shopee-btn shopee-btn--cart" disabled>🛒 Keranjang</button>
+              <button type="button" class="shopee-btn shopee-btn--buy" disabled>Beli Sekarang</button>
+            </div>
+          </div>
         </div>
-
-        <table class="table table--compact" id="variant-rows-table">
-          <thead>
-            <tr><th>Nama varian</th><th>SKU varian</th><th>Harga (Rp)</th><th>Stok</th><th></th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-        <p class="field-hint" id="variant-empty-hint">Belum ada varian. Klik &quot;Tambah varian&quot; — mis. nama "M - Hitam".</p>
-      </div>
-
-      <div class="form-actions">
-        <button type="button" class="btn btn--ghost" data-close-modal>Batal</button>
-        <button type="submit" class="btn btn--primary" id="product-submit-btn">Simpan produk</button>
-      </div>
-    </form>
+        <p class="field-hint" style="margin-top:10px;">Pratinjau ini hanya simulasi tampilan, tidak fungsional.</p>
+      </aside>
+    </div>
   </div>
 </div>
 

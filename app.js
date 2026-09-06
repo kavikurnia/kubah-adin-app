@@ -45,6 +45,7 @@ const state = {
   dashPeriod: "today", // "today" | "7d" | "30d" | "custom"
   dashCustomDate: "", // "YYYY-MM-DD", dipakai saat dashPeriod === "custom"
   variantRows: [],
+  previewSelectedIndex: null,
   orderItemRows: [],
   openOrderId: null,
   editingProductId: null,
@@ -503,12 +504,12 @@ function buildSeedData() {
   ];
 
   const products = [
-    { name: "Kemeja Flanel", category: "Atasan", description: "Kemeja flanel lengan panjang, bahan katun tebal.", price: 235000, weight: 300, sku: "KMJ-FLN", status: "aktif", photoUrl: "https://picsum.photos/seed/kmjfln/120", variants: [{ name: "M - Hitam", sku: "KMJ-FLN-M-HTM", price: 235000, stock: 8 }, { name: "L - Hitam", sku: "KMJ-FLN-L-HTM", price: 235000, stock: 3 }, { name: "L - Merah", sku: "KMJ-FLN-L-MRH", price: 245000, stock: 2 }], totalStock: 13, createdAt: daysAgo(20) },
-    { name: "Blouse Katun", category: "Atasan", description: "Blouse katun ringan untuk sehari-hari.", price: 90000, weight: 150, sku: "BLS-KTN", status: "aktif", photoUrl: "https://picsum.photos/seed/blsktn/120", variants: [{ name: "S - Putih", sku: "BLS-KTN-S-PTH", price: 90000, stock: 12 }, { name: "M - Dusty Pink", sku: "BLS-KTN-M-DPK", price: 95000, stock: 4 }], totalStock: 16, createdAt: daysAgo(18) },
-    { name: "Celana Chino", category: "Bawahan", description: "Celana chino slim fit, bahan twill.", price: 175000, weight: 350, sku: "CLN-CHN", status: "aktif", photoUrl: "", variants: [{ name: "30 - Hitam", sku: "CLN-CHN-30-HTM", price: 175000, stock: 1 }, { name: "32 - Krem", sku: "CLN-CHN-32-KRM", price: 175000, stock: 6 }], totalStock: 7, createdAt: daysAgo(15) },
-    { name: "Dress Linen", category: "Dress", description: "Dress linen midi, cocok untuk acara santai.", price: 310000, weight: 280, sku: "DRS-LNN", status: "aktif", photoUrl: "https://picsum.photos/seed/drslnn/120", variants: [{ name: "M - Sage", sku: "DRS-LNN-M-SAG", price: 310000, stock: 2 }], totalStock: 2, createdAt: daysAgo(10) },
-    { name: "Jaket Denim", category: "Outer", description: "Jaket denim washed, unisex.", price: 420000, weight: 500, sku: "JKT-DNM", status: "aktif", photoUrl: "", variants: [{ name: "L - Biru", sku: "JKT-DNM-L-BIR", price: 420000, stock: 5 }], totalStock: 5, createdAt: daysAgo(9) },
-    { name: "Kaos Polos", category: "Atasan", description: "Kaos polos cotton combed 24s.", price: 85000, weight: 140, sku: "KOS-PLS", status: "draft", photoUrl: "", variants: [{ name: "L - Putih", sku: "KOS-PLS-L-PTH", price: 85000, stock: 20 }], totalStock: 20, createdAt: daysAgo(5) },
+    { name: "Kemeja Flanel", category: "Atasan", description: "Kemeja flanel lengan panjang, bahan katun tebal.", price: 235000, weight: 300, sku: "KMJ-FLN", status: "aktif", photoUrl: "https://picsum.photos/seed/kmjfln/120", variants: [{ image: "", color: "Hitam", size: "M", sku: "KMJ-FLN-M-HTM", price: 235000, stock: 8 }, { image: "", color: "Hitam", size: "L", sku: "KMJ-FLN-L-HTM", price: 235000, stock: 3 }, { image: "", color: "Merah", size: "L", sku: "KMJ-FLN-L-MRH", price: 245000, stock: 2 }], totalStock: 13, createdAt: daysAgo(20) },
+    { name: "Blouse Katun", category: "Atasan", description: "Blouse katun ringan untuk sehari-hari.", price: 90000, weight: 150, sku: "BLS-KTN", status: "aktif", photoUrl: "https://picsum.photos/seed/blsktn/120", variants: [{ image: "", color: "Putih", size: "S", sku: "BLS-KTN-S-PTH", price: 90000, stock: 12 }, { image: "", color: "Dusty Pink", size: "M", sku: "BLS-KTN-M-DPK", price: 95000, stock: 4 }], totalStock: 16, createdAt: daysAgo(18) },
+    { name: "Celana Chino", category: "Bawahan", description: "Celana chino slim fit, bahan twill.", price: 175000, weight: 350, sku: "CLN-CHN", status: "aktif", photoUrl: "", variants: [{ image: "", color: "Hitam", size: "30", sku: "CLN-CHN-30-HTM", price: 175000, stock: 1 }, { image: "", color: "Krem", size: "32", sku: "CLN-CHN-32-KRM", price: 175000, stock: 6 }], totalStock: 7, createdAt: daysAgo(15) },
+    { name: "Dress Linen", category: "Dress", description: "Dress linen midi, cocok untuk acara santai.", price: 310000, weight: 280, sku: "DRS-LNN", status: "aktif", photoUrl: "https://picsum.photos/seed/drslnn/120", variants: [{ image: "", color: "Sage", size: "M", sku: "DRS-LNN-M-SAG", price: 310000, stock: 2 }], totalStock: 2, createdAt: daysAgo(10) },
+    { name: "Jaket Denim", category: "Outer", description: "Jaket denim washed, unisex.", price: 420000, weight: 500, sku: "JKT-DNM", status: "aktif", photoUrl: "", variants: [{ image: "", color: "Biru", size: "L", sku: "JKT-DNM-L-BIR", price: 420000, stock: 5 }], totalStock: 5, createdAt: daysAgo(9) },
+    { name: "Kaos Polos", category: "Atasan", description: "Kaos polos cotton combed 24s.", price: 85000, weight: 140, sku: "KOS-PLS", status: "draft", photoUrl: "", variants: [{ image: "", color: "Putih", size: "L", sku: "KOS-PLS-L-PTH", price: 85000, stock: 20 }], totalStock: 20, createdAt: daysAgo(5) },
   ];
 
   return { orders, products };
@@ -530,6 +531,25 @@ const isToday = (input) => toJsDate(input).toDateString() === new Date().toDateS
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c]));
 }
+
+/** Label tampilan varian: "Warna - Ukuran". Kompatibel mundur dengan data lama berformat {name}. */
+function variantLabel(v) {
+  const combo = [v.color, v.size].filter(Boolean).join(" - ");
+  return combo || v.name || v.sku || "Varian";
+}
+
+/** Normalisasi satu varian (dari Firestore, format lama ATAU baru) ke bentuk baris form yang baru. */
+function normalizeVariantForEdit(v) {
+  return {
+    image: v.image || "",
+    color: v.color !== undefined ? v.color : (v.name || ""),
+    size: v.size || "",
+    price: v.price ?? null,
+    stock: v.stock ?? 0,
+    sku: v.sku || "",
+  };
+}
+
 function showToast(msg) {
   els.toast.textContent = msg;
   els.toast.hidden = false;
@@ -906,7 +926,9 @@ function renderProductsView() {
         ${p.photoUrl ? `<img src="${escapeHtml(p.photoUrl)}" alt="${escapeHtml(p.name)}" class="table-thumb-img" onerror="this.style.display='none'" />` : ""}
       </div>`;
     const variantDetailHtml = (p.variants || [])
-      .map((v) => `<div class="variant-mini-row"><strong>${escapeHtml(v.name)}</strong> <span class="text-muted">(${escapeHtml(v.sku || "-")})</span><br/><span class="text-muted">${formatRupiah(v.price ?? p.price)} · stok ${v.stock}</span></div>`)
+      .map(
+        (v) => `<div class="variant-mini-row">${v.image ? `<img src="${escapeHtml(v.image)}" class="variant-mini-thumb" onerror="this.style.display='none'" />` : ""}<strong>${escapeHtml(variantLabel(v))}</strong> <span class="text-muted">(${escapeHtml(v.sku || "-")})</span><br/><span class="text-muted">${formatRupiah(v.price ?? p.price)} · stok ${v.stock}</span></div>`
+      )
       .join("");
 
     tr.innerHTML = `
@@ -1114,7 +1136,7 @@ function applySettingsToForm() {
 // ------------------------------------------------------------
 // Import produk massal via Excel/CSV
 // ------------------------------------------------------------
-const IMPORT_TEMPLATE_HEADERS = ["Nama Produk", "Kategori", "SKU Induk", "Berat (gram)", "URL Foto", "Nama Varian", "SKU Varian", "Harga Varian", "Stok Varian"];
+const IMPORT_TEMPLATE_HEADERS = ["Nama Produk", "Kategori", "SKU Induk", "Berat (gram)", "URL Foto Produk", "Warna/Nama Varian", "Ukuran", "URL Foto Varian", "SKU Varian", "Harga Varian", "Stok Varian"];
 
 function downloadProductTemplate() {
   if (typeof XLSX === "undefined") {
@@ -1122,9 +1144,9 @@ function downloadProductTemplate() {
     return;
   }
   const sampleRows = [
-    ["Kemeja Flanel", "Atasan", "KMJ-FLN", 300, "https://picsum.photos/seed/kmjfln/120", "M - Hitam", "KMJ-FLN-M-HTM", 235000, 8],
-    ["Kemeja Flanel", "Atasan", "KMJ-FLN", 300, "https://picsum.photos/seed/kmjfln/120", "L - Hitam", "KMJ-FLN-L-HTM", 235000, 3],
-    ["Blouse Katun", "Atasan", "BLS-KTN", 150, "", "S - Putih", "BLS-KTN-S-PTH", 90000, 12],
+    ["Kemeja Flanel", "Atasan", "KMJ-FLN", 300, "https://picsum.photos/seed/kmjfln/120", "Hitam", "M", "", "KMJ-FLN-M-HTM", 235000, 8],
+    ["Kemeja Flanel", "Atasan", "KMJ-FLN", 300, "https://picsum.photos/seed/kmjfln/120", "Hitam", "L", "", "KMJ-FLN-L-HTM", 235000, 3],
+    ["Blouse Katun", "Atasan", "BLS-KTN", 150, "", "Putih", "S", "", "BLS-KTN-S-PTH", 90000, 12],
   ];
   const ws = XLSX.utils.aoa_to_sheet([IMPORT_TEMPLATE_HEADERS, ...sampleRows]);
   ws["!cols"] = IMPORT_TEMPLATE_HEADERS.map(() => ({ wch: 18 }));
@@ -1141,22 +1163,24 @@ function groupImportRows(rows) {
   rows.forEach((row, idx) => {
     const rowNum = idx + 2; // baris 1 di file = header
     const name = String(row["Nama Produk"] || "").trim();
-    const variantName = String(row["Nama Varian"] || "").trim();
+    const variantColor = String(row["Warna/Nama Varian"] || "").trim();
+    const variantSize = String(row["Ukuran"] || "").trim();
 
     if (!name) {
       errors.push({ row: rowNum, reason: "Kolom Nama Produk kosong — baris dilewati." });
       return;
     }
-    if (!variantName) {
-      errors.push({ row: rowNum, reason: `"${name}": kolom Nama Varian kosong — baris dilewati.` });
+    if (!variantColor && !variantSize) {
+      errors.push({ row: rowNum, reason: `"${name}": kolom Warna/Nama Varian dan Ukuran kosong dua-duanya — baris dilewati.` });
       return;
     }
 
     const category = String(row["Kategori"] || "").trim() || "Umum";
     const sku = String(row["SKU Induk"] || "").trim() || slug(name);
     const weight = Number(row["Berat (gram)"]) || 0;
-    const photoUrl = String(row["URL Foto"] || "").trim();
-    const variantSku = String(row["SKU Varian"] || "").trim() || `${sku}-${slug(variantName)}`;
+    const photoUrl = String(row["URL Foto Produk"] || "").trim();
+    const variantImage = String(row["URL Foto Varian"] || "").trim();
+    const variantSku = String(row["SKU Varian"] || "").trim() || `${sku}-${slug(variantColor || variantSize)}`;
     const variantPrice = Number(row["Harga Varian"]) || 0;
     const variantStock = Number(row["Stok Varian"]) || 0;
 
@@ -1166,7 +1190,7 @@ function groupImportRows(rows) {
     }
     const product = groups.get(key);
     if (!product.photoUrl && photoUrl) product.photoUrl = photoUrl;
-    product.variants.push({ name: variantName, sku: variantSku, price: variantPrice, stock: variantStock });
+    product.variants.push({ image: variantImage, color: variantColor, size: variantSize, sku: variantSku, price: variantPrice, stock: variantStock });
   });
 
   const products = Array.from(groups.values()).map((p) => ({ ...p, totalStock: p.variants.reduce((s, v) => s + v.stock, 0) }));
@@ -1309,7 +1333,7 @@ function renderOrderItemRowsTable() {
 
     const productOptions = state.products.map((p) => `<option value="${p.id}" ${row.productId === p.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
     const variantOptions = selectedProduct
-      ? selectedProduct.variants.map((v, vi) => `<option value="${vi}" ${Number(row.variantIndex) === vi ? "selected" : ""}>${escapeHtml(v.name)} (stok ${v.stock})</option>`).join("")
+      ? selectedProduct.variants.map((v, vi) => `<option value="${vi}" ${Number(row.variantIndex) === vi ? "selected" : ""}>${escapeHtml(variantLabel(v))} (stok ${v.stock})</option>`).join("")
       : "";
 
     tr.innerHTML = `
@@ -1348,7 +1372,7 @@ function renderOrderItemRowsTable() {
       const product = state.products.find((p) => p.id === row.productId);
       const variant = product?.variants[Number(e.target.value)];
       row.variantIndex = e.target.value;
-      row.variantName = variant ? variant.name : "";
+      row.variantName = variant ? variantLabel(variant) : "";
       row.variantSku = variant ? variant.sku : "";
       row.price = variant ? Number(variant.price ?? product.price) : 0;
       renderOrderItemRowsTable();
@@ -1576,6 +1600,7 @@ function resetProductForm() {
   els.productForm.reset();
   state.variantRows = [];
   state.editingProductId = null;
+  state.previewSelectedIndex = null;
   els.productModalTitle.textContent = "Tambah produk baru";
   els.productSubmitBtn.textContent = "Simpan produk";
   renderVariantRowsTable();
@@ -1599,7 +1624,7 @@ function openProductModal(product) {
     f["status"].value = product.status || "aktif";
     f["photoUrl"].value = product.photoUrl || "";
 
-    state.variantRows = (product.variants || []).map((v) => ({ ...v }));
+    state.variantRows = (product.variants || []).map(normalizeVariantForEdit);
     renderVariantRowsTable();
   }
   els.productModal.hidden = false;
@@ -1611,12 +1636,13 @@ function slug(str) {
 
 /** Tambah satu baris varian kosong (atau terisi, jika dipanggil dengan data awal). */
 function addVariantRow(initial) {
-  state.variantRows.push({ name: "", sku: "", price: null, stock: 0, ...initial });
+  state.variantRows.push({ image: "", color: "", size: "", price: null, stock: 0, sku: "", ...initial });
   renderVariantRowsTable();
 }
 
 function removeVariantRow(idx) {
   state.variantRows.splice(idx, 1);
+  if (state.previewSelectedIndex === idx) state.previewSelectedIndex = null;
   renderVariantRowsTable();
 }
 
@@ -1628,23 +1654,109 @@ function renderVariantRowsTable() {
   state.variantRows.forEach((row, i) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><input type="text" class="stock-input" style="width:150px;" placeholder="mis. M - Hitam" value="${escapeHtml(row.name)}" data-field="name" /></td>
-      <td><input type="text" class="stock-input" style="width:130px;" placeholder="mis. KMJ-FLN-M-HTM" value="${escapeHtml(row.sku)}" data-field="sku" /></td>
-      <td><input type="number" min="0" class="stock-input" style="width:100px;" placeholder="Ikut harga dasar" value="${row.price ?? ""}" data-field="price" /></td>
-      <td><input type="number" min="0" class="stock-input" style="width:80px;" value="${row.stock}" data-field="stock" /></td>
+      <td>
+        <div class="variant-photo-cell">
+          <div class="variant-photo-box">
+            <span class="variant-photo-fallback">+</span>
+            <img alt="" hidden />
+          </div>
+          <input type="url" class="stock-input variant-photo-input" placeholder="URL foto" value="${escapeHtml(row.image)}" data-field="image" />
+        </div>
+      </td>
+      <td><input type="text" class="stock-input" style="width:120px;" placeholder="mis. Hitam" value="${escapeHtml(row.color)}" data-field="color" /></td>
+      <td><input type="text" class="stock-input" style="width:100px;" placeholder="mis. M" value="${escapeHtml(row.size)}" data-field="size" /></td>
+      <td><input type="number" min="0" class="stock-input" style="width:95px;" placeholder="Ikut dasar" value="${row.price ?? ""}" data-field="price" /></td>
+      <td><input type="number" min="0" class="stock-input" style="width:70px;" value="${row.stock}" data-field="stock" /></td>
+      <td><input type="text" class="stock-input" style="width:110px;" placeholder="SKU" value="${escapeHtml(row.sku)}" data-field="sku" /></td>
       <td><button type="button" class="btn btn--ghost" style="padding:5px 9px;font-size:12px;" aria-label="Hapus varian">&times;</button></td>
     `;
+
+    const imgBox = tr.querySelector(".variant-photo-box");
+    const imgEl = imgBox.querySelector("img");
+    const fallbackEl = imgBox.querySelector(".variant-photo-fallback");
+    const syncImgBox = () => {
+      if (row.image) {
+        imgEl.src = row.image;
+        imgEl.hidden = false;
+        imgEl.onerror = () => { imgEl.hidden = true; fallbackEl.hidden = false; };
+        fallbackEl.hidden = true;
+      } else {
+        imgEl.hidden = true;
+        fallbackEl.hidden = false;
+      }
+    };
+    syncImgBox();
+
     tr.querySelectorAll("input").forEach((input) => {
       input.addEventListener("input", (e) => {
         const field = e.target.dataset.field;
         if (field === "price") row.price = e.target.value === "" ? null : Number(e.target.value);
         else if (field === "stock") row.stock = Number(e.target.value) || 0;
         else row[field] = e.target.value;
+
+        if (field === "image") syncImgBox();
+        updatePreview();
       });
     });
     tr.querySelector("button").addEventListener("click", () => removeVariantRow(i));
     tbody.appendChild(tr);
   });
+
+  updatePreview();
+}
+
+/** Perbarui panel pratinjau kartu produk (judul, rentang harga, thumbnail, foto utama) — dipanggil setiap ada perubahan input. */
+function updatePreview() {
+  const f = els.productForm.elements;
+  const name = f["name"].value.trim();
+  const basePrice = Number(f["price"].value) || 0;
+  const mainPhotoUrl = f["photoUrl"].value.trim();
+
+  els.previewTitle.textContent = name || "Nama produk akan tampil di sini";
+
+  const prices = state.variantRows.map((r) => (r.price === null || r.price === undefined || r.price === "" ? basePrice : Number(r.price)));
+  if (prices.length === 0) {
+    els.previewPrice.textContent = formatRupiah(basePrice);
+  } else {
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    els.previewPrice.textContent = min === max ? formatRupiah(min) : `${formatRupiah(min)} - ${formatRupiah(max)}`;
+  }
+
+  const filledVariants = state.variantRows.map((r, i) => ({ ...r, _idx: i })).filter((r) => r.color || r.size || r.image);
+  els.previewThumbs.innerHTML = "";
+  filledVariants.forEach((v) => {
+    const thumb = document.createElement("div");
+    thumb.className = "shopee-thumb" + (state.previewSelectedIndex === v._idx ? " is-active" : "");
+    thumb.innerHTML = v.image
+      ? `<img src="${escapeHtml(v.image)}" alt="" onerror="this.style.display='none'" />`
+      : `<span class="shopee-thumb-fallback">${escapeHtml(variantLabel(v)).slice(0, 12)}</span>`;
+    thumb.addEventListener("click", () => {
+      state.previewSelectedIndex = v._idx;
+      updatePreview();
+    });
+    els.previewThumbs.appendChild(thumb);
+  });
+
+  let mainImage = "";
+  if (state.previewSelectedIndex !== null && state.variantRows[state.previewSelectedIndex]?.image) {
+    mainImage = state.variantRows[state.previewSelectedIndex].image;
+  } else if (mainPhotoUrl) {
+    mainImage = mainPhotoUrl;
+  } else {
+    const firstWithImage = state.variantRows.find((r) => r.image);
+    if (firstWithImage) mainImage = firstWithImage.image;
+  }
+
+  if (mainImage) {
+    els.previewMainImg.src = mainImage;
+    els.previewMainImg.hidden = false;
+    els.previewMainImg.onerror = () => { els.previewMainImg.hidden = true; els.previewMainFallback.hidden = false; };
+    els.previewMainFallback.hidden = true;
+  } else {
+    els.previewMainImg.hidden = true;
+    els.previewMainFallback.hidden = false;
+  }
 }
 
 // ============================================================
@@ -1778,24 +1890,29 @@ function bindEvents() {
   els.importModalClose.addEventListener("click", () => { els.importModal.hidden = true; });
 
   els.btnAddVariantRow.addEventListener("click", () => addVariantRow());
+  ["name", "price", "photoUrl"].forEach((fieldName) => {
+    els.productForm.elements[fieldName].addEventListener("input", updatePreview);
+  });
 
   els.productForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = new FormData(els.productForm);
     const basePrice = Number(f.get("price")) || 0;
 
-    // Baris kosong (belum diisi nama) diabaikan, bukan dianggap error.
+    // Baris tanpa Warna maupun Ukuran diabaikan, bukan dianggap error.
     const variants = state.variantRows
-      .filter((r) => r.name.trim() !== "")
+      .filter((r) => r.color.trim() !== "" || r.size.trim() !== "")
       .map((r) => ({
-        name: r.name.trim(),
+        image: r.image.trim(),
+        color: r.color.trim(),
+        size: r.size.trim(),
         sku: r.sku.trim(),
         price: r.price === null || r.price === "" ? basePrice : Number(r.price),
         stock: Number(r.stock) || 0,
       }));
 
     if (variants.length === 0) {
-      showToast("Tambahkan minimal 1 varian sebelum menyimpan.");
+      showToast("Tambahkan minimal 1 varian (isi Warna atau Ukuran) sebelum menyimpan.");
       return;
     }
 
@@ -1950,6 +2067,12 @@ function cacheEls() {
   els.variantRowsTable = document.getElementById("variant-rows-table");
   els.btnAddVariantRow = document.getElementById("btn-add-variant-row");
   els.variantEmptyHint = document.getElementById("variant-empty-hint");
+  els.previewMainPhoto = document.getElementById("preview-main-photo");
+  els.previewMainImg = document.getElementById("preview-main-img");
+  els.previewMainFallback = document.getElementById("preview-main-fallback");
+  els.previewThumbs = document.getElementById("preview-thumbs");
+  els.previewTitle = document.getElementById("preview-title");
+  els.previewPrice = document.getElementById("preview-price");
 
   els.customerSearch = document.getElementById("customer-search");
   els.btnAddCustomer = document.getElementById("btn-add-customer");
