@@ -36,13 +36,13 @@
         <span class="nav-dot"></span> Produk
       </button>
 
-      <button class="nav-item is-disabled" data-view="pelanggan" disabled>
+      <button class="nav-item" data-view="pelanggan">
         <span class="nav-dot"></span> Pelanggan
       </button>
-      <button class="nav-item is-disabled" data-view="keuangan" disabled>
+      <button class="nav-item" data-view="keuangan">
         <span class="nav-dot"></span> Keuangan
       </button>
-      <button class="nav-item is-disabled" data-view="pengaturan" disabled>
+      <button class="nav-item" data-view="pengaturan">
         <span class="nav-dot"></span> Pengaturan
       </button>
     </nav>
@@ -154,6 +154,101 @@
       </div>
     </section>
 
+    <!-- ---------- PELANGGAN ---------- -->
+    <section class="view" id="view-pelanggan" hidden>
+      <header class="view-head">
+        <h1>Pelanggan</h1>
+        <p class="view-sub">Tersinkron otomatis dari pesanan yang masuk</p>
+      </header>
+
+      <div class="toolbar">
+        <input type="search" id="customer-search" placeholder="Cari nama atau no. HP" />
+        <button class="btn btn--primary" id="btn-add-customer">Tambah pelanggan</button>
+      </div>
+
+      <table class="table" id="table-customers">
+        <thead>
+          <tr><th>Nama</th><th>No. WhatsApp/HP</th><th>Alamat pengiriman</th><th>Total pesanan</th><th>Total belanja</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- ---------- KEUANGAN ---------- -->
+    <section class="view" id="view-keuangan" hidden>
+      <header class="view-head">
+        <h1>Keuangan</h1>
+        <p class="view-sub">Pesanan berstatus selesai otomatis tercatat sebagai pemasukan</p>
+      </header>
+
+      <div class="stat-row stat-row--3col">
+        <div class="stat">
+          <span class="stat-value" id="fin-income">Rp 0</span>
+          <span class="stat-label">Total pemasukan</span>
+        </div>
+        <div class="stat stat--red">
+          <span class="stat-value" id="fin-expense">Rp 0</span>
+          <span class="stat-label">Total pengeluaran</span>
+        </div>
+        <div class="stat stat--amber">
+          <span class="stat-value" id="fin-balance">Rp 0</span>
+          <span class="stat-label">Saldo bersih</span>
+        </div>
+      </div>
+
+      <div class="tabs" id="finance-tabs"></div>
+
+      <div class="toolbar toolbar--between">
+        <span class="toolbar-count" id="finance-count"></span>
+        <button class="btn btn--primary" id="btn-add-transaction">Catat kas/pengeluaran</button>
+      </div>
+
+      <table class="table" id="table-transactions">
+        <thead>
+          <tr><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th>Jenis</th><th>Nominal</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- ---------- PENGATURAN ---------- -->
+    <section class="view" id="view-pengaturan" hidden>
+      <header class="view-head">
+        <h1>Pengaturan</h1>
+        <p class="view-sub">Profil toko ini dipakai otomatis sebagai kop nota/invoice</p>
+      </header>
+
+      <div class="panel" style="max-width:560px;">
+        <form id="settings-form">
+          <div class="form-grid">
+            <label class="field field--wide">
+              <span>Nama toko *</span>
+              <input type="text" name="storeName" required />
+            </label>
+            <label class="field field--wide">
+              <span>Slogan</span>
+              <input type="text" name="tagline" placeholder="mis. Pakaian berkualitas untuk sehari-hari" />
+            </label>
+            <label class="field field--wide">
+              <span>Alamat lengkap / kota asal *</span>
+              <textarea name="address" rows="2" required></textarea>
+            </label>
+            <label class="field">
+              <span>No. WhatsApp admin *</span>
+              <input type="text" name="phone" required />
+            </label>
+            <label class="field">
+              <span>URL logo toko</span>
+              <input type="url" name="logoUrl" placeholder="https://…/logo.png" />
+            </label>
+          </div>
+          <div class="form-actions" style="justify-content:flex-start;">
+            <button type="submit" class="btn btn--primary">Simpan pengaturan</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -243,9 +338,91 @@
   </div>
 </div>
 
+<!-- ============ CUSTOMER MODAL ============ -->
+<div class="overlay" id="customer-modal" hidden>
+  <div class="modal">
+    <button class="modal-close" data-close-modal>&times;</button>
+    <h2 id="customer-modal-title">Tambah pelanggan</h2>
+    <div id="customer-modal-stats"></div>
+
+    <form id="customer-form">
+      <div class="form-grid">
+        <label class="field field--wide">
+          <span>Nama *</span>
+          <input type="text" name="name" required />
+        </label>
+        <label class="field">
+          <span>No. WhatsApp/HP *</span>
+          <input type="text" name="phone" required />
+        </label>
+        <label class="field field--wide">
+          <span>Alamat pengiriman</span>
+          <textarea name="address" rows="2"></textarea>
+        </label>
+      </div>
+
+      <div id="customer-order-history"></div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn--ghost" data-close-modal>Batal</button>
+        <button type="submit" class="btn btn--primary" id="customer-submit-btn">Simpan pelanggan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ TRANSACTION MODAL ============ -->
+<div class="overlay" id="transaction-modal" hidden>
+  <div class="modal">
+    <button class="modal-close" data-close-modal>&times;</button>
+    <h2>Catat kas/pengeluaran</h2>
+
+    <form id="transaction-form">
+      <div class="form-grid">
+        <label class="field">
+          <span>Tanggal *</span>
+          <input type="date" name="date" required />
+        </label>
+        <label class="field">
+          <span>Jenis *</span>
+          <select name="type" required>
+            <option value="keluar">Keluar</option>
+            <option value="masuk">Masuk</option>
+          </select>
+        </label>
+        <label class="field field--wide">
+          <span>Keterangan *</span>
+          <input type="text" name="description" required />
+        </label>
+        <label class="field">
+          <span>Kategori *</span>
+          <input type="text" name="category" list="tx-category-options" required />
+          <datalist id="tx-category-options">
+            <option value="Penjualan"></option>
+            <option value="Modal"></option>
+            <option value="Operasional"></option>
+            <option value="Gaji"></option>
+            <option value="Lainnya"></option>
+          </datalist>
+        </label>
+        <label class="field">
+          <span>Nominal (Rp) *</span>
+          <input type="number" name="amount" min="0" required />
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn--ghost" data-close-modal>Batal</button>
+        <button type="submit" class="btn btn--primary">Simpan transaksi</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast" hidden></div>
 
 <script src="firebase-config.js"></script>
-<script type="module" src="app.js?v=2"></script></body>
+<script type="module" src="app.js"></script>
+</body>
 </html>

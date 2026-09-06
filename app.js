@@ -21,23 +21,31 @@ const STATUS_META = {
 };
 const STATUS_ORDER = ["menunggu_pembayaran", "perlu_verifikasi", "diproses", "dikirim", "selesai", "dibatalkan"];
 
-// Info toko untuk kop nota — ganti sesuai data tokomu.
-const STORE_INFO = {
-  name: "Atelier Admin",
+// Profil toko default — dipakai sebelum menu Pengaturan pernah diisi.
+const DEFAULT_SETTINGS = {
+  storeName: "Atelier Admin",
+  tagline: "",
   address: "Jl. Contoh Toko No. 1, Sidoarjo, Jawa Timur",
   phone: "0812-0000-0000",
+  logoUrl: "",
 };
 
 const state = {
   view: "dashboard",
   orders: [],
   products: [],
+  customers: [],
+  transactions: [],
+  settings: { ...DEFAULT_SETTINGS },
   orderTab: "semua",
   orderSearch: "",
   productSearch: "",
+  customerSearch: "",
+  financeTab: "semua",
   variantRows: [],
   openOrderId: null,
   editingProductId: null,
+  editingCustomerId: null,
   mode: "demo", // "demo" | "firebase"
 };
 
@@ -49,6 +57,9 @@ const els = {};
 
 const LOCAL_KEY_ORDERS = "atelier_demo_orders";
 const LOCAL_KEY_PRODUCTS = "atelier_demo_products";
+const LOCAL_KEY_CUSTOMERS = "atelier_demo_customers";
+const LOCAL_KEY_TRANSACTIONS = "atelier_demo_transactions";
+const LOCAL_KEY_SETTINGS = "atelier_demo_settings";
 
 let fb = null; // { db, addDoc, updateDoc, collection, doc, onSnapshot, serverTimestamp, query, orderBy, deleteDoc }
 
@@ -59,7 +70,7 @@ async function initDataLayer() {
   if (isPlaceholder) {
     state.mode = "demo";
     setConnectionBadge("demo", "Mode demo (localStorage)");
-    loadDemoData();
+    await loadDemoData();
     return;
   }
 
@@ -78,7 +89,7 @@ async function initDataLayer() {
     console.warn("Gagal konek Firebase, memakai mode demo.", err);
     state.mode = "demo";
     setConnectionBadge("demo", "Mode demo (Firebase gagal konek)");
-    loadDemoData();
+    await loadDemoData();
   }
 }
 
@@ -88,14 +99,42 @@ function setConnectionBadge(kind, label) {
 }
 
 function subscribeFirestore() {
-  const { collection, onSnapshot, query, orderBy } = fb;
+  const { collection, doc, onSnapshot, setDoc, query, orderBy } = fb;
+
   onSnapshot(query(collection(fb.db, "orders"), orderBy("createdAt", "desc")), (snap) => {
     state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    if (snap.empty) seedFirestore();
+    if (snap.empty) {
+      seedFirestore();
+    } else {
+      syncCustomersFromOrders();
+      syncIncomeFromOrders();
+    }
     renderAll();
   });
+
   onSnapshot(query(collection(fb.db, "products"), orderBy("createdAt", "desc")), (snap) => {
     state.products = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAll();
+  });
+
+  onSnapshot(query(collection(fb.db, "customers"), orderBy("name")), (snap) => {
+    state.customers = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAll();
+  });
+
+  onSnapshot(query(collection(fb.db, "transactions"), orderBy("date", "desc")), (snap) => {
+    state.transactions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAll();
+  });
+
+  onSnapshot(doc(fb.db, "settings", "store"), (snap) => {
+    if (snap.exists()) {
+      state.settings = snap.data();
+    } else {
+      setDoc(doc(fb.db, "settings", "store"), DEFAULT_SETTINGS);
+      state.settings = { ...DEFAULT_SETTINGS };
+    }
+    if (state.view === "pengaturan") applySettingsToForm();
     renderAll();
   });
 }
@@ -111,22 +150,37 @@ async function seedFirestore() {
   }
 }
 
-function loadDemoData() {
+async function loadDemoData() {
   let orders = JSON.parse(localStorage.getItem(LOCAL_KEY_ORDERS) || "null");
   let products = JSON.parse(localStorage.getItem(LOCAL_KEY_PRODUCTS) || "null");
+  const customers = JSON.parse(localStorage.getItem(LOCAL_KEY_CUSTOMERS) || "null");
+  const transactions = JSON.parse(localStorage.getItem(LOCAL_KEY_TRANSACTIONS) || "null");
+  const settings = JSON.parse(localStorage.getItem(LOCAL_KEY_SETTINGS) || "null");
+
   if (!orders || !products) {
     const seed = buildSeedData();
     orders = seed.orders.map((o, i) => ({ ...o, id: "demo-order-" + i, createdAt: o.createdAt }));
     products = seed.products.map((p, i) => ({ ...p, id: "demo-product-" + i, createdAt: p.createdAt }));
-    saveDemoData(orders, products);
   }
+
   state.orders = orders;
   state.products = products;
+  state.customers = customers || [];
+  state.transactions = transactions || [];
+  state.settings = settings || { ...DEFAULT_SETTINGS };
+
+  // Bangun data pelanggan & pemasukan dari pesanan yang sudah ada (juga jalan tiap kali pesanan berubah).
+  await syncCustomersFromOrders();
+  await syncIncomeFromOrders();
+  saveDemoData();
 }
 
-function saveDemoData(orders = state.orders, products = state.products) {
-  localStorage.setItem(LOCAL_KEY_ORDERS, JSON.stringify(orders));
-  localStorage.setItem(LOCAL_KEY_PRODUCTS, JSON.stringify(products));
+function saveDemoData() {
+  localStorage.setItem(LOCAL_KEY_ORDERS, JSON.stringify(state.orders));
+  localStorage.setItem(LOCAL_KEY_PRODUCTS, JSON.stringify(state.products));
+  localStorage.setItem(LOCAL_KEY_CUSTOMERS, JSON.stringify(state.customers));
+  localStorage.setItem(LOCAL_KEY_TRANSACTIONS, JSON.stringify(state.transactions));
+  localStorage.setItem(LOCAL_KEY_SETTINGS, JSON.stringify(state.settings));
 }
 
 /** Update satu order (status + field lain) — dipakai untuk semua aksi alur kerja. */
@@ -141,6 +195,7 @@ async function updateOrder(orderId, patch, historyLabel) {
     Object.assign(order, patch);
     order.statusHistory = [...(order.statusHistory || []), { status: historyLabel || patch.status, at: new Date().toISOString() }];
     saveDemoData();
+    await syncIncomeFromOrders();
     renderAll();
   }
 }
@@ -179,6 +234,110 @@ async function updateProduct(productId, patch) {
     Object.assign(product, patch);
     saveDemoData();
     renderAll();
+  }
+}
+
+/** Tambah pelanggan baru (manual ATAU otomatis dari sinkronisasi pesanan). */
+async function addCustomer(customer) {
+  if (state.mode === "firebase") {
+    const { addDoc, collection, serverTimestamp } = fb;
+    await addDoc(collection(fb.db, "customers"), { ...customer, createdAt: serverTimestamp() });
+  } else {
+    const newCustomer = { ...customer, id: "demo-customer-" + Date.now() + Math.random().toString(36).slice(2, 6), createdAt: new Date().toISOString() };
+    state.customers.push(newCustomer);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+async function updateCustomer(customerId, patch) {
+  if (state.mode === "firebase") {
+    const { doc, updateDoc } = fb;
+    await updateDoc(doc(fb.db, "customers", customerId), patch);
+  } else {
+    const customer = state.customers.find((c) => c.id === customerId);
+    Object.assign(customer, patch);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+/** Catat satu transaksi kas (manual ATAU otomatis dari pesanan selesai). */
+async function addTransaction(tx) {
+  if (state.mode === "firebase") {
+    const { addDoc, collection, serverTimestamp } = fb;
+    await addDoc(collection(fb.db, "transactions"), { ...tx, createdAt: serverTimestamp() });
+  } else {
+    const newTx = { ...tx, id: "demo-tx-" + Date.now() + Math.random().toString(36).slice(2, 6), createdAt: new Date().toISOString() };
+    state.transactions.push(newTx);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+/** Simpan profil toko (dipakai form Pengaturan). */
+async function saveSettings(patch) {
+  const merged = { ...DEFAULT_SETTINGS, ...(state.settings || {}), ...patch };
+  if (state.mode === "firebase") {
+    const { doc, setDoc } = fb;
+    await setDoc(doc(fb.db, "settings", "store"), merged, { merge: true });
+  } else {
+    state.settings = merged;
+    saveDemoData();
+    renderAll();
+  }
+}
+
+// ------------------------------------------------------------
+// Sinkronisasi otomatis: Pesanan → Pelanggan & Pesanan → Keuangan
+// ------------------------------------------------------------
+const customerSyncInFlight = new Set(); // no. HP yang sedang dalam proses dibuatkan data pelanggan
+const incomeSyncInFlight = new Set(); // id pesanan yang sedang dalam proses dicatat sebagai pemasukan
+
+function toDateInputValue(input) {
+  const d = input?.toDate ? input.toDate() : new Date(input || Date.now());
+  if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Pastikan setiap nomor HP unik di daftar pesanan punya data pelanggan di koleksi customers. */
+async function syncCustomersFromOrders() {
+  const seenPhones = new Set();
+  for (const o of state.orders) {
+    const phone = (o.phone || "").trim();
+    if (!phone || seenPhones.has(phone)) continue;
+    seenPhones.add(phone);
+    const alreadyExists = state.customers.some((c) => (c.phone || "").trim() === phone);
+    if (alreadyExists || customerSyncInFlight.has(phone)) continue;
+    customerSyncInFlight.add(phone);
+    try {
+      await addCustomer({ name: o.customerName, phone, address: o.address || "" });
+    } finally {
+      customerSyncInFlight.delete(phone);
+    }
+  }
+}
+
+/** Pastikan setiap pesanan berstatus "selesai" punya satu baris pemasukan di koleksi transactions. */
+async function syncIncomeFromOrders() {
+  for (const o of state.orders) {
+    if (o.status !== "selesai") continue;
+    const alreadyExists = state.transactions.some((t) => t.orderId === o.id);
+    if (alreadyExists || incomeSyncInFlight.has(o.id)) continue;
+    incomeSyncInFlight.add(o.id);
+    try {
+      const completedEntry = (o.statusHistory || []).find((h) => h.status === "selesai");
+      await addTransaction({
+        date: toDateInputValue(completedEntry ? completedEntry.at : o.createdAt),
+        description: `Pesanan ${o.invoiceNo} — ${o.customerName}`,
+        category: "Penjualan",
+        type: "masuk",
+        amount: o.total,
+        orderId: o.id,
+      });
+    } finally {
+      incomeSyncInFlight.delete(o.id);
+    }
   }
 }
 
@@ -243,6 +402,8 @@ function renderAll() {
   if (state.view === "dashboard") renderDashboard();
   if (state.view === "pesanan") renderOrdersView();
   if (state.view === "produk") renderProductsView();
+  if (state.view === "pelanggan") renderPelangganView();
+  if (state.view === "keuangan") renderKeuanganView();
   if (state.openOrderId) renderOrderModalBody(state.openOrderId);
 }
 
@@ -371,6 +532,7 @@ function actionLabelFor(status) {
 // Cetak nota / invoice
 // ------------------------------------------------------------
 function buildInvoiceHtml(o) {
+  const store = { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
   const subtotal = o.items.reduce((s, it) => s + it.price * it.qty, 0);
   const itemRows = o.items
     .map(
@@ -427,9 +589,12 @@ function buildInvoiceHtml(o) {
   </div>
   <div class="sheet">
     <div class="inv-head">
-      <div>
-        <p class="store-name">${escapeHtml(STORE_INFO.name)}</p>
-        <p class="store-meta">${escapeHtml(STORE_INFO.address)}<br/>WhatsApp: ${escapeHtml(STORE_INFO.phone)}</p>
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        ${store.logoUrl ? `<img src="${escapeHtml(store.logoUrl)}" alt="logo" style="width:48px;height:48px;object-fit:contain;" onerror="this.style.display='none'" />` : ""}
+        <div>
+          <p class="store-name">${escapeHtml(store.storeName)}</p>
+          <p class="store-meta">${store.tagline ? escapeHtml(store.tagline) + "<br/>" : ""}${escapeHtml(store.address)}<br/>WhatsApp: ${escapeHtml(store.phone)}</p>
+        </div>
       </div>
       <div class="inv-title">
         <h2>NOTA</h2>
@@ -575,6 +740,158 @@ function renderProductsView() {
 }
 
 // ------------------------------------------------------------
+// Pelanggan
+// ------------------------------------------------------------
+function customerStatsFor(customer) {
+  const orders = state.orders.filter((o) => (o.phone || "").trim() === (customer.phone || "").trim());
+  const totalOrders = orders.length;
+  const totalSpent = orders.filter((o) => o.status !== "dibatalkan").reduce((s, o) => s + o.total, 0);
+  return { orders, totalOrders, totalSpent };
+}
+
+function renderPelangganView() {
+  const q = state.customerSearch.trim().toLowerCase();
+  const filtered = state.customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone || "").toLowerCase().includes(q));
+  const tbody = els.tableCustomers.querySelector("tbody");
+  tbody.innerHTML = "";
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="table-empty">Belum ada pelanggan.</td></tr>`;
+    return;
+  }
+  filtered
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((c) => {
+      const { totalOrders, totalSpent } = customerStatsFor(c);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><strong>${escapeHtml(c.name)}</strong></td>
+        <td>${escapeHtml(c.phone || "-")}</td>
+        <td>${escapeHtml(c.address || "-")}</td>
+        <td>${totalOrders} pesanan</td>
+        <td>${formatRupiah(totalSpent)}</td>
+        <td></td>
+      `;
+      const actionTd = tr.querySelector("td:last-child");
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn btn--ghost";
+      editBtn.style.padding = "5px 10px";
+      editBtn.style.fontSize = "12px";
+      editBtn.textContent = "Detail/Edit";
+      editBtn.addEventListener("click", () => openCustomerModal(c));
+      actionTd.appendChild(editBtn);
+      tbody.appendChild(tr);
+    });
+}
+
+function resetCustomerForm() {
+  els.customerForm.reset();
+  state.editingCustomerId = null;
+  els.customerModalTitle.textContent = "Tambah pelanggan";
+  els.customerSubmitBtn.textContent = "Simpan pelanggan";
+  els.customerModalStats.innerHTML = "";
+  els.customerOrderHistory.innerHTML = "";
+}
+
+/** Buka modal pelanggan. Tanpa argumen = tambah baru. Dengan argumen = mode Detail/Edit, form & riwayat terisi otomatis. */
+function openCustomerModal(customer) {
+  resetCustomerForm();
+  if (customer) {
+    state.editingCustomerId = customer.id;
+    els.customerModalTitle.textContent = `Edit pelanggan — ${customer.name}`;
+    els.customerSubmitBtn.textContent = "Simpan perubahan";
+
+    const f = els.customerForm.elements;
+    f["name"].value = customer.name || "";
+    f["phone"].value = customer.phone || "";
+    f["address"].value = customer.address || "";
+
+    const { orders, totalOrders, totalSpent } = customerStatsFor(customer);
+    els.customerModalStats.innerHTML = `
+      <div class="od-action-block" style="margin-top:0;margin-bottom:18px;">
+        <div class="od-action-row" style="justify-content:space-between;">
+          <span><strong>${totalOrders}</strong> total pesanan</span>
+          <span><strong>${formatRupiah(totalSpent)}</strong> total belanja</span>
+        </div>
+      </div>`;
+
+    if (orders.length > 0) {
+      const rows = orders
+        .slice()
+        .sort((a, b) => new Date(b.createdAt?.toDate?.() || b.createdAt) - new Date(a.createdAt?.toDate?.() || a.createdAt))
+        .map((o) => `<li><span>${escapeHtml(o.invoiceNo)} — <span class="tag tag--${o.status}">${STATUS_META[o.status].label}</span></span><span>${formatRupiah(o.total)}</span></li>`)
+        .join("");
+      els.customerOrderHistory.innerHTML = `<h3 style="font-size:12px;color:var(--text-muted);margin:18px 0 8px;">Riwayat pesanan</h3><ul class="od-items">${rows}</ul>`;
+    }
+  }
+  els.customerModal.hidden = false;
+}
+
+// ------------------------------------------------------------
+// Keuangan
+// ------------------------------------------------------------
+function renderKeuanganView() {
+  const income = state.transactions.filter((t) => t.type === "masuk").reduce((s, t) => s + Number(t.amount || 0), 0);
+  const expense = state.transactions.filter((t) => t.type === "keluar").reduce((s, t) => s + Number(t.amount || 0), 0);
+  els.finIncome.textContent = formatRupiah(income);
+  els.finExpense.textContent = formatRupiah(expense);
+  els.finBalance.textContent = formatRupiah(income - expense);
+
+  els.financeTabs.innerHTML = "";
+  const tabs = [
+    { key: "semua", label: "Semua" },
+    { key: "masuk", label: "Pemasukan" },
+    { key: "keluar", label: "Pengeluaran" },
+  ];
+  tabs.forEach((t) => {
+    const count = t.key === "semua" ? state.transactions.length : state.transactions.filter((x) => x.type === t.key).length;
+    const btn = document.createElement("button");
+    btn.className = "tab" + (state.financeTab === t.key ? " is-active" : "");
+    btn.textContent = `${t.label} (${count})`;
+    btn.addEventListener("click", () => { state.financeTab = t.key; renderKeuanganView(); });
+    els.financeTabs.appendChild(btn);
+  });
+
+  let filtered = state.transactions;
+  if (state.financeTab !== "semua") filtered = filtered.filter((t) => t.type === state.financeTab);
+  filtered = filtered.slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  els.financeCount.textContent = `${filtered.length} transaksi`;
+
+  const tbody = els.tableTransactions.querySelector("tbody");
+  tbody.innerHTML = "";
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="table-empty">Belum ada transaksi.</td></tr>`;
+    return;
+  }
+  filtered.forEach((t) => {
+    const isIncome = t.type === "masuk";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${formatDate(t.date)}</td>
+      <td>${escapeHtml(t.description)}</td>
+      <td>${escapeHtml(t.category)}</td>
+      <td><span class="tag ${isIncome ? "tag--selesai" : "tag--dibatalkan"}">${isIncome ? "Masuk" : "Keluar"}</span></td>
+      <td style="color:${isIncome ? "var(--green)" : "var(--red)"};font-weight:600;">${isIncome ? "+" : "-"} ${formatRupiah(t.amount)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ------------------------------------------------------------
+// Pengaturan
+// ------------------------------------------------------------
+function applySettingsToForm() {
+  const s = { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
+  const f = els.settingsForm.elements;
+  f["storeName"].value = s.storeName || "";
+  f["tagline"].value = s.tagline || "";
+  f["address"].value = s.address || "";
+  f["phone"].value = s.phone || "";
+  f["logoUrl"].value = s.logoUrl || "";
+}
+
+// ------------------------------------------------------------
 // Order detail modal
 // ------------------------------------------------------------
 function openOrderModal(orderId) {
@@ -585,8 +902,11 @@ function openOrderModal(orderId) {
 function closeModals() {
   els.orderModal.hidden = true;
   els.productModal.hidden = true;
+  els.customerModal.hidden = true;
+  els.transactionModal.hidden = true;
   state.openOrderId = null;
   resetProductForm();
+  resetCustomerForm();
 }
 
 function renderOrderModalBody(orderId) {
@@ -787,6 +1107,7 @@ function navigateTo(view) {
   document.querySelectorAll(".view").forEach((v) => (v.hidden = true));
   document.getElementById("view-" + view).hidden = false;
   document.querySelectorAll(".nav-item[data-view]").forEach((btn) => btn.classList.toggle("is-active", btn.dataset.view === view));
+  if (view === "pengaturan") applySettingsToForm();
   renderAll();
 }
 
@@ -802,7 +1123,7 @@ function bindEvents() {
   els.productSearch.addEventListener("input", (e) => { state.productSearch = e.target.value; renderProductsView(); });
 
   document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", closeModals));
-  [els.orderModal, els.productModal].forEach((overlay) => {
+  [els.orderModal, els.productModal, els.customerModal, els.transactionModal].forEach((overlay) => {
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModals(); });
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModals(); });
@@ -857,6 +1178,67 @@ function bindEvents() {
       showToast(`Produk "${product.name}" tersimpan.`);
     }
   });
+
+  // ---- Pelanggan ----
+  els.customerSearch.addEventListener("input", (e) => { state.customerSearch = e.target.value; renderPelangganView(); });
+  els.btnAddCustomer.addEventListener("click", () => openCustomerModal());
+
+  els.customerForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(els.customerForm);
+    const customer = {
+      name: f.get("name").trim(),
+      phone: f.get("phone").trim(),
+      address: f.get("address").trim(),
+    };
+    if (state.editingCustomerId) {
+      await updateCustomer(state.editingCustomerId, customer);
+      showToast(`Pelanggan "${customer.name}" diperbarui.`);
+    } else {
+      await addCustomer(customer);
+      showToast(`Pelanggan "${customer.name}" ditambahkan.`);
+    }
+    closeModals();
+    navigateTo("pelanggan");
+  });
+
+  // ---- Keuangan ----
+  els.btnAddTransaction.addEventListener("click", () => {
+    els.transactionForm.reset();
+    els.transactionForm.elements["date"].value = toDateInputValue(new Date());
+    els.transactionModal.hidden = false;
+  });
+
+  els.transactionForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(els.transactionForm);
+    const tx = {
+      date: f.get("date"),
+      description: f.get("description").trim(),
+      category: f.get("category").trim(),
+      type: f.get("type"),
+      amount: Number(f.get("amount")) || 0,
+    };
+    await addTransaction(tx);
+    els.transactionForm.reset();
+    closeModals();
+    navigateTo("keuangan");
+    showToast("Transaksi tersimpan.");
+  });
+
+  // ---- Pengaturan ----
+  els.settingsForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(els.settingsForm);
+    await saveSettings({
+      storeName: f.get("storeName").trim(),
+      tagline: f.get("tagline").trim(),
+      address: f.get("address").trim(),
+      phone: f.get("phone").trim(),
+      logoUrl: f.get("logoUrl").trim(),
+    });
+    showToast("Pengaturan toko disimpan.");
+  });
 }
 
 // ============================================================
@@ -895,6 +1277,28 @@ function cacheEls() {
   els.variantRowsTable = document.getElementById("variant-rows-table");
   els.btnAddVariantRow = document.getElementById("btn-add-variant-row");
   els.variantEmptyHint = document.getElementById("variant-empty-hint");
+
+  els.customerSearch = document.getElementById("customer-search");
+  els.btnAddCustomer = document.getElementById("btn-add-customer");
+  els.tableCustomers = document.getElementById("table-customers");
+  els.customerModal = document.getElementById("customer-modal");
+  els.customerModalTitle = document.getElementById("customer-modal-title");
+  els.customerSubmitBtn = document.getElementById("customer-submit-btn");
+  els.customerModalStats = document.getElementById("customer-modal-stats");
+  els.customerOrderHistory = document.getElementById("customer-order-history");
+  els.customerForm = document.getElementById("customer-form");
+
+  els.finIncome = document.getElementById("fin-income");
+  els.finExpense = document.getElementById("fin-expense");
+  els.finBalance = document.getElementById("fin-balance");
+  els.financeTabs = document.getElementById("finance-tabs");
+  els.financeCount = document.getElementById("finance-count");
+  els.tableTransactions = document.getElementById("table-transactions");
+  els.btnAddTransaction = document.getElementById("btn-add-transaction");
+  els.transactionModal = document.getElementById("transaction-modal");
+  els.transactionForm = document.getElementById("transaction-form");
+
+  els.settingsForm = document.getElementById("settings-form");
 
   els.toast = document.getElementById("toast");
 }
