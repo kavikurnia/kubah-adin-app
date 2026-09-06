@@ -60,9 +60,18 @@
 
     <!-- ---------- DASHBOARD ---------- -->
     <section class="view" id="view-dashboard">
-      <header class="view-head">
-        <h1>Ringkasan hari ini</h1>
-        <p class="view-sub" id="today-date"></p>
+      <header class="view-head dash-head">
+        <div>
+          <h1>Ringkasan</h1>
+          <p class="view-sub" id="today-date"></p>
+        </div>
+        <div class="period-filter" id="period-filter">
+          <button class="tab is-active" type="button" data-period="today">Hari Ini</button>
+          <button class="tab" type="button" data-period="7d">7 Hari Terakhir</button>
+          <button class="tab" type="button" data-period="30d">30 Hari Terakhir</button>
+          <button class="tab" type="button" data-period="custom">Pilih Tanggal</button>
+          <input type="date" id="dash-custom-date" class="stock-input" hidden />
+        </div>
       </header>
 
       <div class="stat-row">
@@ -76,7 +85,7 @@
         </div>
         <div class="stat">
           <span class="stat-value" id="stat-revenue">Rp 0</span>
-          <span class="stat-label">Penjualan hari ini</span>
+          <span class="stat-label">Total penjualan</span>
         </div>
         <div class="stat stat--red">
           <span class="stat-value" id="stat-lowstock">0</span>
@@ -91,7 +100,7 @@
         </div>
 
         <div class="panel">
-          <h2>Tren penjualan — 7 hari</h2>
+          <h2 id="chart-title">Tren penjualan — 7 hari</h2>
           <svg id="sales-chart" class="chart" viewBox="0 0 320 140" preserveAspectRatio="none"></svg>
         </div>
       </div>

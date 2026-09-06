@@ -179,6 +179,13 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 
 .view-head { margin-bottom: 28px; }
+.view-head.dash-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px;
+}
 .view-head h1 {
   font-family: var(--font-display);
   font-size: 30px;
@@ -186,6 +193,20 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   margin: 0 0 4px;
 }
 .view-sub { color: var(--text-muted); margin: 0; font-size: 14px; }
+
+.period-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.period-filter input[type="date"] {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+}
 
 /* ==========================================================
    DASHBOARD

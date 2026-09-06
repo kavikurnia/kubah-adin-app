@@ -42,6 +42,8 @@ const state = {
   productSearch: "",
   customerSearch: "",
   financeTab: "semua",
+  dashPeriod: "today", // "today" | "7d" | "30d" | "custom"
+  dashCustomDate: "", // "YYYY-MM-DD", dipakai saat dashPeriod === "custom"
   variantRows: [],
   orderItemRows: [],
   openOrderId: null,
@@ -454,11 +456,9 @@ const formatDate = (iso) => {
   if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 };
-const isToday = (iso) => {
-  const d = iso?.toDate ? iso.toDate() : new Date(iso);
-  const now = new Date();
-  return d.toDateString() === now.toDateString();
-};
+/** Konversi Firestore Timestamp atau string ISO menjadi objek Date JS. */
+const toJsDate = (input) => (input?.toDate ? input.toDate() : new Date(input));
+const isToday = (input) => toJsDate(input).toDateString() === new Date().toDateString();
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c]));
 }
@@ -488,23 +488,61 @@ function renderNavBadge() {
   els.navBadgePesanan.style.display = count > 0 ? "inline-block" : "none";
 }
 
+/** Hitung rentang tanggal [start, end) dan label tampilan sesuai filter periode dashboard yang aktif. */
+function getDashboardDateRange() {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endExclusive = new Date(startOfToday);
+  endExclusive.setDate(endExclusive.getDate() + 1);
+
+  if (state.dashPeriod === "7d") {
+    const start = new Date(startOfToday);
+    start.setDate(start.getDate() - 6);
+    return { start, end: endExclusive, label: `7 hari terakhir — ${formatDate(start)} s/d ${formatDate(now)}` };
+  }
+  if (state.dashPeriod === "30d") {
+    const start = new Date(startOfToday);
+    start.setDate(start.getDate() - 29);
+    return { start, end: endExclusive, label: `30 hari terakhir — ${formatDate(start)} s/d ${formatDate(now)}` };
+  }
+  if (state.dashPeriod === "custom" && state.dashCustomDate) {
+    const [y, m, d] = state.dashCustomDate.split("-").map(Number);
+    const start = new Date(y, m - 1, d);
+    const end = new Date(y, m - 1, d + 1);
+    return { start, end, label: formatDate(start) };
+  }
+  // default: hari ini
+  return { start: startOfToday, end: endExclusive, label: now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) };
+}
+
+function isWithinRange(dateInput, start, end) {
+  const d = toJsDate(dateInput);
+  return d >= start && d < end;
+}
+
 function renderDashboard() {
-  const orders = state.orders;
-  const newToday = orders.filter((o) => isToday(o.createdAt)).length;
-  const needVerify = orders.filter((o) => o.status === "perlu_verifikasi").length;
-  const revenueToday = orders.filter((o) => isToday(o.createdAt) && o.status !== "dibatalkan").reduce((s, o) => s + o.total, 0);
+  const { start, end, label } = getDashboardDateRange();
+  const periodOrders = state.orders.filter((o) => isWithinRange(o.createdAt, start, end));
+
+  const newInPeriod = periodOrders.length;
+  const needVerifyInPeriod = periodOrders.filter((o) => o.status === "perlu_verifikasi").length;
+  const revenueInPeriod = periodOrders.filter((o) => o.status !== "dibatalkan").reduce((s, o) => s + o.total, 0);
   const lowStockProducts = state.products.filter((p) => p.totalStock <= 5 && p.status === "aktif");
 
-  els.statNewOrders.textContent = newToday;
-  els.statVerify.textContent = needVerify;
-  els.statRevenue.textContent = formatRupiah(revenueToday);
+  els.statNewOrders.textContent = newInPeriod;
+  els.statVerify.textContent = needVerifyInPeriod;
+  els.statRevenue.textContent = formatRupiah(revenueInPeriod);
   els.statLowstock.textContent = lowStockProducts.length;
+  els.todayDate.textContent = label;
 
-  // Perlu aksi segera
+  // Perlu aksi segera — SELALU dari semua pesanan (bukan hanya periode terpilih),
+  // karena ini daftar tugas operasional yang tetap perlu ditangani berapa pun umur pesanannya.
+  const orders = state.orders;
+  const needVerifyGlobal = orders.filter((o) => o.status === "perlu_verifikasi").length;
   const actions = [];
-  if (needVerify > 0) actions.push({ text: `${needVerify} pesanan menunggu verifikasi pembayaran`, goto: () => { state.view = "pesanan"; state.orderTab = "perlu_verifikasi"; navigateTo("pesanan"); } });
+  if (needVerifyGlobal > 0) actions.push({ text: `${needVerifyGlobal} pesanan menunggu verifikasi pembayaran`, goto: () => { state.orderTab = "perlu_verifikasi"; navigateTo("pesanan"); } });
   const needShip = orders.filter((o) => o.status === "diproses").length;
-  if (needShip > 0) actions.push({ text: `${needShip} pesanan siap dikirim, resi belum diinput`, goto: () => { state.view = "pesanan"; state.orderTab = "diproses"; navigateTo("pesanan"); } });
+  if (needShip > 0) actions.push({ text: `${needShip} pesanan siap dikirim, resi belum diinput`, goto: () => { state.orderTab = "diproses"; navigateTo("pesanan"); } });
   if (lowStockProducts.length > 0) actions.push({ text: `${lowStockProducts.length} produk stok tinggal ${Math.min(...lowStockProducts.map((p) => p.totalStock))}–5 unit`, goto: () => navigateTo("produk") });
 
   els.actionList.innerHTML = "";
@@ -523,38 +561,54 @@ function renderDashboard() {
     });
   }
 
-  // Pesanan terbaru (5)
-  const recent = [...orders].sort((a, b) => new Date(b.createdAt?.toDate?.() || b.createdAt) - new Date(a.createdAt?.toDate?.() || a.createdAt)).slice(0, 5);
+  // Pesanan terbaru (5) — tetap dari semua pesanan, bukan hanya periode terpilih.
+  const recent = [...orders].sort((a, b) => toJsDate(b.createdAt) - toJsDate(a.createdAt)).slice(0, 5);
   renderOrderRows(els.tableRecentOrders.querySelector("tbody"), recent, false);
 
   renderSalesChart();
 }
 
 function renderSalesChart() {
-  const days = [...Array(7)].map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
+  let dayCount = 7;
+  let endDate = new Date();
+  if (state.dashPeriod === "30d") {
+    dayCount = 30;
+  } else if (state.dashPeriod === "custom" && state.dashCustomDate) {
+    const [y, m, d] = state.dashCustomDate.split("-").map(Number);
+    endDate = new Date(y, m - 1, d);
+  }
+  // "today" & "custom" tetap menampilkan tren 7 hari di sekitarnya — grafik 1 bar tidak informatif.
+
+  els.chartTitle.textContent = `Tren penjualan — ${dayCount} hari terakhir`;
+
+  const days = [...Array(dayCount)].map((_, i) => {
+    const d = new Date(endDate);
+    d.setDate(d.getDate() - (dayCount - 1 - i));
     return d;
   });
   const totals = days.map((d) =>
     state.orders
       .filter((o) => o.status !== "dibatalkan")
-      .filter((o) => {
-        const od = o.createdAt?.toDate ? o.createdAt.toDate() : new Date(o.createdAt);
-        return od.toDateString() === d.toDateString();
-      })
+      .filter((o) => toJsDate(o.createdAt).toDateString() === d.toDateString())
       .reduce((s, o) => s + o.total, 0)
   );
+
   const max = Math.max(...totals, 1);
-  const w = 320, h = 140, padBottom = 20, barGap = 10;
-  const barW = (w - barGap * 6) / 7;
+  const w = 320, h = 140, padBottom = 20;
+  const barGap = dayCount > 14 ? 2 : 10;
+  const barW = (w - barGap * (dayCount - 1)) / dayCount;
+  const labelEvery = dayCount <= 10 ? 1 : Math.ceil(dayCount / 8);
+
   let svg = "";
   totals.forEach((t, i) => {
     const barH = (t / max) * (h - padBottom - 10);
     const x = i * (barW + barGap);
     const y = h - padBottom - barH;
-    svg += `<rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="2" fill="#7C2D3B" opacity="${0.55 + (i / 6) * 0.45}"></rect>`;
-    svg += `<text x="${x + barW / 2}" y="${h - 4}" font-size="9" fill="#6E6754" text-anchor="middle" font-family="Inter, sans-serif">${days[i].toLocaleDateString("id-ID", { weekday: "short" }).slice(0, 2)}</text>`;
+    svg += `<rect x="${x}" y="${y}" width="${Math.max(barW, 1)}" height="${barH}" rx="2" fill="#7C2D3B" opacity="${0.4 + (i / (dayCount - 1 || 1)) * 0.6}"></rect>`;
+    if (i % labelEvery === 0) {
+      const labelText = dayCount <= 10 ? days[i].toLocaleDateString("id-ID", { weekday: "short" }).slice(0, 2) : String(days[i].getDate());
+      svg += `<text x="${x + barW / 2}" y="${h - 4}" font-size="8.5" fill="#6E6754" text-anchor="middle" font-family="Inter, sans-serif">${labelText}</text>`;
+    }
   });
   els.salesChart.innerHTML = svg;
 }
@@ -1545,6 +1599,29 @@ function bindEvents() {
     btn.addEventListener("click", () => navigateTo(btn.dataset.goto));
   });
 
+  // ---- Filter periode dashboard ----
+  els.periodFilter.querySelectorAll(".tab[data-period]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const period = btn.dataset.period;
+      state.dashPeriod = period;
+      els.periodFilter.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-active", t.dataset.period === period));
+      if (period === "custom") {
+        els.dashCustomDate.hidden = false;
+        if (!state.dashCustomDate) {
+          state.dashCustomDate = toDateInputValue(new Date());
+          els.dashCustomDate.value = state.dashCustomDate;
+        }
+      } else {
+        els.dashCustomDate.hidden = true;
+      }
+      renderDashboard();
+    });
+  });
+  els.dashCustomDate.addEventListener("change", (e) => {
+    state.dashCustomDate = e.target.value;
+    renderDashboard();
+  });
+
   els.orderSearch.addEventListener("input", (e) => { state.orderSearch = e.target.value; renderOrdersView(); });
 
   els.btnAddOrder.addEventListener("click", openCreateOrderModal);
@@ -1726,11 +1803,14 @@ function cacheEls() {
   els.navBadgePesanan = document.getElementById("nav-badge-pesanan");
 
   els.todayDate = document.getElementById("today-date");
+  els.periodFilter = document.getElementById("period-filter");
+  els.dashCustomDate = document.getElementById("dash-custom-date");
   els.statNewOrders = document.getElementById("stat-new-orders");
   els.statVerify = document.getElementById("stat-verify");
   els.statRevenue = document.getElementById("stat-revenue");
   els.statLowstock = document.getElementById("stat-lowstock");
   els.actionList = document.getElementById("action-list");
+  els.chartTitle = document.getElementById("chart-title");
   els.salesChart = document.getElementById("sales-chart");
   els.tableRecentOrders = document.getElementById("table-recent-orders");
 
@@ -1796,7 +1876,6 @@ function cacheEls() {
 
 async function init() {
   cacheEls();
-  els.todayDate.textContent = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   bindEvents();
   await initDataLayer();
   renderAll();
