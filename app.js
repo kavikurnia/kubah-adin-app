@@ -21,6 +21,13 @@ const STATUS_META = {
 };
 const STATUS_ORDER = ["menunggu_pembayaran", "perlu_verifikasi", "diproses", "dikirim", "selesai", "dibatalkan"];
 
+// Info toko untuk kop nota — ganti sesuai data tokomu.
+const STORE_INFO = {
+  name: "Atelier Admin",
+  address: "Jl. Contoh Toko No. 1, Sidoarjo, Jawa Timur",
+  phone: "0812-0000-0000",
+};
+
 const state = {
   view: "dashboard",
   orders: [],
@@ -338,11 +345,17 @@ function renderOrderRows(tbody, orders, withAction) {
     });
     if (withAction) {
       const actionTd = tr.querySelector("td:last-child");
+      actionTd.classList.add("row-actions");
       const btn = document.createElement("button");
       btn.className = "mini-btn";
       btn.textContent = actionLabelFor(o.status);
       btn.addEventListener("click", () => openOrderModal(o.id));
+      const printBtn = document.createElement("button");
+      printBtn.className = "mini-btn mini-btn--outline";
+      printBtn.textContent = "Cetak nota";
+      printBtn.addEventListener("click", () => printInvoice(o));
       actionTd.appendChild(btn);
+      actionTd.appendChild(printBtn);
     }
     tbody.appendChild(tr);
   });
@@ -352,6 +365,132 @@ function actionLabelFor(status) {
   if (status === "perlu_verifikasi") return "Verifikasi";
   if (status === "diproses") return "Input resi";
   return "Detail";
+}
+
+// ------------------------------------------------------------
+// Cetak nota / invoice
+// ------------------------------------------------------------
+function buildInvoiceHtml(o) {
+  const subtotal = o.items.reduce((s, it) => s + it.price * it.qty, 0);
+  const itemRows = o.items
+    .map(
+      (it, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${escapeHtml(it.productName)}</td>
+        <td>${escapeHtml(it.variant || "-")}</td>
+        <td class="num">${it.qty}</td>
+        <td class="num">${formatRupiah(it.price)}</td>
+        <td class="num">${formatRupiah(it.price * it.qty)}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<title>Nota ${escapeHtml(o.invoiceNo)}</title>
+<style>
+  @page { size: A4; margin: 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1B1F2A; margin: 0; padding: 0; font-size: 13px; }
+  .sheet { max-width: 720px; margin: 0 auto; padding: 24px; }
+  .inv-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1B1F2A; padding-bottom: 16px; margin-bottom: 20px; }
+  .store-name { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+  .store-meta { font-size: 12px; color: #555; line-height: 1.5; margin: 0; }
+  .inv-title { text-align: right; }
+  .inv-title h2 { margin: 0; font-size: 22px; letter-spacing: 1px; }
+  .inv-title p { margin: 4px 0 0; font-size: 12.5px; }
+  .inv-cols { display: flex; justify-content: space-between; margin-bottom: 22px; gap: 20px; }
+  .inv-cols h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #777; }
+  .inv-cols p { margin: 0 0 2px; }
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  table.items th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .3px; color: #555; border-bottom: 1.5px solid #1B1F2A; padding: 6px 8px; }
+  table.items td { padding: 8px; border-bottom: 1px solid #ddd; }
+  table.items td.num, table.items th.num { text-align: right; }
+  .totals { width: 260px; margin-left: auto; }
+  .totals-row { display: flex; justify-content: space-between; padding: 5px 8px; font-size: 13px; }
+  .totals-row.grand { border-top: 2px solid #1B1F2A; font-weight: 700; font-size: 15px; margin-top: 4px; }
+  .status-badge { display: inline-block; margin-top: 4px; padding: 3px 10px; border: 1px solid #1B1F2A; border-radius: 3px; font-size: 11.5px; font-weight: 600; }
+  .footer-note { margin-top: 32px; font-size: 12px; color: #555; text-align: center; border-top: 1px dashed #ccc; padding-top: 14px; }
+  .print-bar { text-align: center; padding: 12px; background: #F1EAD9; }
+  .print-bar button { padding: 8px 18px; font-size: 13px; font-weight: 600; border-radius: 4px; border: none; background: #7C2D3B; color: #fff; cursor: pointer; }
+  @media print {
+    .no-print { display: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="print-bar no-print">
+    <button onclick="window.print()">Cetak sekarang</button>
+  </div>
+  <div class="sheet">
+    <div class="inv-head">
+      <div>
+        <p class="store-name">${escapeHtml(STORE_INFO.name)}</p>
+        <p class="store-meta">${escapeHtml(STORE_INFO.address)}<br/>WhatsApp: ${escapeHtml(STORE_INFO.phone)}</p>
+      </div>
+      <div class="inv-title">
+        <h2>NOTA</h2>
+        <p><strong>${escapeHtml(o.invoiceNo)}</strong></p>
+        <p>${formatDate(o.createdAt)}</p>
+      </div>
+    </div>
+
+    <div class="inv-cols">
+      <div>
+        <h4>Ditagihkan kepada</h4>
+        <p><strong>${escapeHtml(o.customerName)}</strong></p>
+        <p>${escapeHtml(o.phone)}</p>
+        <p>${escapeHtml(o.address)}</p>
+      </div>
+      <div style="text-align:right;">
+        <h4>Status pesanan</h4>
+        <span class="status-badge">${escapeHtml(STATUS_META[o.status]?.label || o.status)}</span>
+        ${o.status === "dikirim" || o.status === "selesai" ? `<p style="margin-top:8px;">${escapeHtml(o.courier || "-")} — ${escapeHtml(o.trackingNumber || "-")}</p>` : ""}
+      </div>
+    </div>
+
+    <table class="items">
+      <thead>
+        <tr><th>No</th><th>Produk</th><th>Varian</th><th class="num">Qty</th><th class="num">Harga</th><th class="num">Subtotal</th></tr>
+      </thead>
+      <tbody>${itemRows}</tbody>
+    </table>
+
+    <div class="totals">
+      <div class="totals-row"><span>Subtotal</span><span>${formatRupiah(subtotal)}</span></div>
+      <div class="totals-row"><span>Ongkos kirim</span><span>${formatRupiah(o.shippingCost)}</span></div>
+      <div class="totals-row grand"><span>Total</span><span>${formatRupiah(o.total)}</span></div>
+    </div>
+
+    <p class="footer-note">Terima kasih atas pesanan Anda. Nota ini dicetak otomatis oleh sistem admin.</p>
+  </div>
+</body>
+</html>`;
+}
+
+/** Buka jendela baru berisi nota siap cetak, lalu otomatis memicu dialog print browser. */
+function printInvoice(order) {
+  const printWindow = window.open("", "_blank", "width=850,height=1000");
+  if (!printWindow) {
+    showToast("Popup diblokir browser — izinkan pop-up untuk situs ini agar bisa mencetak nota.");
+    return;
+  }
+  printWindow.document.open();
+  printWindow.document.write(buildInvoiceHtml(order));
+  printWindow.document.close();
+
+  let hasPrinted = false;
+  const triggerPrint = () => {
+    if (hasPrinted) return;
+    hasPrinted = true;
+    printWindow.focus();
+    printWindow.print();
+  };
+  printWindow.onload = triggerPrint;
+  setTimeout(triggerPrint, 500); // fallback untuk browser yang tidak konsisten memicu onload
 }
 
 function renderOrdersView() {
