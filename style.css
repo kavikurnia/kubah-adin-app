@@ -1106,6 +1106,25 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .deduction-row:last-child { border-bottom: none; }
 
 /* ==========================================================
+   LAPORAN HR
+   ========================================================== */
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+.report-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--paper);
+  border-radius: var(--radius-sm);
+}
+.report-item span { font-size: 11.5px; color: var(--text-muted); }
+.report-item strong { font-size: 17px; font-family: var(--font-display); }
+
+/* ==========================================================
    SLIP GAJI
    ========================================================== */
 .slip-sheet {

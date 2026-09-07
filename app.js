@@ -370,6 +370,7 @@ function subscribeFirestore() {
 
   firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "payrolls"), orderBy("createdAt", "desc")), (snap) => {
     state.payrolls = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    syncFinanceFromPayrolls();
     renderAll();
   }));
 }
@@ -415,6 +416,7 @@ async function loadDemoData() {
   // Bangun data pelanggan & pemasukan dari pesanan yang sudah ada (juga jalan tiap kali pesanan berubah).
   await syncCustomersFromOrders();
   await syncIncomeFromOrders();
+  await syncFinanceFromPayrolls();
   saveDemoData();
 }
 
@@ -693,6 +695,7 @@ async function addPayroll(payroll) {
     const newPayroll = { ...payroll, id: "demo-payroll-" + Date.now() + Math.random().toString(36).slice(2, 6), createdAt: new Date().toISOString() };
     state.payrolls.push(newPayroll);
     saveDemoData();
+    await syncFinanceFromPayrolls();
     renderAll();
   }
 }
@@ -705,6 +708,7 @@ async function updatePayroll(payrollId, patch) {
     const payroll = state.payrolls.find((p) => p.id === payrollId);
     Object.assign(payroll, patch);
     saveDemoData();
+    await syncFinanceFromPayrolls();
     renderAll();
   }
 }
@@ -1521,12 +1525,32 @@ function renderKaryawanView() {
   renderReviewListView();
   renderContractView();
   renderPayrollView();
+  renderLaporanView();
+}
+
+function getCurrentPeriodValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getEmployeesNeedingReview() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+  return state.employees
+    .filter((e) => (e.employeeStatus || "Aktif") === "Aktif")
+    .map((e) => ({ employee: e, latest: getLatestReviewForEmployee(e.id) }))
+    .filter(({ latest }) => !latest || toJsDate(latest.createdAt) < cutoff);
+}
+
+function getAverageLatestReviewScore() {
+  const latestReviews = state.employees.map((e) => getLatestReviewForEmployee(e.id)).filter(Boolean);
+  if (latestReviews.length === 0) return null;
+  return latestReviews.reduce((s, r) => s + Number(r.finalScore || 0), 0) / latestReviews.length;
 }
 
 function renderKaryawanDashboard() {
   const employees = state.employees;
   const active = employees.filter((e) => (e.employeeStatus || "Aktif") === "Aktif").length;
-  const contractCount = employees.filter((e) => e.workStatus === "Kontrak").length;
 
   const expiringSoon = employees
     .filter((e) => e.workStatus === "Kontrak" && e.contractEnd)
@@ -1534,10 +1558,16 @@ function renderKaryawanDashboard() {
     .filter((e) => e._daysLeft !== null && e._daysLeft <= 30)
     .sort((a, b) => a._daysLeft - b._daysLeft);
 
+  const needReview = getEmployeesNeedingReview();
+  const avgScore = getAverageLatestReviewScore();
+  const payrollThisMonth = state.payrolls.filter((p) => p.period === getCurrentPeriodValue()).reduce((s, p) => s + (p.netSalary || 0), 0);
+
   els.empStatTotal.textContent = employees.length;
   els.empStatActive.textContent = active;
-  els.empStatContract.textContent = contractCount;
   els.empStatExpiring.textContent = expiringSoon.length;
+  els.empStatNeedReview.textContent = needReview.length;
+  els.empStatAvgScore.textContent = avgScore === null ? "-" : `${avgScore.toFixed(2)} / 5`;
+  els.empStatPayrollMonth.textContent = formatRupiah(payrollThisMonth);
 
   els.empContractAlertList.innerHTML = "";
   if (expiringSoon.length === 0) {
@@ -1553,6 +1583,35 @@ function renderKaryawanDashboard() {
       btn.addEventListener("click", () => openContractReviewModal(e));
       li.appendChild(btn);
       els.empContractAlertList.appendChild(li);
+    });
+  }
+
+  els.empReviewAlertList.innerHTML = "";
+  if (needReview.length === 0) {
+    els.empReviewAlertList.innerHTML = `<li class="action-empty"><span>Semua karyawan aktif sudah dinilai dalam 90 hari terakhir.</span></li>`;
+  } else {
+    needReview.forEach(({ employee, latest }) => {
+      const li = document.createElement("li");
+      const lastInfo = latest ? `Penilaian terakhir: ${formatDate(latest.createdAt)}` : "Belum pernah dinilai";
+      li.innerHTML = `<span><strong>${escapeHtml(employee.name)}</strong> — ${escapeHtml(positionLabel(employee.positionId))} · ${lastInfo}</span>`;
+      const btn = document.createElement("button");
+      btn.className = "mini-btn";
+      btn.textContent = "Nilai Sekarang";
+      btn.addEventListener("click", () => openReviewModalForEmployee(employee));
+      li.appendChild(btn);
+      els.empReviewAlertList.appendChild(li);
+    });
+  }
+
+  els.empRecentReviewsList.innerHTML = "";
+  const recentReviews = state.performanceReviews.slice().sort((a, b) => toJsDate(b.createdAt) - toJsDate(a.createdAt)).slice(0, 5);
+  if (recentReviews.length === 0) {
+    els.empRecentReviewsList.innerHTML = `<li class="action-empty"><span>Belum ada penilaian kinerja.</span></li>`;
+  } else {
+    recentReviews.forEach((r) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span><strong>${escapeHtml(r.employeeName)}</strong> — ${escapeHtml(r.positionName || "-")} · <span class="tag ${categoryBadgeClass(r.category)}">${Number(r.finalScore).toFixed(2)} (${escapeHtml(r.category)})</span></span>`;
+      els.empRecentReviewsList.appendChild(li);
     });
   }
 }
@@ -1905,6 +1964,14 @@ function resetReviewForm() {
 }
 
 /** Buka modal penilaian. Tanpa argumen = buat baru. Dengan argumen = edit, form terisi otomatis. */
+/** Buka form Buat Penilaian dengan karyawan sudah terpilih (dipakai tombol "Nilai Sekarang" di dashboard). */
+function openReviewModalForEmployee(employee) {
+  resetReviewForm();
+  els.reviewEmployeeSelect.value = employee.id;
+  handleReviewEmployeeChange();
+  els.reviewModal.hidden = false;
+}
+
 function openReviewModal(review) {
   resetReviewForm();
   if (review) {
@@ -2798,6 +2865,175 @@ async function sharePayslip(payroll, employee, targetPhone) {
   }
 
   window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+}
+
+// ------------------------------------------------------------
+// Laporan HR
+// ------------------------------------------------------------
+function matchesReportPeriod(period) {
+  if (!period) return false;
+  const [y, m] = period.split("-");
+  if (els.reportFilterYear.value && y !== String(els.reportFilterYear.value)) return false;
+  if (els.reportFilterMonth.value && m !== els.reportFilterMonth.value) return false;
+  return true;
+}
+
+function renderReportFilterOptions() {
+  const current = els.reportFilterPosition.value;
+  els.reportFilterPosition.innerHTML = `<option value="">Semua posisi</option>` + state.positions.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+  els.reportFilterPosition.value = current;
+}
+
+function renderLaporanView() {
+  renderReportFilterOptions();
+  const posFilter = els.reportFilterPosition.value;
+  const workStatusFilter = els.reportFilterWorkStatus.value;
+
+  let employees = state.employees;
+  if (posFilter) employees = employees.filter((e) => e.positionId === posFilter);
+  if (workStatusFilter) employees = employees.filter((e) => e.workStatus === workStatusFilter);
+
+  const employeeIds = new Set(employees.map((e) => e.id));
+  const activeEmployees = employees.filter((e) => (e.employeeStatus || "Aktif") === "Aktif");
+  const contractEmployees = employees.filter((e) => e.workStatus === "Kontrak");
+  const avgSalary = employees.length ? employees.reduce((s, e) => s + (e.baseSalary || 0), 0) / employees.length : 0;
+
+  const latestReviews = employees.map((e) => getLatestReviewForEmployee(e.id)).filter(Boolean);
+  const avgScore = latestReviews.length ? latestReviews.reduce((s, r) => s + Number(r.finalScore || 0), 0) / latestReviews.length : null;
+  const countByCategory = (cat) => latestReviews.filter((r) => r.category === cat).length;
+
+  const contractStatuses = contractEmployees.map((e) => getContractStatus(e));
+  const countStatus = (status) => contractStatuses.filter((s) => s === status).length;
+
+  const relevantPayrolls = state.payrolls.filter((p) => employeeIds.has(p.employeeId) && matchesReportPeriod(p.period));
+  const totalPayroll = relevantPayrolls.reduce((s, p) => s + (p.netSalary || 0), 0);
+  const totalBonus = relevantPayrolls.reduce((s, p) => s + (p.bonus || 0), 0);
+  const totalIncentive = relevantPayrolls.reduce((s, p) => s + (p.incentive || 0), 0);
+  const totalDeduction = relevantPayrolls.reduce((s, p) => s + (p.totalDeduction || 0), 0);
+
+  els.reportTotalEmployees.textContent = employees.length;
+  els.reportActiveEmployees.textContent = activeEmployees.length;
+  els.reportContractEmployees.textContent = contractEmployees.length;
+  els.reportAvgSalary.textContent = formatRupiah(avgSalary);
+  els.reportTotalPayroll.textContent = formatRupiah(totalPayroll);
+  els.reportTotalBonus.textContent = formatRupiah(totalBonus);
+  els.reportTotalIncentive.textContent = formatRupiah(totalIncentive);
+  els.reportTotalDeduction.textContent = formatRupiah(totalDeduction);
+  els.reportAvgScore.textContent = avgScore === null ? "-" : `${avgScore.toFixed(2)} / 5`;
+  els.reportCountSangatBaik.textContent = countByCategory("Sangat Baik");
+  els.reportCountBaik.textContent = countByCategory("Baik");
+  els.reportCountCukup.textContent = countByCategory("Cukup");
+  els.reportCountExpiring.textContent = countStatus("Akan Berakhir");
+  els.reportCountExtended.textContent = countStatus("Diperpanjang");
+  els.reportCountNotExtended.textContent = countStatus("Tidak Diperpanjang");
+}
+
+// ------------------------------------------------------------
+// Export Excel
+// ------------------------------------------------------------
+function exportToExcel(filename, sheetName, rows) {
+  if (typeof XLSX === "undefined") {
+    showToast("Library Excel belum termuat — cek koneksi internet lalu coba lagi.");
+    return;
+  }
+  if (rows.length === 0) {
+    showToast("Tidak ada data untuk diekspor.");
+    return;
+  }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, filename);
+}
+
+function exportEmployeesToExcel() {
+  const rows = state.employees.map((e) => ({
+    "ID Karyawan": e.employeeId || "",
+    "Nama": e.name || "",
+    "Posisi": positionLabel(e.positionId),
+    "Departemen": state.positions.find((p) => p.id === e.positionId)?.department || "",
+    "No. HP": e.phone || "",
+    "Email": e.email || "",
+    "Tanggal Masuk": e.joinDate || "",
+    "Status Kerja": e.workStatus || "",
+    "Status Karyawan": e.employeeStatus || "Aktif",
+    "Gaji Pokok": e.baseSalary || 0,
+  }));
+  exportToExcel("Data-Karyawan.xlsx", "Karyawan", rows);
+}
+
+function exportReviewsToExcel() {
+  const rows = state.performanceReviews.map((r) => ({
+    "Nama": r.employeeName,
+    "Posisi": r.positionName,
+    "Periode Mulai": r.periodStart,
+    "Periode Selesai": r.periodEnd,
+    "Nilai Umum": Number(r.generalScore || 0).toFixed(2),
+    "Nilai KPI": r.kpiScore != null ? Number(r.kpiScore).toFixed(2) : "-",
+    "Nilai Akhir": Number(r.finalScore || 0).toFixed(2),
+    "Kategori": r.category,
+    "Rekomendasi": r.recommendation,
+    "Tanggal Penilaian": formatDate(r.createdAt),
+  }));
+  exportToExcel("Penilaian-Kinerja.xlsx", "Penilaian", rows);
+}
+
+function exportContractsToExcel() {
+  const rows = state.employees
+    .filter((e) => e.workStatus === "Kontrak" && e.contractEnd)
+    .map((e) => ({
+      "Nama": e.name,
+      "Posisi": positionLabel(e.positionId),
+      "Mulai": e.contractStart || "",
+      "Berakhir": e.contractEnd || "",
+      "Sisa Hari": daysUntil(e.contractEnd),
+      "Status": getContractStatus(e),
+    }));
+  exportToExcel("Kontrak-Karyawan.xlsx", "Kontrak", rows);
+}
+
+function exportPayrollToExcel() {
+  const rows = state.payrolls.map((p) => ({
+    "Nama": p.employeeName,
+    "Posisi": p.positionName,
+    "Periode": formatPeriodLabel(p.period),
+    "Gaji Pokok": p.baseSalary,
+    "Tunjangan": p.allowance,
+    "Bonus": p.bonus,
+    "Insentif": p.incentive,
+    "Total Pendapatan": p.totalIncome,
+    "Total Potongan": p.totalDeduction,
+    "Total Diterima": p.netSalary,
+    "Status": p.status,
+  }));
+  exportToExcel("Payroll.xlsx", "Payroll", rows);
+}
+
+// ------------------------------------------------------------
+// Integrasi Keuangan: payroll Dibayar -> transaksi pengeluaran otomatis
+// ------------------------------------------------------------
+const payrollFinanceSyncInFlight = new Set();
+
+/** Setiap payroll berstatus Dibayar dipastikan punya 1 transaksi pengeluaran di Keuangan (dicek via payrollId, anti-duplikat). */
+async function syncFinanceFromPayrolls() {
+  for (const p of state.payrolls) {
+    if (p.status !== "Dibayar") continue;
+    const alreadyExists = state.transactions.some((t) => t.payrollId === p.id);
+    if (alreadyExists || payrollFinanceSyncInFlight.has(p.id)) continue;
+    payrollFinanceSyncInFlight.add(p.id);
+    try {
+      await addTransaction({
+        date: p.paymentDate || toDateInputValue(new Date()),
+        description: `Gaji Karyawan - ${p.employeeName} - ${formatPeriodLabel(p.period)}`,
+        category: "Gaji Karyawan",
+        type: "keluar",
+        amount: p.netSalary || 0,
+        payrollId: p.id,
+      });
+    } finally {
+      payrollFinanceSyncInFlight.delete(p.id);
+    }
+  }
 }
 
 // ------------------------------------------------------------
@@ -3888,6 +4124,7 @@ function bindEvents() {
       els.karyawanTabPenilaian.hidden = state.karyawanTab !== "penilaian";
       els.karyawanTabKontrak.hidden = state.karyawanTab !== "kontrak";
       els.karyawanTabPayroll.hidden = state.karyawanTab !== "payroll";
+      els.karyawanTabLaporan.hidden = state.karyawanTab !== "laporan";
       renderKaryawanView();
     });
   });
@@ -4141,6 +4378,18 @@ function bindEvents() {
   els.btnSlipShare.addEventListener("click", () => sharePayslip(state.viewingSlipPayroll, state.viewingSlipEmployee));
   els.btnSlipShareEmployee.addEventListener("click", () => sharePayslip(state.viewingSlipPayroll, state.viewingSlipEmployee, state.viewingSlipEmployee?.phone));
 
+  // ---- Export Excel ----
+  els.btnExportEmployees.addEventListener("click", exportEmployeesToExcel);
+  els.btnExportReviews.addEventListener("click", exportReviewsToExcel);
+  els.btnExportContracts.addEventListener("click", exportContractsToExcel);
+  els.btnExportPayroll.addEventListener("click", exportPayrollToExcel);
+
+  // ---- Laporan HR ----
+  els.reportFilterMonth.addEventListener("change", renderLaporanView);
+  els.reportFilterYear.addEventListener("input", renderLaporanView);
+  els.reportFilterPosition.addEventListener("change", renderLaporanView);
+  els.reportFilterWorkStatus.addEventListener("change", renderLaporanView);
+
   els.btnAddCustomer.addEventListener("click", () => openCustomerModal());
 
   els.customerForm.addEventListener("submit", async (e) => {
@@ -4291,9 +4540,13 @@ function cacheEls() {
   els.karyawanTabData = document.getElementById("karyawan-tab-data");
   els.empStatTotal = document.getElementById("emp-stat-total");
   els.empStatActive = document.getElementById("emp-stat-active");
-  els.empStatContract = document.getElementById("emp-stat-contract");
   els.empStatExpiring = document.getElementById("emp-stat-expiring");
+  els.empStatNeedReview = document.getElementById("emp-stat-need-review");
+  els.empStatAvgScore = document.getElementById("emp-stat-avg-score");
+  els.empStatPayrollMonth = document.getElementById("emp-stat-payroll-month");
   els.empContractAlertList = document.getElementById("emp-contract-alert-list");
+  els.empReviewAlertList = document.getElementById("emp-review-alert-list");
+  els.empRecentReviewsList = document.getElementById("emp-recent-reviews-list");
   els.employeeSearch = document.getElementById("employee-search");
   els.employeeFilterPosition = document.getElementById("employee-filter-position");
   els.employeeFilterWorkStatus = document.getElementById("employee-filter-workstatus");
@@ -4387,6 +4640,32 @@ function cacheEls() {
   els.btnSlipPng = document.getElementById("btn-slip-png");
   els.btnSlipShare = document.getElementById("btn-slip-share");
   els.btnSlipShareEmployee = document.getElementById("btn-slip-share-employee");
+
+  els.btnExportEmployees = document.getElementById("btn-export-employees");
+  els.btnExportReviews = document.getElementById("btn-export-reviews");
+  els.btnExportContracts = document.getElementById("btn-export-contracts");
+  els.btnExportPayroll = document.getElementById("btn-export-payroll");
+
+  els.karyawanTabLaporan = document.getElementById("karyawan-tab-laporan");
+  els.reportFilterMonth = document.getElementById("report-filter-month");
+  els.reportFilterYear = document.getElementById("report-filter-year");
+  els.reportFilterPosition = document.getElementById("report-filter-position");
+  els.reportFilterWorkStatus = document.getElementById("report-filter-workstatus");
+  els.reportTotalEmployees = document.getElementById("report-total-employees");
+  els.reportActiveEmployees = document.getElementById("report-active-employees");
+  els.reportContractEmployees = document.getElementById("report-contract-employees");
+  els.reportAvgSalary = document.getElementById("report-avg-salary");
+  els.reportTotalPayroll = document.getElementById("report-total-payroll");
+  els.reportTotalBonus = document.getElementById("report-total-bonus");
+  els.reportTotalIncentive = document.getElementById("report-total-incentive");
+  els.reportTotalDeduction = document.getElementById("report-total-deduction");
+  els.reportAvgScore = document.getElementById("report-avg-score");
+  els.reportCountSangatBaik = document.getElementById("report-count-sangat-baik");
+  els.reportCountBaik = document.getElementById("report-count-baik");
+  els.reportCountCukup = document.getElementById("report-count-cukup");
+  els.reportCountExpiring = document.getElementById("report-count-expiring");
+  els.reportCountExtended = document.getElementById("report-count-extended");
+  els.reportCountNotExtended = document.getElementById("report-count-not-extended");
   els.customerModal = document.getElementById("customer-modal");
   els.customerModalTitle = document.getElementById("customer-modal-title");
   els.customerSubmitBtn = document.getElementById("customer-submit-btn");

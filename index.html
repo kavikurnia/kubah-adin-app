@@ -298,10 +298,11 @@
         <button class="tab" type="button" data-karyawan-tab="penilaian">Penilaian Kinerja</button>
         <button class="tab" type="button" data-karyawan-tab="kontrak">Kontrak</button>
         <button class="tab" type="button" data-karyawan-tab="payroll">Payroll / Gaji</button>
+        <button class="tab" type="button" data-karyawan-tab="laporan">Laporan</button>
       </div>
 
       <div id="karyawan-tab-dashboard">
-        <div class="stat-row">
+        <div class="stat-row stat-row--3col">
           <div class="stat">
             <span class="stat-value" id="emp-stat-total">0</span>
             <span class="stat-label">Total karyawan</span>
@@ -310,13 +311,34 @@
             <span class="stat-value" id="emp-stat-active">0</span>
             <span class="stat-label">Karyawan aktif</span>
           </div>
-          <div class="stat stat--amber">
-            <span class="stat-value" id="emp-stat-contract">0</span>
-            <span class="stat-label">Karyawan kontrak</span>
-          </div>
           <div class="stat stat--red">
             <span class="stat-value" id="emp-stat-expiring">0</span>
             <span class="stat-label">Kontrak akan berakhir (30 hari)</span>
+          </div>
+        </div>
+        <div class="stat-row stat-row--3col">
+          <div class="stat stat--amber">
+            <span class="stat-value" id="emp-stat-need-review">0</span>
+            <span class="stat-label">Penilaian perlu dilakukan</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="emp-stat-avg-score">-</span>
+            <span class="stat-label">Rata-rata nilai kinerja</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="emp-stat-payroll-month">Rp 0</span>
+            <span class="stat-label">Total payroll bulan ini</span>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+          <div class="panel panel--action">
+            <h2>Penilaian perlu dilakukan</h2>
+            <ul class="action-list" id="emp-review-alert-list"></ul>
+          </div>
+          <div class="panel">
+            <h2>Kinerja terbaru</h2>
+            <ul class="action-list" id="emp-recent-reviews-list"></ul>
           </div>
         </div>
 
@@ -348,6 +370,7 @@
             <option value="Resign">Resign</option>
             <option value="Kontrak Habis">Kontrak Habis</option>
           </select>
+          <button class="btn btn--ghost" id="btn-export-employees">Export Excel</button>
           <button class="btn btn--primary" id="btn-add-employee" style="margin-left:auto;">+ Tambah Karyawan</button>
         </div>
 
@@ -392,6 +415,7 @@
             <option value="Peringatan">Peringatan</option>
             <option value="Tidak Ada Perubahan">Tidak Ada Perubahan</option>
           </select>
+          <button class="btn btn--ghost" id="btn-export-reviews">Export Excel</button>
           <button class="btn btn--primary" id="btn-add-review" style="margin-left:auto;">+ Buat Penilaian</button>
         </div>
 
@@ -410,6 +434,10 @@
           <h1 style="font-size:20px;">Kontrak Karyawan</h1>
           <p class="view-sub">Pantau masa kontrak, tinjau kinerja, dan tentukan keputusan perpanjangan.</p>
         </header>
+
+        <div class="toolbar" style="justify-content:flex-end;">
+          <button class="btn btn--ghost" id="btn-export-contracts">Export Excel</button>
+        </div>
 
         <div class="table-scroll">
           <table class="table" id="table-contracts">
@@ -436,6 +464,7 @@
             <option value="Dibayar">Dibayar</option>
           </select>
           <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn--ghost" id="btn-export-payroll">Export Excel</button>
             <button class="btn btn--secondary" id="btn-mass-payroll">Buat Payroll Semua Karyawan</button>
             <button class="btn btn--primary" id="btn-add-payroll">+ Buat Payroll</button>
           </div>
@@ -448,6 +477,77 @@
             </thead>
             <tbody></tbody>
           </table>
+        </div>
+      </div>
+
+      <div id="karyawan-tab-laporan" hidden>
+        <header class="view-head" style="margin-bottom:20px;">
+          <h1 style="font-size:20px;">Laporan HR</h1>
+          <p class="view-sub">Ringkasan performa dan biaya SDM.</p>
+        </header>
+
+        <div class="toolbar" style="flex-wrap:wrap;row-gap:10px;">
+          <select id="report-filter-month" class="stock-input" style="width:130px;">
+            <option value="">Semua bulan</option>
+            <option value="01">Januari</option>
+            <option value="02">Februari</option>
+            <option value="03">Maret</option>
+            <option value="04">April</option>
+            <option value="05">Mei</option>
+            <option value="06">Juni</option>
+            <option value="07">Juli</option>
+            <option value="08">Agustus</option>
+            <option value="09">September</option>
+            <option value="10">Oktober</option>
+            <option value="11">November</option>
+            <option value="12">Desember</option>
+          </select>
+          <input type="number" id="report-filter-year" class="stock-input" style="width:100px;" placeholder="Tahun" />
+          <select id="report-filter-position" class="stock-input" style="width:160px;">
+            <option value="">Semua posisi</option>
+          </select>
+          <select id="report-filter-workstatus" class="stock-input" style="width:160px;">
+            <option value="">Semua status kerja</option>
+            <option value="Tetap">Tetap</option>
+            <option value="Kontrak">Kontrak</option>
+            <option value="Probation">Probation</option>
+            <option value="Freelance">Freelance</option>
+            <option value="Harian">Harian</option>
+            <option value="Magang">Magang</option>
+          </select>
+        </div>
+
+        <div class="panel">
+          <h2>Ringkasan Karyawan</h2>
+          <div class="report-grid">
+            <div class="report-item"><span>Total Karyawan</span><strong id="report-total-employees">0</strong></div>
+            <div class="report-item"><span>Karyawan Aktif</span><strong id="report-active-employees">0</strong></div>
+            <div class="report-item"><span>Karyawan Kontrak</span><strong id="report-contract-employees">0</strong></div>
+            <div class="report-item"><span>Rata-rata Gaji</span><strong id="report-avg-salary">Rp 0</strong></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Ringkasan Payroll <span class="field-hint">(mengikuti filter Bulan/Tahun)</span></h2>
+          <div class="report-grid">
+            <div class="report-item"><span>Total Payroll</span><strong id="report-total-payroll">Rp 0</strong></div>
+            <div class="report-item"><span>Total Bonus</span><strong id="report-total-bonus">Rp 0</strong></div>
+            <div class="report-item"><span>Total Insentif</span><strong id="report-total-incentive">Rp 0</strong></div>
+            <div class="report-item"><span>Total Potongan Kesalahan Kerja</span><strong id="report-total-deduction">Rp 0</strong></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Ringkasan Kinerja &amp; Kontrak</h2>
+          <div class="report-grid">
+            <div class="report-item"><span>Nilai Kinerja Rata-rata</span><strong id="report-avg-score">-</strong></div>
+            <div class="report-item"><span>Karyawan Sangat Baik</span><strong id="report-count-sangat-baik">0</strong></div>
+            <div class="report-item"><span>Karyawan Baik</span><strong id="report-count-baik">0</strong></div>
+            <div class="report-item"><span>Karyawan Cukup</span><strong id="report-count-cukup">0</strong></div>
+            <div class="report-item"><span>Kontrak Akan Berakhir</span><strong id="report-count-expiring">0</strong></div>
+            <div class="report-item"><span>Kontrak Diperpanjang</span><strong id="report-count-extended">0</strong></div>
+            <div class="report-item"><span>Kontrak Tidak Diperpanjang</span><strong id="report-count-not-extended">0</strong></div>
+          </div>
         </div>
       </div>
     </section>
