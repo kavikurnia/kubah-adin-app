@@ -21,6 +21,42 @@ const STATUS_META = {
 };
 const STATUS_ORDER = ["menunggu_pembayaran", "perlu_verifikasi", "diproses", "dikirim", "selesai", "dibatalkan"];
 
+// Item Penilaian Umum (berlaku untuk semua posisi).
+const GENERAL_REVIEW_ITEMS = ["Kedisiplinan", "Tanggung Jawab", "Kejujuran", "Kerja Sama Tim", "Komunikasi", "Ketelitian", "Kecepatan Kerja", "Inisiatif", "Sikap", "Kemampuan Belajar", "Kepatuhan SOP"];
+
+// KPI khusus per posisi (dicocokkan dari nama posisi, case-insensitive).
+// Untuk menambah KPI posisi baru di masa depan, cukup tambah entri di sini.
+const KPI_BY_POSITION_NAME = {
+  "HOST LIVE": ["Konsistensi Suara", "Kejelasan Bicara", "Product Knowledge", "Kemampuan Menjelaskan Produk", "Interaksi dengan Viewer", "Kemampuan Closing", "Keaktifan Menawarkan Produk", "Penguasaan Promo", "Kerapihan Saat Live", "Tanggung Jawab", "Konsistensi Performa"],
+  "PACKING": ["Kecepatan Packing", "Ketelitian SKU", "Ketelitian Varian", "Ketelitian Jumlah Barang", "Minim Kesalahan Packing", "Kerapihan Packing", "Produktivitas", "Tanggung Jawab", "Kepatuhan SOP"],
+  "GUDANG": ["Akurasi Stok", "Kecepatan Picking", "Ketelitian Picking", "Penataan Barang", "Stock Opname", "Minim Selisih Stok", "Kebersihan Area", "Produktivitas", "Tanggung Jawab"],
+  "ADMIN MARKETPLACE": ["Kecepatan Respons", "Akurasi Input Produk", "Akurasi Pesanan", "Ketelitian Data", "Penanganan Komplain", "Akurasi Stok", "Produktivitas", "Tanggung Jawab", "Kepatuhan SOP"],
+  "CUSTOMER SERVICE": ["Kecepatan Respons", "Kesopanan", "Kualitas Komunikasi", "Product Knowledge", "Kemampuan Menyelesaikan Masalah", "Penanganan Komplain", "Ketelitian", "Tanggung Jawab"],
+};
+
+function getKpiItemsForPosition(positionName) {
+  if (!positionName) return [];
+  return KPI_BY_POSITION_NAME[positionName.trim().toUpperCase()] || [];
+}
+
+function categoryFromScore(score) {
+  if (score >= 4.51) return "Sangat Baik";
+  if (score >= 3.51) return "Baik";
+  if (score >= 2.51) return "Cukup";
+  if (score >= 1.51) return "Kurang";
+  return "Sangat Kurang";
+}
+
+function categoryBadgeClass(category) {
+  switch (category) {
+    case "Sangat Baik": return "tag--selesai";
+    case "Baik": return "tag--diproses";
+    case "Cukup": return "tag--perlu_verifikasi";
+    case "Kurang": return "tag--menunggu_pembayaran";
+    default: return "tag--dibatalkan"; // Sangat Kurang
+  }
+}
+
 // Profil toko default — dipakai sebelum menu Pengaturan pernah diisi.
 const DEFAULT_SETTINGS = {
   storeName: "Atelier Admin",
@@ -58,7 +94,15 @@ const state = {
   employeeFilterStatus: "",
   editingEmployeeId: null,
   employeePhoto: null, // { url, uploading, progress }
-  karyawanTab: "dashboard", // "dashboard" | "data"
+  karyawanTab: "dashboard", // "dashboard" | "data" | "penilaian"
+  performanceReviews: [],
+  reviewSearch: "",
+  reviewFilterPosition: "",
+  reviewFilterCategory: "",
+  reviewFilterRecommendation: "",
+  editingReviewId: null,
+  reviewGeneralScores: {},
+  reviewKpiScores: {},
   openOrderId: null,
   editingProductId: null,
   editingCustomerId: null,
@@ -78,6 +122,7 @@ const LOCAL_KEY_TRANSACTIONS = "atelier_demo_transactions";
 const LOCAL_KEY_SETTINGS = "atelier_demo_settings";
 const LOCAL_KEY_EMPLOYEES = "atelier_demo_employees";
 const LOCAL_KEY_POSITIONS = "atelier_demo_positions";
+const LOCAL_KEY_REVIEWS = "atelier_demo_performance_reviews";
 
 let fb = null; // { db, addDoc, updateDoc, collection, doc, onSnapshot, serverTimestamp, query, orderBy, deleteDoc }
 let authInstance = null;
@@ -289,6 +334,11 @@ function subscribeFirestore() {
     state.employees = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAll();
   }));
+
+  firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "performanceReviews"), orderBy("createdAt", "desc")), (snap) => {
+    state.performanceReviews = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAll();
+  }));
 }
 
 async function seedFirestore() {
@@ -310,6 +360,7 @@ async function loadDemoData() {
   const settings = JSON.parse(localStorage.getItem(LOCAL_KEY_SETTINGS) || "null");
   const employees = JSON.parse(localStorage.getItem(LOCAL_KEY_EMPLOYEES) || "null");
   const positions = JSON.parse(localStorage.getItem(LOCAL_KEY_POSITIONS) || "null");
+  const performanceReviews = JSON.parse(localStorage.getItem(LOCAL_KEY_REVIEWS) || "null");
 
   if (!orders || !products) {
     const seed = buildSeedData();
@@ -324,6 +375,7 @@ async function loadDemoData() {
   state.settings = settings || { ...DEFAULT_SETTINGS };
   state.employees = employees || [];
   state.positions = positions || [];
+  state.performanceReviews = performanceReviews || [];
 
   // Bangun data pelanggan & pemasukan dari pesanan yang sudah ada (juga jalan tiap kali pesanan berubah).
   await syncCustomersFromOrders();
@@ -339,6 +391,7 @@ function saveDemoData() {
   localStorage.setItem(LOCAL_KEY_SETTINGS, JSON.stringify(state.settings));
   localStorage.setItem(LOCAL_KEY_EMPLOYEES, JSON.stringify(state.employees));
   localStorage.setItem(LOCAL_KEY_POSITIONS, JSON.stringify(state.positions));
+  localStorage.setItem(LOCAL_KEY_REVIEWS, JSON.stringify(state.performanceReviews));
 }
 
 /** Update satu order (status + field lain) — dipakai untuk semua aksi alur kerja. */
@@ -567,6 +620,30 @@ async function updateEmployee(employeeId, patch) {
   } else {
     const employee = state.employees.find((e) => e.id === employeeId);
     Object.assign(employee, patch);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+async function addPerformanceReview(review) {
+  if (state.mode === "firebase") {
+    const { addDoc, collection, serverTimestamp } = fb;
+    await addDoc(collection(fb.db, "performanceReviews"), { ...review, createdAt: serverTimestamp() });
+  } else {
+    const newReview = { ...review, id: "demo-review-" + Date.now(), createdAt: new Date().toISOString() };
+    state.performanceReviews.push(newReview);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+async function updatePerformanceReview(reviewId, patch) {
+  if (state.mode === "firebase") {
+    const { doc, updateDoc } = fb;
+    await updateDoc(doc(fb.db, "performanceReviews", reviewId), patch);
+  } else {
+    const review = state.performanceReviews.find((r) => r.id === reviewId);
+    Object.assign(review, patch);
     saveDemoData();
     renderAll();
   }
@@ -1376,6 +1453,7 @@ function renderKaryawanView() {
   renderKaryawanDashboard();
   renderEmployeeFilterOptions();
   renderEmployeeTable();
+  renderReviewListView();
 }
 
 function renderKaryawanDashboard() {
@@ -1577,6 +1655,260 @@ function openEmployeeModal(employee) {
     toggleEmployeeContractSection();
   }
   els.employeeModal.hidden = false;
+}
+
+// ------------------------------------------------------------
+// Penilaian Kinerja
+// ------------------------------------------------------------
+function renderReviewFilterOptions() {
+  const current = els.reviewFilterPosition.value;
+  els.reviewFilterPosition.innerHTML = `<option value="">Semua posisi</option>` + state.positions.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+  els.reviewFilterPosition.value = current;
+}
+
+function renderReviewListView() {
+  renderReviewFilterOptions();
+  const q = state.reviewSearch.trim().toLowerCase();
+  let filtered = state.performanceReviews.filter((r) => (r.employeeName || "").toLowerCase().includes(q) || (r.employeeCode || "").toLowerCase().includes(q));
+  if (state.reviewFilterPosition) filtered = filtered.filter((r) => r.positionId === state.reviewFilterPosition);
+  if (state.reviewFilterCategory) filtered = filtered.filter((r) => r.category === state.reviewFilterCategory);
+  if (state.reviewFilterRecommendation) filtered = filtered.filter((r) => r.recommendation === state.reviewFilterRecommendation);
+  filtered = filtered.slice().sort((a, b) => toJsDate(b.createdAt) - toJsDate(a.createdAt));
+
+  const tbody = els.tableReviews.querySelector("tbody");
+  tbody.innerHTML = "";
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="table-empty">Belum ada penilaian kinerja.</td></tr>`;
+    return;
+  }
+  filtered.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(r.employeeName)}</strong></td>
+      <td>${escapeHtml(r.positionName || "-")}</td>
+      <td>${formatDate(r.periodStart)} – ${formatDate(r.periodEnd)}</td>
+      <td>${Number(r.finalScore || 0).toFixed(2)} / 5</td>
+      <td><span class="tag ${categoryBadgeClass(r.category)}">${escapeHtml(r.category)}</span></td>
+      <td>${escapeHtml(r.recommendation || "-")}</td>
+      <td>${formatDate(r.createdAt)}</td>
+      <td></td>
+    `;
+    const actionTd = tr.querySelector("td:last-child");
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "btn btn--ghost";
+    viewBtn.style.cssText = "padding:5px 10px;font-size:12px;margin-right:6px;";
+    viewBtn.textContent = "Lihat";
+    viewBtn.addEventListener("click", () => openReviewDetailModal(r));
+    const editBtn = document.createElement("button");
+    editBtn.className = "btn btn--ghost";
+    editBtn.style.cssText = "padding:5px 10px;font-size:12px;";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => openReviewModal(r));
+    actionTd.appendChild(viewBtn);
+    actionTd.appendChild(editBtn);
+    tbody.appendChild(tr);
+  });
+}
+
+/** Bangun grup tombol rating 1-5 untuk satu daftar item (dipakai untuk Penilaian Umum & KPI). */
+function renderRatingGroup(container, items, scoreMap, onChange) {
+  container.innerHTML = "";
+  items.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "rating-item";
+    row.innerHTML = `
+      <span class="rating-item-label">${escapeHtml(item)}</span>
+      <div class="rating-buttons">
+        ${[1, 2, 3, 4, 5].map((n) => `<button type="button" class="rating-btn ${scoreMap[item] === n ? "is-selected" : ""}" data-score="${n}">${n}</button>`).join("")}
+      </div>
+    `;
+    row.querySelectorAll(".rating-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        scoreMap[item] = Number(btn.dataset.score);
+        row.querySelectorAll(".rating-btn").forEach((b) => b.classList.toggle("is-selected", Number(b.dataset.score) === scoreMap[item]));
+        onChange();
+      });
+    });
+    container.appendChild(row);
+  });
+}
+
+function populateReviewEmployeeSelect() {
+  els.reviewEmployeeSelect.innerHTML =
+    `<option value="">Pilih karyawan</option>` +
+    state.employees.map((e) => `<option value="${e.id}">${escapeHtml(e.name)} - ${escapeHtml(positionLabel(e.positionId))}</option>`).join("");
+}
+
+function computeReviewScores() {
+  const generalValues = Object.values(state.reviewGeneralScores);
+  const generalScore = generalValues.length ? generalValues.reduce((s, v) => s + v, 0) / generalValues.length : 0;
+  const kpiValues = Object.values(state.reviewKpiScores);
+  const hasKpi = kpiValues.length > 0;
+  const kpiScore = hasKpi ? kpiValues.reduce((s, v) => s + v, 0) / kpiValues.length : null;
+  const finalScore = hasKpi ? generalScore * 0.4 + kpiScore * 0.6 : generalScore;
+  return { generalScore, kpiScore, finalScore, category: categoryFromScore(finalScore), hasKpi };
+}
+
+function updateReviewScores() {
+  const { generalScore, kpiScore, finalScore, category, hasKpi } = computeReviewScores();
+  els.reviewGeneralScoreDisplay.textContent = `${generalScore.toFixed(2)} / 5`;
+  els.reviewKpiScoreDisplay.textContent = hasKpi ? `${kpiScore.toFixed(2)} / 5` : "-";
+  els.reviewFinalScoreDisplay.textContent = `${finalScore.toFixed(2)} / 5`;
+  els.reviewCategoryBadge.innerHTML = `<span class="tag ${categoryBadgeClass(category)}">${category}</span>`;
+}
+
+/** Saat karyawan dipilih: tampilkan info otomatis + siapkan KPI sesuai posisinya. */
+function handleReviewEmployeeChange() {
+  const employee = state.employees.find((e) => e.id === els.reviewEmployeeSelect.value);
+
+  if (!employee) {
+    els.reviewEmployeeInfo.hidden = true;
+    els.reviewKpiBlock.hidden = true;
+    els.reviewNoKpiHint.hidden = true;
+    els.reviewKpiScoreRow.hidden = true;
+    state.reviewKpiScores = {};
+    renderRatingGroup(els.reviewKpiItems, [], {}, updateReviewScores);
+    updateReviewScores();
+    return;
+  }
+
+  const positionName = positionLabel(employee.positionId);
+  const contractInfo = employee.workStatus === "Kontrak" && employee.contractEnd ? `s/d ${formatDate(employee.contractEnd)}` : "-";
+
+  els.reviewEmployeeInfo.hidden = false;
+  els.reviewEmployeeInfo.innerHTML = `
+    <div class="od-action-row" style="justify-content:space-between;flex-wrap:wrap;gap:14px;">
+      <div><span class="text-muted" style="font-size:11px;">Nama</span><br/><strong>${escapeHtml(employee.name)}</strong></div>
+      <div><span class="text-muted" style="font-size:11px;">ID Karyawan</span><br/><strong>${escapeHtml(employee.employeeId || "-")}</strong></div>
+      <div><span class="text-muted" style="font-size:11px;">Posisi</span><br/><strong>${escapeHtml(positionName)}</strong></div>
+      <div><span class="text-muted" style="font-size:11px;">Tanggal Masuk</span><br/><strong>${formatDate(employee.joinDate)}</strong></div>
+      <div><span class="text-muted" style="font-size:11px;">Status Kerja</span><br/><strong>${escapeHtml(employee.workStatus || "-")}</strong></div>
+      <div><span class="text-muted" style="font-size:11px;">Status Kontrak</span><br/><strong>${contractInfo}</strong></div>
+      <div><span class="text-muted" style="font-size:11px;">Gaji Pokok</span><br/><strong>${formatRupiah(employee.baseSalary)}</strong></div>
+    </div>
+  `;
+
+  const kpiItems = getKpiItemsForPosition(positionName);
+  if (kpiItems.length > 0) {
+    els.reviewKpiBlock.hidden = false;
+    els.reviewNoKpiHint.hidden = true;
+    els.reviewKpiScoreRow.hidden = false;
+    renderRatingGroup(els.reviewKpiItems, kpiItems, state.reviewKpiScores, updateReviewScores);
+  } else {
+    els.reviewKpiBlock.hidden = true;
+    els.reviewNoKpiHint.hidden = false;
+    els.reviewKpiScoreRow.hidden = true;
+    state.reviewKpiScores = {};
+  }
+  updateReviewScores();
+}
+
+/** Isi otomatis Tanggal Selesai berdasarkan Jenis Periode + Tanggal Mulai (kecuali Custom). */
+function handlePeriodTypeChange() {
+  const type = els.reviewPeriodType.value;
+  const start = els.reviewPeriodStart.value;
+  if (!start || type === "Custom") return;
+  const d = new Date(start);
+  if (type === "Bulanan") d.setMonth(d.getMonth() + 1);
+  else if (type === "3 Bulan") d.setMonth(d.getMonth() + 3);
+  else if (type === "6 Bulan") d.setMonth(d.getMonth() + 6);
+  else if (type === "Tahunan") d.setFullYear(d.getFullYear() + 1);
+  d.setDate(d.getDate() - 1);
+  els.reviewPeriodEnd.value = toDateInputValue(d);
+}
+
+function resetReviewForm() {
+  els.reviewForm.reset();
+  state.editingReviewId = null;
+  state.reviewGeneralScores = {};
+  state.reviewKpiScores = {};
+  els.reviewModalTitle.textContent = "Buat penilaian";
+  els.reviewSubmitBtn.textContent = "Simpan Penilaian";
+  els.reviewEmployeeSelect.disabled = false;
+  populateReviewEmployeeSelect();
+  renderRatingGroup(els.reviewGeneralItems, GENERAL_REVIEW_ITEMS, state.reviewGeneralScores, updateReviewScores);
+  handleReviewEmployeeChange();
+}
+
+/** Buka modal penilaian. Tanpa argumen = buat baru. Dengan argumen = edit, form terisi otomatis. */
+function openReviewModal(review) {
+  resetReviewForm();
+  if (review) {
+    state.editingReviewId = review.id;
+    els.reviewModalTitle.textContent = `Edit penilaian — ${review.employeeName}`;
+    els.reviewSubmitBtn.textContent = "Simpan perubahan";
+    els.reviewEmployeeSelect.value = review.employeeId;
+    els.reviewEmployeeSelect.disabled = true; // karyawan yang dinilai tidak diganti saat edit
+    handleReviewEmployeeChange();
+
+    els.reviewPeriodType.value = review.periodType || "Bulanan";
+    els.reviewPeriodStart.value = review.periodStart || "";
+    els.reviewPeriodEnd.value = review.periodEnd || "";
+
+    state.reviewGeneralScores = { ...(review.generalScores || {}) };
+    state.reviewKpiScores = { ...(review.kpiScores || {}) };
+    renderRatingGroup(els.reviewGeneralItems, GENERAL_REVIEW_ITEMS, state.reviewGeneralScores, updateReviewScores);
+    const kpiItems = getKpiItemsForPosition(review.positionName);
+    if (kpiItems.length > 0) renderRatingGroup(els.reviewKpiItems, kpiItems, state.reviewKpiScores, updateReviewScores);
+
+    const f = els.reviewForm.elements;
+    f["strengths"].value = review.strengths || "";
+    f["improvements"].value = review.improvements || "";
+    f["managerNotes"].value = review.managerNotes || "";
+    f["nextTargets"].value = review.nextTargets || "";
+    f["recommendation"].value = review.recommendation || "Pertahankan";
+    updateReviewScores();
+  }
+  els.reviewModal.hidden = false;
+}
+
+/** Tampilan detail penilaian read-only ("Lihat"), dengan tombol lanjut ke Edit. */
+function openReviewDetailModal(review) {
+  const generalRows = GENERAL_REVIEW_ITEMS.map((item) => `<tr><td>${escapeHtml(item)}</td><td style="text-align:right;">${review.generalScores?.[item] ?? "-"}</td></tr>`).join("");
+  const kpiItems = getKpiItemsForPosition(review.positionName);
+  const kpiRows = kpiItems.map((item) => `<tr><td>${escapeHtml(item)}</td><td style="text-align:right;">${review.kpiScores?.[item] ?? "-"}</td></tr>`).join("");
+
+  els.reviewDetailBody.innerHTML = `
+    <div class="od-head">
+      <div>
+        <h2>${escapeHtml(review.employeeName)}</h2>
+        <p class="view-sub" style="margin:0;">${escapeHtml(review.positionName || "-")} · ${formatDate(review.periodStart)} – ${formatDate(review.periodEnd)}</p>
+      </div>
+    </div>
+
+    <div class="od-cols">
+      <div class="od-block">
+        <h3>Penilaian Umum</h3>
+        <table class="table table--compact"><tbody>${generalRows}</tbody></table>
+      </div>
+      <div class="od-block">
+        <h3>KPI Posisi</h3>
+        ${kpiItems.length ? `<table class="table table--compact"><tbody>${kpiRows}</tbody></table>` : `<p class="text-muted">Tidak ada KPI khusus untuk posisi ini.</p>`}
+      </div>
+    </div>
+
+    <div class="od-action-block">
+      <div class="od-action-row" style="justify-content:space-between;"><span>Nilai Umum</span><strong>${Number(review.generalScore || 0).toFixed(2)} / 5</strong></div>
+      ${review.kpiScore !== null && review.kpiScore !== undefined ? `<div class="od-action-row" style="justify-content:space-between;"><span>Nilai KPI</span><strong>${Number(review.kpiScore).toFixed(2)} / 5</strong></div>` : ""}
+      <div class="od-action-row" style="justify-content:space-between;font-weight:700;font-size:15px;margin-top:6px;"><span>Nilai Akhir</span><strong>${Number(review.finalScore || 0).toFixed(2)} / 5</strong></div>
+      <div style="margin-top:8px;"><span class="tag ${categoryBadgeClass(review.category)}">${escapeHtml(review.category)}</span></div>
+    </div>
+
+    <div class="od-block" style="margin-top:16px;"><h3>Kelebihan</h3><p>${escapeHtml(review.strengths || "-")}</p></div>
+    <div class="od-block"><h3>Yang Perlu Diperbaiki</h3><p>${escapeHtml(review.improvements || "-")}</p></div>
+    <div class="od-block"><h3>Catatan Manager</h3><p>${escapeHtml(review.managerNotes || "-")}</p></div>
+    <div class="od-block"><h3>Target Berikutnya</h3><p>${escapeHtml(review.nextTargets || "-")}</p></div>
+    <div class="od-block"><h3>Rekomendasi</h3><p><strong>${escapeHtml(review.recommendation || "-")}</strong></p></div>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn--primary" id="review-detail-edit-btn">Edit Penilaian</button>
+    </div>
+  `;
+  els.reviewDetailBody.querySelector("#review-detail-edit-btn").addEventListener("click", () => {
+    els.reviewDetailModal.hidden = true;
+    openReviewModal(review);
+  });
+  els.reviewDetailModal.hidden = false;
 }
 
 // ------------------------------------------------------------
@@ -1944,11 +2276,14 @@ function closeModals() {
   els.createOrderModal.hidden = true;
   els.employeeModal.hidden = true;
   els.positionModal.hidden = true;
+  els.reviewModal.hidden = true;
+  els.reviewDetailModal.hidden = true;
   state.openOrderId = null;
   resetProductForm();
   resetCustomerForm();
   resetCreateOrderForm();
   resetEmployeeForm();
+  resetReviewForm();
 }
 
 function renderOrderModalBody(orderId) {
@@ -2533,7 +2868,7 @@ function bindEvents() {
   els.productSearch.addEventListener("input", (e) => { state.productSearch = e.target.value; renderProductsView(); });
 
   document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", closeModals));
-  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal, els.employeeModal, els.positionModal].forEach((overlay) => {
+  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal, els.employeeModal, els.positionModal, els.reviewModal, els.reviewDetailModal].forEach((overlay) => {
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModals(); });
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModals(); });
@@ -2655,6 +2990,7 @@ function bindEvents() {
       els.karyawanTabs.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-active", t === btn));
       els.karyawanTabDashboard.hidden = state.karyawanTab !== "dashboard";
       els.karyawanTabData.hidden = state.karyawanTab !== "data";
+      els.karyawanTabPenilaian.hidden = state.karyawanTab !== "penilaian";
       renderKaryawanView();
     });
   });
@@ -2701,6 +3037,84 @@ function bindEvents() {
     populateEmployeeFormDropdowns(state.editingEmployeeId);
     els.employeePositionSelect.value = newId;
     showToast(`Posisi "${position.name}" ditambahkan.`);
+  });
+
+  // ---- Penilaian Kinerja ----
+  els.reviewSearch.addEventListener("input", (e) => { state.reviewSearch = e.target.value; renderReviewListView(); });
+  els.reviewFilterPosition.addEventListener("change", (e) => { state.reviewFilterPosition = e.target.value; renderReviewListView(); });
+  els.reviewFilterCategory.addEventListener("change", (e) => { state.reviewFilterCategory = e.target.value; renderReviewListView(); });
+  els.reviewFilterRecommendation.addEventListener("change", (e) => { state.reviewFilterRecommendation = e.target.value; renderReviewListView(); });
+  els.btnAddReview.addEventListener("click", () => openReviewModal());
+
+  els.reviewEmployeeSelect.addEventListener("change", handleReviewEmployeeChange);
+  els.reviewPeriodType.addEventListener("change", handlePeriodTypeChange);
+  els.reviewPeriodStart.addEventListener("change", handlePeriodTypeChange);
+
+  els.reviewForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const employee = state.employees.find((emp) => emp.id === els.reviewEmployeeSelect.value);
+    if (!employee) {
+      showToast("Pilih karyawan yang akan dinilai.");
+      return;
+    }
+    const periodStart = els.reviewPeriodStart.value;
+    const periodEnd = els.reviewPeriodEnd.value;
+    if (!periodStart || !periodEnd) {
+      showToast("Tanggal mulai dan selesai periode wajib diisi.");
+      return;
+    }
+    if (new Date(periodEnd) < new Date(periodStart)) {
+      showToast("Tanggal selesai tidak boleh sebelum tanggal mulai.");
+      return;
+    }
+    if (Object.keys(state.reviewGeneralScores).length < GENERAL_REVIEW_ITEMS.length) {
+      showToast("Lengkapi semua nilai Penilaian Umum (1-5).");
+      return;
+    }
+    const positionName = positionLabel(employee.positionId);
+    const kpiItems = getKpiItemsForPosition(positionName);
+    if (kpiItems.length > 0 && Object.keys(state.reviewKpiScores).length < kpiItems.length) {
+      showToast("Lengkapi semua nilai KPI Posisi (1-5).");
+      return;
+    }
+
+    const { generalScore, kpiScore, finalScore, category } = computeReviewScores();
+    const f = new FormData(els.reviewForm);
+
+    const review = {
+      employeeId: employee.id,
+      employeeName: employee.name,
+      employeeCode: employee.employeeId || "",
+      positionId: employee.positionId || "",
+      positionName,
+      periodType: els.reviewPeriodType.value,
+      periodStart,
+      periodEnd,
+      generalScores: { ...state.reviewGeneralScores },
+      kpiScores: kpiItems.length > 0 ? { ...state.reviewKpiScores } : {},
+      generalScore,
+      kpiScore: kpiItems.length > 0 ? kpiScore : null,
+      finalScore,
+      category,
+      strengths: f.get("strengths").trim(),
+      improvements: f.get("improvements").trim(),
+      managerNotes: f.get("managerNotes").trim(),
+      nextTargets: f.get("nextTargets").trim(),
+      recommendation: f.get("recommendation"),
+      createdBy: authInstance?.currentUser?.email || "admin",
+    };
+
+    if (state.editingReviewId) {
+      await updatePerformanceReview(state.editingReviewId, review);
+      closeModals();
+      navigateTo("karyawan");
+      showToast(`Penilaian ${employee.name} diperbarui.`);
+    } else {
+      await addPerformanceReview(review);
+      closeModals();
+      navigateTo("karyawan");
+      showToast(`Penilaian ${employee.name} tersimpan.`);
+    }
   });
 
   els.employeeForm.addEventListener("submit", async (e) => {
@@ -2932,6 +3346,34 @@ function cacheEls() {
   els.btnAddPosition = document.getElementById("btn-add-position");
   els.positionModal = document.getElementById("position-modal");
   els.positionForm = document.getElementById("position-form");
+
+  els.karyawanTabPenilaian = document.getElementById("karyawan-tab-penilaian");
+  els.reviewSearch = document.getElementById("review-search");
+  els.reviewFilterPosition = document.getElementById("review-filter-position");
+  els.reviewFilterCategory = document.getElementById("review-filter-category");
+  els.reviewFilterRecommendation = document.getElementById("review-filter-recommendation");
+  els.btnAddReview = document.getElementById("btn-add-review");
+  els.tableReviews = document.getElementById("table-reviews");
+  els.reviewModal = document.getElementById("review-modal");
+  els.reviewModalTitle = document.getElementById("review-modal-title");
+  els.reviewSubmitBtn = document.getElementById("review-submit-btn");
+  els.reviewForm = document.getElementById("review-form");
+  els.reviewEmployeeSelect = document.getElementById("review-employee-select");
+  els.reviewEmployeeInfo = document.getElementById("review-employee-info");
+  els.reviewPeriodType = document.getElementById("review-period-type");
+  els.reviewPeriodStart = document.getElementById("review-period-start");
+  els.reviewPeriodEnd = document.getElementById("review-period-end");
+  els.reviewGeneralItems = document.getElementById("review-general-items");
+  els.reviewKpiBlock = document.getElementById("review-kpi-block");
+  els.reviewKpiItems = document.getElementById("review-kpi-items");
+  els.reviewNoKpiHint = document.getElementById("review-no-kpi-hint");
+  els.reviewGeneralScoreDisplay = document.getElementById("review-general-score-display");
+  els.reviewKpiScoreRow = document.getElementById("review-kpi-score-row");
+  els.reviewKpiScoreDisplay = document.getElementById("review-kpi-score-display");
+  els.reviewFinalScoreDisplay = document.getElementById("review-final-score-display");
+  els.reviewCategoryBadge = document.getElementById("review-category-badge");
+  els.reviewDetailModal = document.getElementById("review-detail-modal");
+  els.reviewDetailBody = document.getElementById("review-detail-body");
   els.customerModal = document.getElementById("customer-modal");
   els.customerModalTitle = document.getElementById("customer-modal-title");
   els.customerSubmitBtn = document.getElementById("customer-submit-btn");

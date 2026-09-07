@@ -1034,6 +1034,35 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   .variant-card-fields { grid-template-columns: 1fr; }
 }
 
+/* ==========================================================
+   PENILAIAN KINERJA — tombol rating 1-5
+   ========================================================== */
+.rating-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px dashed var(--border);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rating-item:last-child { border-bottom: none; }
+.rating-item-label { font-size: 13px; flex: 1; min-width: 150px; }
+.rating-buttons { display: flex; gap: 6px; }
+.rating-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.rating-btn:hover { border-color: var(--garnet); }
+.rating-btn.is-selected { background: var(--garnet); border-color: var(--garnet); color: #fff; }
+
 /* Tabel produk jadi kartu bertumpuk di layar sempit, tanpa duplikasi markup JS */
 @media (max-width: 760px) {
   #table-products thead { display: none; }
