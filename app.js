@@ -1553,6 +1553,13 @@ function renderEmployeeTable() {
       editBtn.addEventListener("click", () => openEmployeeModal(e));
       actionTd.appendChild(editBtn);
 
+      const decisionBtn = document.createElement("button");
+      decisionBtn.className = "btn btn--ghost";
+      decisionBtn.style.cssText = "padding:5px 10px;font-size:12px;margin-right:6px;";
+      decisionBtn.textContent = "Keputusan";
+      decisionBtn.addEventListener("click", () => openDecisionModal(e));
+      actionTd.appendChild(decisionBtn);
+
       if (empStatus === "Aktif") {
         const deactivateBtn = document.createElement("button");
         deactivateBtn.className = "btn btn--danger";
@@ -2154,6 +2161,152 @@ function renderContractDecisionForm(employee, decision) {
 }
 
 // ------------------------------------------------------------
+// Keputusan Karyawan: Naik Gaji, Promosi/Pindah Posisi, Timeline
+// ------------------------------------------------------------
+/** Gabungkan seluruh riwayat penting karyawan (gaji, posisi, kontrak, penilaian) jadi satu timeline terurut. */
+function buildEmployeeTimeline(employee) {
+  const events = [];
+  if (employee.joinDate) {
+    events.push({ date: employee.joinDate, text: `Mulai bekerja sebagai ${positionLabel(employee.positionId)}` });
+  }
+  (employee.salaryHistory || []).forEach((h) => {
+    events.push({ date: h.date, text: `Gaji berubah ${formatRupiah(h.oldSalary)} → ${formatRupiah(h.newSalary)}${h.reason ? " — " + h.reason : ""}` });
+  });
+  (employee.positionHistory || []).forEach((h) => {
+    events.push({ date: h.date, text: `Posisi berubah ${escapeHtml(h.oldPositionName)} → ${escapeHtml(h.newPositionName)}${h.note ? " — " + h.note : ""}` });
+  });
+  (employee.contractHistory || []).forEach((h) => {
+    events.push({ date: h.decidedAt, text: `Kontrak: ${h.decision}${h.decisionNote ? " — " + h.decisionNote : ""}` });
+  });
+  state.performanceReviews
+    .filter((r) => r.employeeId === employee.id)
+    .forEach((r) => {
+      events.push({ date: r.createdAt, text: `Penilaian kinerja: ${Number(r.finalScore).toFixed(2)}/5 (${r.category}) — rekomendasi ${r.recommendation}` });
+    });
+  return events.filter((ev) => ev.date).sort((a, b) => toJsDate(b.date) - toJsDate(a.date));
+}
+
+function renderEmployeeTimeline(employee) {
+  const events = buildEmployeeTimeline(employee);
+  if (events.length === 0) return `<p class="text-muted">Belum ada riwayat aktivitas.</p>`;
+  return `<ul class="od-items">${events.map((ev) => `<li><span>${formatDate(ev.date)}</span><span>${escapeHtml(ev.text)}</span></li>`).join("")}</ul>`;
+}
+
+function openDecisionModal(employee) {
+  renderDecisionBody(employee);
+  els.decisionModal.hidden = false;
+}
+
+function renderDecisionBody(employee) {
+  els.decisionBody.innerHTML = `
+    <div class="od-head">
+      <div>
+        <h2>${escapeHtml(employee.name)}</h2>
+        <p class="view-sub" style="margin:0;">${escapeHtml(positionLabel(employee.positionId))} · Gaji sekarang: ${formatRupiah(employee.baseSalary)}</p>
+      </div>
+    </div>
+
+    <div class="od-action-block">
+      <h3 style="margin:0 0 10px;font-size:13px;">Keputusan</h3>
+      <div class="od-action-row">
+        <button type="button" class="btn btn--primary" data-emp-decision="naik_gaji">Naik Gaji</button>
+        <button type="button" class="btn btn--ghost" data-emp-decision="pindah_posisi">Promosi / Pindah Posisi</button>
+      </div>
+      <div id="emp-decision-form"></div>
+    </div>
+
+    <div class="od-history" style="margin-top:18px;">
+      <strong>Riwayat / Timeline</strong>
+      <div style="margin-top:8px;">${renderEmployeeTimeline(employee)}</div>
+    </div>
+  `;
+
+  els.decisionBody.querySelectorAll("[data-emp-decision]").forEach((btn) => {
+    btn.addEventListener("click", () => renderEmployeeDecisionForm(employee, btn.dataset.empDecision));
+  });
+}
+
+function renderEmployeeDecisionForm(employee, decision) {
+  const container = document.getElementById("emp-decision-form");
+
+  if (decision === "naik_gaji") {
+    container.innerHTML = `
+      <div class="form-grid" style="margin-top:14px;">
+        <label class="field"><span>Gaji Sekarang</span><input type="text" value="${formatRupiah(employee.baseSalary)}" disabled /></label>
+        <label class="field"><span>Gaji Baru (Rp) *</span><input type="number" min="0" id="ed-new-salary" /></label>
+        <label class="field"><span>Efektif Mulai *</span><input type="date" id="ed-effective-date" value="${toDateInputValue(new Date())}" /></label>
+        <label class="field field--wide"><span>Alasan *</span><textarea id="ed-reason" rows="2"></textarea></label>
+      </div>
+      <button type="button" class="btn btn--primary" id="ed-confirm-btn" style="margin-top:10px;">Simpan Keputusan</button>
+    `;
+    document.getElementById("ed-confirm-btn").addEventListener("click", async () => {
+      const newSalary = Number(document.getElementById("ed-new-salary").value);
+      const effectiveDate = document.getElementById("ed-effective-date").value;
+      const reason = document.getElementById("ed-reason").value.trim();
+      if (!newSalary || newSalary <= 0) { showToast("Gaji baru wajib diisi dan lebih dari 0."); return; }
+      if (!effectiveDate) { showToast("Tanggal efektif wajib diisi."); return; }
+      if (!reason) { showToast("Alasan wajib diisi."); return; }
+
+      const historyEntry = {
+        date: effectiveDate,
+        oldSalary: employee.baseSalary || 0,
+        newSalary,
+        reason,
+        changedBy: authInstance?.currentUser?.email || "admin",
+      };
+      await updateEmployee(employee.id, {
+        baseSalary: newSalary,
+        salaryHistory: [...(employee.salaryHistory || []), historyEntry],
+      });
+      els.decisionModal.hidden = true;
+      showToast(`Gaji ${employee.name} diperbarui menjadi ${formatRupiah(newSalary)}.`);
+    });
+  }
+
+  if (decision === "pindah_posisi") {
+    const positionOptions = state.positions
+      .filter((p) => p.id !== employee.positionId)
+      .map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`)
+      .join("");
+    container.innerHTML = `
+      <div class="form-grid" style="margin-top:14px;">
+        <label class="field"><span>Posisi Lama</span><input type="text" value="${escapeHtml(positionLabel(employee.positionId))}" disabled /></label>
+        <label class="field">
+          <span>Posisi Baru *</span>
+          <select id="ed-new-position"><option value="">Pilih posisi</option>${positionOptions}</select>
+        </label>
+        <label class="field"><span>Tanggal Efektif *</span><input type="date" id="ed-position-date" value="${toDateInputValue(new Date())}" /></label>
+        <label class="field field--wide"><span>Catatan</span><textarea id="ed-position-note" rows="2"></textarea></label>
+      </div>
+      <button type="button" class="btn btn--primary" id="ed-confirm-btn2" style="margin-top:10px;">Simpan Keputusan</button>
+    `;
+    document.getElementById("ed-confirm-btn2").addEventListener("click", async () => {
+      const newPositionId = document.getElementById("ed-new-position").value;
+      const effectiveDate = document.getElementById("ed-position-date").value;
+      const note = document.getElementById("ed-position-note").value.trim();
+      if (!newPositionId) { showToast("Posisi baru wajib dipilih."); return; }
+      if (!effectiveDate) { showToast("Tanggal efektif wajib diisi."); return; }
+
+      const historyEntry = {
+        date: effectiveDate,
+        oldPositionId: employee.positionId || "",
+        oldPositionName: positionLabel(employee.positionId),
+        newPositionId,
+        newPositionName: positionLabel(newPositionId),
+        note,
+        changedBy: authInstance?.currentUser?.email || "admin",
+      };
+      await updateEmployee(employee.id, {
+        positionId: newPositionId,
+        positionHistory: [...(employee.positionHistory || []), historyEntry],
+      });
+      els.decisionModal.hidden = true;
+      showToast(`Posisi ${employee.name} diperbarui menjadi ${positionLabel(newPositionId)}.`);
+    });
+  }
+}
+
+// ------------------------------------------------------------
 function applySettingsToForm() {
   const s = { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
   const f = els.settingsForm.elements;
@@ -2521,6 +2674,7 @@ function closeModals() {
   els.reviewModal.hidden = true;
   els.reviewDetailModal.hidden = true;
   els.contractReviewModal.hidden = true;
+  els.decisionModal.hidden = true;
   state.openOrderId = null;
   resetProductForm();
   resetCustomerForm();
@@ -3111,7 +3265,7 @@ function bindEvents() {
   els.productSearch.addEventListener("input", (e) => { state.productSearch = e.target.value; renderProductsView(); });
 
   document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", closeModals));
-  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal, els.employeeModal, els.positionModal, els.reviewModal, els.reviewDetailModal, els.contractReviewModal].forEach((overlay) => {
+  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal, els.employeeModal, els.positionModal, els.reviewModal, els.reviewDetailModal, els.contractReviewModal, els.decisionModal].forEach((overlay) => {
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModals(); });
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModals(); });
@@ -3623,6 +3777,8 @@ function cacheEls() {
   els.tableContracts = document.getElementById("table-contracts");
   els.contractReviewModal = document.getElementById("contract-review-modal");
   els.contractReviewBody = document.getElementById("contract-review-body");
+  els.decisionModal = document.getElementById("decision-modal");
+  els.decisionBody = document.getElementById("decision-body");
   els.customerModal = document.getElementById("customer-modal");
   els.customerModalTitle = document.getElementById("customer-modal-title");
   els.customerSubmitBtn = document.getElementById("customer-submit-btn");
