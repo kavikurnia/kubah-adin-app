@@ -824,11 +824,120 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 .shopee-btn--buy { background: var(--garnet); color: #fff; }
 
-/* Sel foto per-baris varian di tabel form */
-.variant-photo-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.variant-photo-box {
-  width: 36px;
-  height: 36px;
+/* ==========================================================
+   GALERI FOTO PRODUK (multi-foto, upload sungguhan)
+   ========================================================== */
+.photo-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.photo-thumb-item {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  overflow: hidden;
+  background: var(--paper);
+}
+.photo-thumb-item.is-primary { border-color: var(--garnet); }
+.photo-thumb-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-primary-badge {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  background: var(--garnet);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.photo-thumb-actions {
+  position: absolute;
+  inset: 0;
+  background: rgba(27, 31, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.photo-thumb-item:hover .photo-thumb-actions { opacity: 1; }
+.photo-thumb-actions button {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 11px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.photo-thumb-actions button:disabled { opacity: 0.35; cursor: not-allowed; }
+.photo-thumb-uploading {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.photo-upload-btn { display: inline-block; cursor: pointer; }
+
+/* ==========================================================
+   KARTU VARIAN (form Tambah/Edit Produk)
+   ========================================================== */
+.variant-cards { display: flex; flex-direction: column; gap: 14px; margin-bottom: 12px; }
+.variant-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+.variant-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 14px;
+  background: var(--paper);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.variant-remove-btn {
+  background: none;
+  border: none;
+  color: var(--red);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.variant-card-body {
+  display: flex;
+  gap: 16px;
+  padding: 14px;
+  flex-wrap: wrap;
+}
+.variant-photo-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.variant-photo-preview {
+  width: 68px;
+  height: 68px;
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
   display: grid;
@@ -837,9 +946,17 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   background: var(--paper);
   position: relative;
 }
-.variant-photo-box .variant-photo-fallback { font-size: 15px; color: var(--text-muted); }
-.variant-photo-box img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.variant-photo-input { width: 84px !important; font-size: 10.5px !important; padding: 4px 6px !important; }
+.variant-photo-preview .variant-photo-fallback { font-size: 20px; color: var(--text-muted); }
+.variant-photo-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.variant-photo-upload-btn { font-size: 11.5px; padding: 6px 10px; cursor: pointer; }
+.variant-card-fields {
+  flex: 1;
+  min-width: 240px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+}
+.variant-card-fields .field span { font-size: 11.5px; }
 
 .variant-mini-thumb {
   width: 18px;
@@ -851,9 +968,99 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   border: 1px solid var(--border);
 }
 
+/* ==========================================================
+   TABEL PRODUK — baris expand/collapse varian
+   ========================================================== */
+.variant-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--garnet);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.variant-toggle-btn:hover { border-color: var(--garnet); }
+
+.variant-expand-row td {
+  background: var(--paper);
+  padding: 12px 16px;
+}
+.variant-expand-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 6px;
+  border-bottom: 1px dashed var(--border);
+}
+.variant-expand-item:last-child { border-bottom: none; }
+.variant-expand-thumb {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.variant-expand-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.variant-expand-info {
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.variant-expand-info .text-muted { font-size: 11.5px; }
+.variant-expand-specs {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.variant-expand-specs > div { font-size: 11.5px; color: var(--text-muted); text-align: right; }
+.variant-expand-specs > div strong { display: block; font-size: 13px; color: var(--text); font-weight: 700; }
+
 @media (max-width: 900px) {
   .shopee-layout { grid-template-columns: 1fr; }
   .shopee-preview-col { position: static; max-width: 360px; }
+  .variant-card-fields { grid-template-columns: 1fr; }
+}
+
+/* Tabel produk jadi kartu bertumpuk di layar sempit, tanpa duplikasi markup JS */
+@media (max-width: 760px) {
+  #table-products thead { display: none; }
+  #table-products, #table-products tbody, #table-products tr, #table-products td { display: block; width: 100%; }
+  #table-products tbody tr:not(.variant-expand-row) {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: var(--surface);
+  }
+  #table-products tbody tr.variant-expand-row { border: none; margin-top: -10px; margin-bottom: 12px; border-radius: 0 0 var(--radius-md) var(--radius-md); }
+  #table-products td { border: none; padding: 5px 0; text-align: left !important; }
+  #table-products td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+  #table-products td[data-label="Foto"] { display: inline-block; width: auto; vertical-align: top; margin-right: 10px; }
+  #table-products td[data-label="Foto"]::before { content: none; }
+  #table-products td[data-label="Produk"] { display: inline-block; width: calc(100% - 60px); vertical-align: top; }
+  .variant-expand-specs { margin-left: 0; justify-content: flex-start; gap: 16px; }
 }
 
 /* ==========================================================

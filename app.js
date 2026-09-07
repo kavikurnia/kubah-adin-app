@@ -47,6 +47,8 @@ const state = {
   variantRows: [],
   previewSelectedIndex: null,
   previewPriceChannel: "offline",
+  productImages: [],
+  expandedProductIds: new Set(),
   orderItemRows: [],
   openOrderId: null,
   editingProductId: null,
@@ -70,6 +72,61 @@ let fb = null; // { db, addDoc, updateDoc, collection, doc, onSnapshot, serverTi
 let authInstance = null;
 let authFns = null; // { signInWithEmailAndPassword, signOut, onAuthStateChanged, ... }
 let firestoreUnsubscribers = [];
+let fbApp = null;
+let storageInstance = null;
+let storageFns = null; // { ref, uploadBytesResumable, getDownloadURL, deleteObject }
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+/** Validasi file sebelum diupload: tipe & ukuran. Melempar Error dengan pesan yang bisa ditampilkan ke user. */
+function validateImageFile(file) {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    throw new Error("Format file tidak didukung. Gunakan JPG, JPEG, PNG, atau WEBP.");
+  }
+  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    throw new Error("Ukuran file maksimal 5MB.");
+  }
+}
+
+/**
+ * Upload satu file gambar ke Firebase Storage, kembalikan URL permanen hasil upload.
+ * onProgress(percent) dipanggil berkala selama upload berlangsung.
+ */
+async function uploadImageFile(file, pathPrefix, onProgress) {
+  validateImageFile(file);
+  if (state.mode !== "firebase") {
+    throw new Error("Upload foto hanya tersedia saat aplikasi terhubung ke Firebase (tidak tersedia di mode demo).");
+  }
+  if (!storageFns) {
+    storageFns = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js");
+  }
+  if (!storageInstance) {
+    storageInstance = storageFns.getStorage(fbApp);
+  }
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${pathPrefix}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
+  const storageRef = storageFns.ref(storageInstance, path);
+  const task = storageFns.uploadBytesResumable(storageRef, file);
+
+  return new Promise((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snap) => {
+        if (onProgress) onProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100));
+      },
+      (err) => reject(err),
+      async () => {
+        try {
+          const url = await storageFns.getDownloadURL(task.snapshot.ref);
+          resolve(url);
+        } catch (err) {
+          reject(err);
+        }
+      }
+    );
+  });
+}
 
 async function initDataLayer() {
   const cfg = window.FIREBASE_CONFIG || {};
@@ -93,6 +150,7 @@ async function initDataLayer() {
       import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),
     ]);
     const app = initializeApp(cfg);
+    fbApp = app;
     const db = firestore.getFirestore(app);
     fb = { db, ...firestore };
     state.mode = "firebase";
@@ -549,6 +607,27 @@ function normalizeVariantPricing(v) {
   };
 }
 
+/**
+ * Daftar foto produk terurut. Kompatibel mundur: produk lama yang cuma punya
+ * `photoUrl` tunggal otomatis dibungkus jadi array 1 elemen.
+ */
+function getProductImages(p) {
+  if (Array.isArray(p.images) && p.images.length > 0) {
+    return [...p.images].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }
+  if (p.photoUrl) {
+    return [{ url: p.photoUrl, isPrimary: true, order: 0 }];
+  }
+  return [];
+}
+
+/** URL foto utama produk (dipakai untuk thumbnail tabel, fallback foto varian, dll). */
+function getPrimaryImageUrl(p) {
+  const images = getProductImages(p);
+  const primary = images.find((i) => i.isPrimary) || images[0];
+  return primary ? primary.url : "";
+}
+
 /** Normalisasi harga dasar produk (HPP/Offline/Online). Kompatibel mundur dengan skema lama {price}. */
 function getProductBasePricing(p) {
   return {
@@ -947,36 +1026,43 @@ function renderProductsView() {
       const status = p.status || "aktif";
       const lowStock = totalStock <= 5;
       const initials = escapeHtml((p.name || "?").charAt(0).toUpperCase());
+      const primaryUrl = getPrimaryImageUrl(p);
       const thumbHtml = `
         <div class="table-thumb-wrap">
           <span class="table-thumb-fallback">${initials}</span>
-          ${p.photoUrl ? `<img src="${escapeHtml(p.photoUrl)}" alt="${escapeHtml(p.name)}" class="table-thumb-img" onerror="this.style.display='none'" />` : ""}
+          ${primaryUrl ? `<img src="${escapeHtml(primaryUrl)}" alt="${escapeHtml(p.name)}" class="table-thumb-img" onerror="this.style.display='none'" />` : ""}
         </div>`;
       const basePricing = getProductBasePricing(p);
-      const variantDetailHtml = variants.length
-        ? variants
-            .map((v) => {
-              const vp = normalizeVariantPricing(v);
-              return `<div class="variant-mini-row">${v.image ? `<img src="${escapeHtml(v.image)}" class="variant-mini-thumb" onerror="this.style.display='none'" />` : ""}<strong>${escapeHtml(variantLabel(v))}</strong> <span class="text-muted">(${escapeHtml(v.sku || "-")})</span><br/><span class="text-muted">HPP ${formatRupiah(vp.hpp)} · Off ${formatRupiah(vp.priceOffline)} · On ${formatRupiah(vp.priceOnline)} · stok ${v.stock ?? 0}</span></div>`;
-            })
-            .join("")
-        : `<span class="text-muted">Belum ada varian</span>`;
+      const isExpanded = state.expandedProductIds.has(p.id);
 
       tr.innerHTML = `
-        <td>${thumbHtml}</td>
-        <td><strong>${escapeHtml(p.name || "(tanpa nama)")}</strong><br/><span style="color:var(--text-muted);font-size:12px;">${variants.length} varian</span></td>
-        <td>${escapeHtml(p.sku || "-")}</td>
-        <td>${escapeHtml(p.category || "-")}</td>
-        <td>${formatRupiah(basePricing.hpp)}</td>
-        <td>${formatRupiah(basePricing.priceOffline)}</td>
-        <td>${formatRupiah(basePricing.priceOnline)}</td>
-        <td>${Number(p.weight || 0)} g</td>
-        <td>${lowStock ? `<span class="tag tag--dibatalkan">${totalStock} unit</span>` : `${totalStock} unit`}</td>
-        <td class="variant-detail-cell">${variantDetailHtml}</td>
-        <td><span class="tag tag--${status === "aktif" ? "selesai" : status === "draft" ? "menunggu_pembayaran" : "dibatalkan"}">${escapeHtml(status)}</span></td>
-        <td></td>
+        <td data-label="Foto">${thumbHtml}</td>
+        <td data-label="Produk"><strong>${escapeHtml(p.name || "(tanpa nama)")}</strong><br/><span style="color:var(--text-muted);font-size:12px;">${variants.length} varian</span></td>
+        <td data-label="SKU">${escapeHtml(p.sku || "-")}</td>
+        <td data-label="Kategori">${escapeHtml(p.category || "-")}</td>
+        <td data-label="HPP">${formatRupiah(basePricing.hpp)}</td>
+        <td data-label="Offline">${formatRupiah(basePricing.priceOffline)}</td>
+        <td data-label="Online">${formatRupiah(basePricing.priceOnline)}</td>
+        <td data-label="Berat">${Number(p.weight || 0)} g</td>
+        <td data-label="Total stok">${lowStock ? `<span class="tag tag--dibatalkan">${totalStock} unit</span>` : `${totalStock} unit`}</td>
+        <td data-label="Varian"></td>
+        <td data-label="Status"><span class="tag tag--${status === "aktif" ? "selesai" : status === "draft" ? "menunggu_pembayaran" : "dibatalkan"}">${escapeHtml(status)}</span></td>
+        <td data-label="Aksi"></td>
       `;
-      const actionTd = tr.querySelector("td:last-child");
+
+      const variantToggleTd = tr.children[9];
+      const toggleBtn = document.createElement("button");
+      toggleBtn.type = "button";
+      toggleBtn.className = "variant-toggle-btn";
+      toggleBtn.textContent = isExpanded ? "▲ Sembunyikan" : `▼ Lihat Semua (${variants.length} Varian)`;
+      toggleBtn.addEventListener("click", () => {
+        if (isExpanded) state.expandedProductIds.delete(p.id);
+        else state.expandedProductIds.add(p.id);
+        renderProductsView();
+      });
+      variantToggleTd.appendChild(toggleBtn);
+
+      const actionTd = tr.children[11];
       const editBtn = document.createElement("button");
       editBtn.className = "btn btn--ghost";
       editBtn.style.padding = "5px 10px";
@@ -998,6 +1084,39 @@ function renderProductsView() {
       actionTd.appendChild(editBtn);
       actionTd.appendChild(delBtn);
       tbody.appendChild(tr);
+
+      if (isExpanded) {
+        const detailTr = document.createElement("tr");
+        detailTr.className = "variant-expand-row";
+        const detailTd = document.createElement("td");
+        detailTd.colSpan = 12;
+        detailTd.innerHTML = variants.length
+          ? variants
+              .map((v) => {
+                const vp = normalizeVariantPricing(v);
+                const imgUrl = v.image || primaryUrl;
+                return `
+                  <div class="variant-expand-item">
+                    <div class="variant-expand-thumb">
+                      ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" alt="" onerror="this.parentElement.innerHTML='${escapeHtml(variantLabel(v)).charAt(0)}'" />` : escapeHtml(variantLabel(v)).charAt(0) || "?"}
+                    </div>
+                    <div class="variant-expand-info">
+                      <strong>${escapeHtml(variantLabel(v))}</strong>
+                      <span class="text-muted">SKU: ${escapeHtml(v.sku || "-")}</span>
+                    </div>
+                    <div class="variant-expand-specs">
+                      <div><span>HPP</span><strong>${formatRupiah(vp.hpp)}</strong></div>
+                      <div><span>Offline</span><strong>${formatRupiah(vp.priceOffline)}</strong></div>
+                      <div><span>Online</span><strong>${formatRupiah(vp.priceOnline)}</strong></div>
+                      <div><span>Stok</span><strong>${v.stock ?? 0} unit</strong></div>
+                    </div>
+                  </div>`;
+              })
+              .join("")
+          : `<p class="text-muted" style="padding:6px 0;margin:0;">Belum ada varian.</p>`;
+        detailTr.appendChild(detailTd);
+        tbody.appendChild(detailTr);
+      }
     } catch (err) {
       // Satu dokumen bermasalah tidak boleh membuat seluruh tabel kosong — lewati baris ini saja.
       console.warn("Gagal render produk, dilewati:", p?.id, err);
@@ -1694,16 +1813,110 @@ async function handleOrderAction(order, act) {
 // ------------------------------------------------------------
 // Product form / variant matrix
 // ------------------------------------------------------------
+// ------------------------------------------------------------
+// Galeri foto produk (multi-foto, upload sungguhan ke Firebase Storage)
+// ------------------------------------------------------------
+const MAX_PRODUCT_PHOTOS = 9;
+
+function renderProductPhotoGallery() {
+  const container = els.productPhotoGallery;
+  container.innerHTML = "";
+  const sorted = [...state.productImages].sort((a, b) => a.order - b.order);
+
+  sorted.forEach((img, idx) => {
+    const item = document.createElement("div");
+    item.className = "photo-thumb-item" + (img.isPrimary ? " is-primary" : "");
+
+    if (img.uploading) {
+      item.innerHTML = `<div class="photo-thumb-uploading"><span>${img.progress ?? 0}%</span></div>`;
+    } else {
+      item.innerHTML = `
+        <img src="${escapeHtml(img.url)}" alt="" onerror="this.style.opacity='0.3'" />
+        ${img.isPrimary ? `<span class="photo-primary-badge">Utama</span>` : ""}
+        <div class="photo-thumb-actions">
+          <button type="button" data-act="primary" title="Jadikan foto utama">★</button>
+          <button type="button" data-act="left" title="Geser kiri" ${idx === 0 ? "disabled" : ""}>←</button>
+          <button type="button" data-act="right" title="Geser kanan" ${idx === sorted.length - 1 ? "disabled" : ""}>→</button>
+          <button type="button" data-act="remove" title="Hapus">&times;</button>
+        </div>
+      `;
+      item.querySelector('[data-act="primary"]').addEventListener("click", () => setPrimaryProductImage(img.tempId));
+      item.querySelector('[data-act="left"]').addEventListener("click", () => moveProductImage(img.tempId, -1));
+      item.querySelector('[data-act="right"]').addEventListener("click", () => moveProductImage(img.tempId, 1));
+      item.querySelector('[data-act="remove"]').addEventListener("click", () => removeProductImage(img.tempId));
+    }
+    container.appendChild(item);
+  });
+
+  els.btnUploadProductPhotoLabel.style.display = state.productImages.length >= MAX_PRODUCT_PHOTOS ? "none" : "";
+  updatePreview();
+}
+
+function setPrimaryProductImage(tempId) {
+  state.productImages.forEach((img) => { img.isPrimary = img.tempId === tempId; });
+  renderProductPhotoGallery();
+}
+
+function moveProductImage(tempId, dir) {
+  const sorted = [...state.productImages].sort((a, b) => a.order - b.order);
+  const idx = sorted.findIndex((i) => i.tempId === tempId);
+  const swapIdx = idx + dir;
+  if (idx === -1 || swapIdx < 0 || swapIdx >= sorted.length) return;
+  const tmp = sorted[idx].order;
+  sorted[idx].order = sorted[swapIdx].order;
+  sorted[swapIdx].order = tmp;
+  renderProductPhotoGallery();
+}
+
+function removeProductImage(tempId) {
+  const removed = state.productImages.find((i) => i.tempId === tempId);
+  state.productImages = state.productImages.filter((i) => i.tempId !== tempId);
+  if (removed?.isPrimary && state.productImages.length > 0) {
+    state.productImages.sort((a, b) => a.order - b.order)[0].isPrimary = true;
+  }
+  renderProductPhotoGallery();
+}
+
+async function handleProductPhotoFiles(fileList) {
+  const files = Array.from(fileList);
+  const remainingSlots = MAX_PRODUCT_PHOTOS - state.productImages.length;
+  if (remainingSlots <= 0) {
+    showToast(`Maksimal ${MAX_PRODUCT_PHOTOS} foto produk.`);
+    return;
+  }
+  for (const file of files.slice(0, remainingSlots)) {
+    const tempId = "img-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6);
+    const placeholder = { tempId, url: "", isPrimary: state.productImages.length === 0, order: state.productImages.length, uploading: true, progress: 0 };
+    state.productImages.push(placeholder);
+    renderProductPhotoGallery();
+    try {
+      const url = await uploadImageFile(file, "products", (pct) => {
+        placeholder.progress = pct;
+        renderProductPhotoGallery();
+      });
+      placeholder.url = url;
+      placeholder.uploading = false;
+      renderProductPhotoGallery();
+    } catch (err) {
+      showToast(err.message || "Gagal upload foto.");
+      state.productImages = state.productImages.filter((i) => i.tempId !== tempId);
+      renderProductPhotoGallery();
+    }
+  }
+}
+
 function resetProductForm() {
   els.productForm.reset();
   state.variantRows = [];
   state.editingProductId = null;
   state.previewSelectedIndex = null;
   state.previewPriceChannel = "offline";
+  state.productImages = [];
   els.previewPriceToggle.querySelectorAll(".price-toggle-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.channel === "offline"));
   els.productModalTitle.textContent = "Tambah produk baru";
   els.productSubmitBtn.textContent = "Simpan produk";
   renderVariantRowsTable();
+  renderProductPhotoGallery();
 }
 
 /** Buka modal produk. Tanpa argumen = mode tambah baru. Dengan argumen produk = mode edit, form terisi otomatis. */
@@ -1725,7 +1938,9 @@ function openProductModal(product) {
     f["weight"].value = product.weight ?? "";
     f["sku"].value = product.sku || "";
     f["status"].value = product.status || "aktif";
-    f["photoUrl"].value = product.photoUrl || "";
+
+    state.productImages = getProductImages(product).map((img, i) => ({ ...img, tempId: "existing-" + i }));
+    renderProductPhotoGallery();
 
     state.variantRows = (product.variants || []).map(normalizeVariantForEdit);
     renderVariantRowsTable();
@@ -1750,36 +1965,45 @@ function removeVariantRow(idx) {
 }
 
 function renderVariantRowsTable() {
-  const tbody = els.variantRowsTable.querySelector("tbody");
-  tbody.innerHTML = "";
+  const container = els.variantCardsContainer;
+  container.innerHTML = "";
   els.variantEmptyHint.hidden = state.variantRows.length > 0;
 
   state.variantRows.forEach((row, i) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>
-        <div class="variant-photo-cell">
-          <div class="variant-photo-box">
+    const card = document.createElement("div");
+    card.className = "variant-card";
+    card.innerHTML = `
+      <div class="variant-card-head">
+        <span>Varian ${i + 1}</span>
+        <button type="button" class="variant-remove-btn" aria-label="Hapus varian">&times;</button>
+      </div>
+      <div class="variant-card-body">
+        <div class="variant-photo-upload">
+          <div class="variant-photo-preview">
             <span class="variant-photo-fallback">+</span>
             <img alt="" hidden />
           </div>
-          <input type="url" class="stock-input variant-photo-input" placeholder="URL foto" value="${escapeHtml(row.image)}" data-field="image" />
+          <label class="btn btn--ghost variant-photo-upload-btn">
+            Upload Foto
+            <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" hidden />
+          </label>
         </div>
-      </td>
-      <td><input type="text" class="stock-input" style="width:120px;" placeholder="mis. Hitam" value="${escapeHtml(row.color)}" data-field="color" /></td>
-      <td><input type="text" class="stock-input" style="width:100px;" placeholder="mis. M" value="${escapeHtml(row.size)}" data-field="size" /></td>
-      <td><input type="number" min="0" class="stock-input" style="width:85px;" placeholder="Dasar" value="${row.hpp ?? ""}" data-field="hpp" /></td>
-      <td><input type="number" min="0" class="stock-input" style="width:85px;" placeholder="Dasar" value="${row.priceOffline ?? ""}" data-field="priceOffline" /></td>
-      <td><input type="number" min="0" class="stock-input" style="width:85px;" placeholder="Dasar" value="${row.priceOnline ?? ""}" data-field="priceOnline" /></td>
-      <td><input type="number" min="0" class="stock-input" style="width:70px;" value="${row.stock}" data-field="stock" /></td>
-      <td><input type="text" class="stock-input" style="width:110px;" placeholder="SKU" value="${escapeHtml(row.sku)}" data-field="sku" /></td>
-      <td><button type="button" class="btn btn--ghost" style="padding:5px 9px;font-size:12px;" aria-label="Hapus varian">&times;</button></td>
+        <div class="variant-card-fields">
+          <label class="field"><span>Warna / Nama Varian</span><input type="text" data-field="color" value="${escapeHtml(row.color)}" placeholder="mis. Hitam" /></label>
+          <label class="field"><span>Ukuran</span><input type="text" data-field="size" value="${escapeHtml(row.size)}" placeholder="mis. M" /></label>
+          <label class="field"><span>SKU Varian</span><input type="text" data-field="sku" value="${escapeHtml(row.sku)}" placeholder="SKU" /></label>
+          <label class="field"><span>HPP (Rp)</span><input type="number" min="0" data-field="hpp" value="${row.hpp ?? ""}" placeholder="Ikut dasar" /></label>
+          <label class="field"><span>Harga Offline (Rp)</span><input type="number" min="0" data-field="priceOffline" value="${row.priceOffline ?? ""}" placeholder="Ikut dasar" /></label>
+          <label class="field"><span>Harga Online (Rp)</span><input type="number" min="0" data-field="priceOnline" value="${row.priceOnline ?? ""}" placeholder="Ikut dasar" /></label>
+          <label class="field"><span>Stok</span><input type="number" min="0" data-field="stock" value="${row.stock}" /></label>
+        </div>
+      </div>
     `;
 
-    const imgBox = tr.querySelector(".variant-photo-box");
-    const imgEl = imgBox.querySelector("img");
-    const fallbackEl = imgBox.querySelector(".variant-photo-fallback");
-    const syncImgBox = () => {
+    const preview = card.querySelector(".variant-photo-preview");
+    const imgEl = preview.querySelector("img");
+    const fallbackEl = preview.querySelector(".variant-photo-fallback");
+    const syncPreview = () => {
       if (row.image) {
         imgEl.src = row.image;
         imgEl.hidden = false;
@@ -1790,21 +2014,38 @@ function renderVariantRowsTable() {
         fallbackEl.hidden = false;
       }
     };
-    syncImgBox();
+    syncPreview();
 
-    tr.querySelectorAll("input").forEach((input) => {
+    card.querySelector('input[type="file"]').addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      fallbackEl.hidden = false;
+      imgEl.hidden = true;
+      fallbackEl.textContent = "…";
+      try {
+        const url = await uploadImageFile(file, "variants", (pct) => { fallbackEl.textContent = pct + "%"; });
+        row.image = url;
+        syncPreview();
+        updatePreview();
+      } catch (err) {
+        showToast(err.message || "Gagal upload foto varian.");
+        fallbackEl.textContent = "+";
+      }
+    });
+
+    card.querySelectorAll("[data-field]").forEach((input) => {
       input.addEventListener("input", (e) => {
         const field = e.target.dataset.field;
         if (["hpp", "priceOffline", "priceOnline"].includes(field)) row[field] = e.target.value === "" ? null : Number(e.target.value);
         else if (field === "stock") row.stock = Number(e.target.value) || 0;
         else row[field] = e.target.value;
-
-        if (field === "image") syncImgBox();
         updatePreview();
       });
     });
-    tr.querySelector("button").addEventListener("click", () => removeVariantRow(i));
-    tbody.appendChild(tr);
+
+    card.querySelector(".variant-remove-btn").addEventListener("click", () => removeVariantRow(i));
+    container.appendChild(card);
   });
 
   updatePreview();
@@ -1815,7 +2056,8 @@ function updatePreview() {
   const f = els.productForm.elements;
   const name = f["name"].value.trim();
   const description = f["description"].value.trim();
-  const mainPhotoUrl = f["photoUrl"].value.trim();
+  const primaryGalleryImg = state.productImages.find((i) => i.isPrimary && !i.uploading) || state.productImages.find((i) => !i.uploading);
+  const mainPhotoUrl = primaryGalleryImg ? primaryGalleryImg.url : "";
 
   els.previewTitle.textContent = name || "Nama produk akan tampil di sini";
   els.previewDesc.textContent = description;
@@ -2012,8 +2254,12 @@ function bindEvents() {
   });
 
   els.btnAddVariantRow.addEventListener("click", () => addVariantRow());
-  ["name", "description", "priceOffline", "priceOnline", "photoUrl"].forEach((fieldName) => {
+  ["name", "description", "priceOffline", "priceOnline"].forEach((fieldName) => {
     els.productForm.elements[fieldName].addEventListener("input", updatePreview);
+  });
+  els.productPhotoInput.addEventListener("change", async (e) => {
+    if (e.target.files.length > 0) await handleProductPhotoFiles(e.target.files);
+    e.target.value = "";
   });
   els.previewPriceToggle.querySelectorAll(".price-toggle-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -2026,6 +2272,16 @@ function bindEvents() {
   els.productForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = new FormData(els.productForm);
+
+    if (state.productImages.some((i) => i.uploading)) {
+      showToast("Tunggu proses upload foto sampai selesai sebelum menyimpan.");
+      return;
+    }
+    if (state.productImages.length === 0) {
+      showToast("Tambahkan minimal 1 foto produk utama.");
+      return;
+    }
+
     const baseHpp = Number(f.get("hpp")) || 0;
     const basePriceOffline = Number(f.get("priceOffline")) || 0;
     const basePriceOnline = Number(f.get("priceOnline")) || 0;
@@ -2049,6 +2305,12 @@ function bindEvents() {
       return;
     }
 
+    const images = state.productImages
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map(({ url, isPrimary }, order) => ({ url, isPrimary, order }));
+    const primaryImage = images.find((i) => i.isPrimary) || images[0];
+
     const totalStock = variants.reduce((s, v) => s + v.stock, 0);
     const product = {
       name: f.get("name").trim(),
@@ -2060,7 +2322,8 @@ function bindEvents() {
       weight: Number(f.get("weight")) || 0,
       sku: f.get("sku").trim() || slug(f.get("name")),
       status: f.get("status"),
-      photoUrl: f.get("photoUrl").trim(),
+      images,
+      photoUrl: primaryImage.url, // cermin foto utama, dipakai kode lama yang masih baca photoUrl tunggal
       variants,
       totalStock,
     };
@@ -2206,9 +2469,12 @@ function cacheEls() {
   els.productModalTitle = document.getElementById("product-modal-title");
   els.productSubmitBtn = document.getElementById("product-submit-btn");
   els.productForm = document.getElementById("product-form");
-  els.variantRowsTable = document.getElementById("variant-rows-table");
+  els.variantCardsContainer = document.getElementById("variant-cards");
   els.btnAddVariantRow = document.getElementById("btn-add-variant-row");
   els.variantEmptyHint = document.getElementById("variant-empty-hint");
+  els.productPhotoGallery = document.getElementById("product-photo-gallery");
+  els.productPhotoInput = document.getElementById("product-photo-input");
+  els.btnUploadProductPhotoLabel = document.getElementById("btn-upload-product-photo");
   els.previewMainPhoto = document.getElementById("preview-main-photo");
   els.previewMainImg = document.getElementById("preview-main-img");
   els.previewMainFallback = document.getElementById("preview-main-fallback");

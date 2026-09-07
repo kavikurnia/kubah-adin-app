@@ -195,7 +195,7 @@
       <div class="table-scroll">
         <table class="table" id="table-products">
           <thead>
-            <tr><th></th><th>Produk</th><th>SKU</th><th>Kategori</th><th>HPP</th><th>Offline</th><th>Online</th><th>Berat</th><th>Total stok</th><th>Rincian varian</th><th>Status</th><th></th></tr>
+            <tr><th></th><th>Produk</th><th>SKU</th><th>Kategori</th><th>HPP</th><th>Offline</th><th>Online</th><th>Berat</th><th>Total stok</th><th>Varian</th><th>Status</th><th></th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -424,9 +424,11 @@
               </select>
             </label>
             <label class="field field--wide">
-              <span>URL foto utama produk</span>
-              <input type="url" name="photoUrl" placeholder="https://…/foto-produk.jpg" />
-              <small class="field-hint">Dipakai sebagai foto utama jika belum ada varian dengan foto sendiri.</small>
+              <span>Foto Produk Utama *</span>
+              <div class="photo-gallery" id="product-photo-gallery"></div>
+              <label class="btn btn--secondary photo-upload-btn" id="btn-upload-product-photo" for="product-photo-input">+ Upload Foto</label>
+              <input type="file" id="product-photo-input" accept="image/jpeg,image/jpg,image/png,image/webp" multiple hidden />
+              <small class="field-hint">Bisa lebih dari 1 foto (maks. 9). Foto bertanda ★ dipakai sebagai thumbnail utama di daftar produk.</small>
             </label>
           </div>
 
@@ -435,18 +437,11 @@
           <div class="variant-builder">
             <div class="panel-head-row">
               <span style="font-size:13px;font-weight:600;">Variasi produk *</span>
-              <button type="button" class="btn btn--secondary" id="btn-add-variant-row">+ Tambah varian</button>
+              <button type="button" class="btn btn--secondary" id="btn-add-variant-row">+ Tambah Varian</button>
             </div>
 
-            <div class="table-scroll">
-              <table class="table table--compact" id="variant-rows-table">
-                <thead>
-                  <tr><th>Foto</th><th>Warna / Nama Varian</th><th>Ukuran</th><th>HPP</th><th>Offline</th><th>Online</th><th>Stok</th><th>SKU</th><th></th></tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-            <p class="field-hint" id="variant-empty-hint">Belum ada varian. Klik &quot;+ Tambah varian&quot; — isi minimal Warna atau Ukuran.</p>
+            <div class="variant-cards" id="variant-cards"></div>
+            <p class="field-hint" id="variant-empty-hint">Belum ada varian. Klik &quot;+ Tambah Varian&quot; — isi minimal Warna atau Ukuran.</p>
           </div>
 
           <div class="form-actions">
