@@ -297,6 +297,7 @@
         <button class="tab" type="button" data-karyawan-tab="data">Data Karyawan</button>
         <button class="tab" type="button" data-karyawan-tab="penilaian">Penilaian Kinerja</button>
         <button class="tab" type="button" data-karyawan-tab="kontrak">Kontrak</button>
+        <button class="tab" type="button" data-karyawan-tab="payroll">Payroll / Gaji</button>
       </div>
 
       <div id="karyawan-tab-dashboard">
@@ -414,6 +415,36 @@
           <table class="table" id="table-contracts">
             <thead>
               <tr><th>Nama</th><th>Posisi</th><th>Mulai</th><th>Berakhir</th><th>Sisa Hari</th><th>Status</th><th>Nilai Terakhir</th><th>Rekomendasi</th><th></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="karyawan-tab-payroll" hidden>
+        <header class="view-head" style="margin-bottom:20px;">
+          <h1 style="font-size:20px;">Payroll / Gaji</h1>
+          <p class="view-sub">Kelola penggajian karyawan per periode.</p>
+        </header>
+
+        <div class="toolbar" style="flex-wrap:wrap;row-gap:10px;">
+          <input type="month" id="payroll-filter-period" class="stock-input" style="width:160px;" />
+          <select id="payroll-filter-status" class="stock-input" style="width:180px;">
+            <option value="">Semua status</option>
+            <option value="Draft">Draft</option>
+            <option value="Menunggu Pembayaran">Menunggu Pembayaran</option>
+            <option value="Dibayar">Dibayar</option>
+          </select>
+          <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn--secondary" id="btn-mass-payroll">Buat Payroll Semua Karyawan</button>
+            <button class="btn btn--primary" id="btn-add-payroll">+ Buat Payroll</button>
+          </div>
+        </div>
+
+        <div class="table-scroll">
+          <table class="table" id="table-payrolls">
+            <thead>
+              <tr><th>Nama</th><th>Posisi</th><th>Periode</th><th>Total Pendapatan</th><th>Total Potongan</th><th>Total Diterima</th><th>Status</th><th></th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -847,6 +878,101 @@
   <div class="modal modal--wide">
     <button class="modal-close" data-close-modal>&times;</button>
     <div id="decision-body"></div>
+  </div>
+</div>
+
+<!-- ============ PAYROLL MODAL ============ -->
+<div class="overlay" id="payroll-modal" hidden>
+  <div class="modal modal--wide">
+    <button class="modal-close" data-close-modal>&times;</button>
+    <h2 id="payroll-modal-title">Buat payroll</h2>
+
+    <form id="payroll-form">
+      <div class="form-grid">
+        <label class="field field--wide">
+          <span>Pilih Karyawan *</span>
+          <select id="payroll-employee-select" required><option value="">Pilih karyawan</option></select>
+        </label>
+        <label class="field"><span>Periode *</span><input type="month" id="payroll-period" required /></label>
+        <label class="field"><span>Gaji Pokok</span><input type="text" id="payroll-base-salary-display" data-raw="0" disabled /></label>
+      </div>
+
+      <hr class="divider" />
+      <div class="form-grid">
+        <label class="field"><span>Tunjangan (Rp)</span><input type="number" min="0" id="payroll-allowance" value="0" /></label>
+        <label class="field"><span>Bonus (Rp)</span><input type="number" min="0" id="payroll-bonus" value="0" /></label>
+        <label class="field"><span>Insentif (Rp)</span><input type="number" min="0" id="payroll-incentive" value="0" /></label>
+      </div>
+
+      <hr class="divider" />
+      <div class="panel-head-row">
+        <span style="font-size:13px;font-weight:700;">Potongan Kesalahan Kerja</span>
+        <button type="button" class="btn btn--secondary" id="btn-add-deduction">+ Tambah Potongan Kesalahan</button>
+      </div>
+      <div id="payroll-deductions-list"></div>
+      <p class="field-hint" id="payroll-deductions-empty-hint">Belum ada potongan kesalahan kerja.</p>
+
+      <hr class="divider" />
+      <div class="od-action-block">
+        <div class="od-action-row" style="justify-content:space-between;"><span>Total Pendapatan</span><strong id="payroll-total-income">Rp 0</strong></div>
+        <div class="od-action-row" style="justify-content:space-between;"><span>Total Potongan</span><strong id="payroll-total-deduction">Rp 0</strong></div>
+        <div class="od-action-row" style="justify-content:space-between;font-weight:700;font-size:15px;margin-top:6px;"><span>Total Diterima</span><strong id="payroll-net-salary">Rp 0</strong></div>
+      </div>
+
+      <hr class="divider" />
+      <div class="form-grid">
+        <label class="field">
+          <span>Status</span>
+          <select id="payroll-status">
+            <option value="Draft">Draft</option>
+            <option value="Menunggu Pembayaran">Menunggu Pembayaran</option>
+            <option value="Dibayar">Dibayar</option>
+          </select>
+        </label>
+        <label class="field"><span>Tanggal Pembayaran</span><input type="date" id="payroll-payment-date" /></label>
+        <label class="field">
+          <span>Metode Pembayaran</span>
+          <select id="payroll-payment-method">
+            <option value="Transfer">Transfer</option>
+            <option value="Cash">Cash</option>
+            <option value="Lainnya">Lainnya</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn--ghost" data-close-modal>Batal</button>
+        <button type="submit" class="btn btn--primary" id="payroll-submit-btn">Proses Payroll</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ MASS PAYROLL MODAL ============ -->
+<div class="overlay" id="mass-payroll-modal" hidden>
+  <div class="modal modal--wide">
+    <button class="modal-close" data-close-modal>&times;</button>
+    <h2>Buat Payroll Semua Karyawan</h2>
+
+    <div class="form-grid" style="margin-bottom:14px;">
+      <label class="field"><span>Periode *</span><input type="month" id="mass-payroll-period" /></label>
+    </div>
+    <button type="button" class="btn btn--secondary" id="btn-mass-calculate">Hitung Semua</button>
+
+    <div class="table-scroll" style="margin-top:16px;">
+      <table class="table table--compact" id="table-mass-payroll">
+        <thead>
+          <tr><th>Nama</th><th>Posisi</th><th>Gaji Pokok</th><th>Tunjangan</th><th>Bonus</th><th>Insentif</th><th>Potongan</th><th>Total</th><th>Status</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="field-hint" style="margin-top:8px;">Potongan di sini berupa nominal total (opsional) — untuk rincian alasan per potongan, edit payroll masing-masing karyawan setelah dibuat.</p>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn--ghost" data-close-modal>Batal</button>
+      <button type="button" class="btn btn--primary" id="btn-mass-process">Proses Payroll</button>
+    </div>
   </div>
 </div>
 

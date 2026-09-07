@@ -57,6 +57,25 @@ function categoryBadgeClass(category) {
   }
 }
 
+// Jenis potongan kesalahan kerja (TIDAK ada kasbon/absensi/keterlambatan, sesuai batasan modul ini).
+const DEDUCTION_TYPES = ["Salah Packing", "Salah Kirim Barang", "Salah SKU", "Salah Varian", "Kesalahan Input Pesanan", "Kesalahan Input Stok", "Barang Rusak karena Kelalaian", "Kesalahan Operasional", "Lainnya"];
+
+/** "2026-09" -> "September 2026" */
+function formatPeriodLabel(periodValue) {
+  if (!periodValue) return "-";
+  const [y, m] = periodValue.split("-").map(Number);
+  if (!y || !m) return periodValue;
+  return new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+}
+
+function payrollStatusBadgeClass(status) {
+  switch (status) {
+    case "Dibayar": return "tag--selesai";
+    case "Menunggu Pembayaran": return "tag--perlu_verifikasi";
+    default: return "tag--menunggu_pembayaran"; // Draft
+  }
+}
+
 // Profil toko default — dipakai sebelum menu Pengaturan pernah diisi.
 const DEFAULT_SETTINGS = {
   storeName: "Atelier Admin",
@@ -103,6 +122,12 @@ const state = {
   editingReviewId: null,
   reviewGeneralScores: {},
   reviewKpiScores: {},
+  payrolls: [],
+  payrollFilterPeriod: "",
+  payrollFilterStatus: "",
+  editingPayrollId: null,
+  payrollDeductionRows: [],
+  massPayrollRows: [],
   openOrderId: null,
   editingProductId: null,
   editingCustomerId: null,
@@ -123,6 +148,7 @@ const LOCAL_KEY_SETTINGS = "atelier_demo_settings";
 const LOCAL_KEY_EMPLOYEES = "atelier_demo_employees";
 const LOCAL_KEY_POSITIONS = "atelier_demo_positions";
 const LOCAL_KEY_REVIEWS = "atelier_demo_performance_reviews";
+const LOCAL_KEY_PAYROLLS = "atelier_demo_payrolls";
 
 let fb = null; // { db, addDoc, updateDoc, collection, doc, onSnapshot, serverTimestamp, query, orderBy, deleteDoc }
 let authInstance = null;
@@ -339,6 +365,11 @@ function subscribeFirestore() {
     state.performanceReviews = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAll();
   }));
+
+  firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "payrolls"), orderBy("createdAt", "desc")), (snap) => {
+    state.payrolls = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAll();
+  }));
 }
 
 async function seedFirestore() {
@@ -361,6 +392,7 @@ async function loadDemoData() {
   const employees = JSON.parse(localStorage.getItem(LOCAL_KEY_EMPLOYEES) || "null");
   const positions = JSON.parse(localStorage.getItem(LOCAL_KEY_POSITIONS) || "null");
   const performanceReviews = JSON.parse(localStorage.getItem(LOCAL_KEY_REVIEWS) || "null");
+  const payrolls = JSON.parse(localStorage.getItem(LOCAL_KEY_PAYROLLS) || "null");
 
   if (!orders || !products) {
     const seed = buildSeedData();
@@ -376,6 +408,7 @@ async function loadDemoData() {
   state.employees = employees || [];
   state.positions = positions || [];
   state.performanceReviews = performanceReviews || [];
+  state.payrolls = payrolls || [];
 
   // Bangun data pelanggan & pemasukan dari pesanan yang sudah ada (juga jalan tiap kali pesanan berubah).
   await syncCustomersFromOrders();
@@ -392,6 +425,7 @@ function saveDemoData() {
   localStorage.setItem(LOCAL_KEY_EMPLOYEES, JSON.stringify(state.employees));
   localStorage.setItem(LOCAL_KEY_POSITIONS, JSON.stringify(state.positions));
   localStorage.setItem(LOCAL_KEY_REVIEWS, JSON.stringify(state.performanceReviews));
+  localStorage.setItem(LOCAL_KEY_PAYROLLS, JSON.stringify(state.payrolls));
 }
 
 /** Update satu order (status + field lain) — dipakai untuk semua aksi alur kerja. */
@@ -647,6 +681,35 @@ async function updatePerformanceReview(reviewId, patch) {
     saveDemoData();
     renderAll();
   }
+}
+
+async function addPayroll(payroll) {
+  if (state.mode === "firebase") {
+    const { addDoc, collection, serverTimestamp } = fb;
+    await addDoc(collection(fb.db, "payrolls"), { ...payroll, createdAt: serverTimestamp() });
+  } else {
+    const newPayroll = { ...payroll, id: "demo-payroll-" + Date.now() + Math.random().toString(36).slice(2, 6), createdAt: new Date().toISOString() };
+    state.payrolls.push(newPayroll);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+async function updatePayroll(payrollId, patch) {
+  if (state.mode === "firebase") {
+    const { doc, updateDoc } = fb;
+    await updateDoc(doc(fb.db, "payrolls", payrollId), patch);
+  } else {
+    const payroll = state.payrolls.find((p) => p.id === payrollId);
+    Object.assign(payroll, patch);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+/** Cegah 2 payroll aktif untuk employeeId + periode yang sama. */
+function findExistingPayroll(employeeId, period, excludeId) {
+  return state.payrolls.find((p) => p.employeeId === employeeId && p.period === period && p.id !== excludeId);
 }
 
 // ------------------------------------------------------------
@@ -1455,6 +1518,7 @@ function renderKaryawanView() {
   renderEmployeeTable();
   renderReviewListView();
   renderContractView();
+  renderPayrollView();
 }
 
 function renderKaryawanDashboard() {
@@ -2307,6 +2371,246 @@ function renderEmployeeDecisionForm(employee, decision) {
 }
 
 // ------------------------------------------------------------
+// Payroll / Gaji
+// ------------------------------------------------------------
+function renderPayrollView() {
+  let filtered = state.payrolls.slice();
+  if (state.payrollFilterPeriod) filtered = filtered.filter((p) => p.period === state.payrollFilterPeriod);
+  if (state.payrollFilterStatus) filtered = filtered.filter((p) => p.status === state.payrollFilterStatus);
+  filtered.sort((a, b) => (b.period || "").localeCompare(a.period || "") || (a.employeeName || "").localeCompare(b.employeeName || ""));
+
+  const tbody = els.tablePayrolls.querySelector("tbody");
+  tbody.innerHTML = "";
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="table-empty">Belum ada data payroll.</td></tr>`;
+    return;
+  }
+  filtered.forEach((p) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(p.employeeName)}</strong></td>
+      <td>${escapeHtml(p.positionName || "-")}</td>
+      <td>${formatPeriodLabel(p.period)}</td>
+      <td>${formatRupiah(p.totalIncome)}</td>
+      <td>${formatRupiah(p.totalDeduction)}</td>
+      <td><strong>${formatRupiah(p.netSalary)}</strong></td>
+      <td><span class="tag ${payrollStatusBadgeClass(p.status)}">${escapeHtml(p.status)}</span></td>
+      <td></td>
+    `;
+    const actionTd = tr.querySelector("td:last-child");
+    const editBtn = document.createElement("button");
+    editBtn.className = "mini-btn";
+    editBtn.textContent = "Detail/Edit";
+    editBtn.addEventListener("click", () => openPayrollModal(p));
+    actionTd.appendChild(editBtn);
+    tbody.appendChild(tr);
+  });
+}
+
+function populatePayrollEmployeeSelect() {
+  els.payrollEmployeeSelect.innerHTML =
+    `<option value="">Pilih karyawan</option>` +
+    state.employees
+      .filter((e) => (e.employeeStatus || "Aktif") === "Aktif")
+      .map((e) => `<option value="${e.id}">${escapeHtml(e.name)} - ${escapeHtml(positionLabel(e.positionId))}</option>`)
+      .join("");
+}
+
+function renderDeductionRows() {
+  const container = els.payrollDeductionsList;
+  container.innerHTML = "";
+  els.payrollDeductionsEmptyHint.hidden = state.payrollDeductionRows.length > 0;
+  state.payrollDeductionRows.forEach((row, i) => {
+    const div = document.createElement("div");
+    div.className = "deduction-row";
+    div.innerHTML = `
+      <select data-field="type" class="stock-input" style="flex:1.4;min-width:150px;">
+        ${DEDUCTION_TYPES.map((t) => `<option value="${t}" ${row.type === t ? "selected" : ""}>${t}</option>`).join("")}
+      </select>
+      <input type="date" data-field="date" class="stock-input" value="${row.date || ""}" style="width:140px;" />
+      <input type="text" data-field="description" class="stock-input" placeholder="Keterangan" value="${escapeHtml(row.description || "")}" style="flex:1.6;min-width:150px;" />
+      <input type="number" min="0" data-field="amount" class="stock-input" placeholder="Nominal" value="${row.amount || ""}" style="width:120px;" />
+      <button type="button" class="btn btn--ghost" style="padding:5px 9px;font-size:12px;" aria-label="Hapus potongan">&times;</button>
+    `;
+    div.querySelectorAll("[data-field]").forEach((input) => {
+      input.addEventListener("input", (e) => {
+        const field = e.target.dataset.field;
+        row[field] = field === "amount" ? Number(e.target.value) || 0 : e.target.value;
+        updatePayrollTotals();
+      });
+    });
+    div.querySelector("button").addEventListener("click", () => {
+      state.payrollDeductionRows.splice(i, 1);
+      renderDeductionRows();
+      updatePayrollTotals();
+    });
+    container.appendChild(div);
+  });
+}
+
+function computePayrollTotals() {
+  const baseSalary = Number(els.payrollBaseSalaryDisplay.dataset.raw || 0);
+  const allowance = Number(els.payrollAllowance.value) || 0;
+  const bonus = Number(els.payrollBonus.value) || 0;
+  const incentive = Number(els.payrollIncentive.value) || 0;
+  const totalIncome = baseSalary + allowance + bonus + incentive;
+  const totalDeduction = state.payrollDeductionRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  return { baseSalary, allowance, bonus, incentive, totalIncome, totalDeduction, netSalary: totalIncome - totalDeduction };
+}
+
+function updatePayrollTotals() {
+  const t = computePayrollTotals();
+  els.payrollTotalIncome.textContent = formatRupiah(t.totalIncome);
+  els.payrollTotalDeduction.textContent = formatRupiah(t.totalDeduction);
+  els.payrollNetSalary.textContent = formatRupiah(t.netSalary);
+}
+
+function handlePayrollEmployeeChange() {
+  const employee = state.employees.find((e) => e.id === els.payrollEmployeeSelect.value);
+  els.payrollBaseSalaryDisplay.value = employee ? formatRupiah(employee.baseSalary) : "";
+  els.payrollBaseSalaryDisplay.dataset.raw = String(employee?.baseSalary || 0);
+  updatePayrollTotals();
+}
+
+function resetPayrollForm() {
+  els.payrollForm.reset();
+  state.editingPayrollId = null;
+  state.payrollDeductionRows = [];
+  els.payrollModalTitle.textContent = "Buat payroll";
+  els.payrollSubmitBtn.textContent = "Proses Payroll";
+  els.payrollEmployeeSelect.disabled = false;
+  populatePayrollEmployeeSelect();
+  renderDeductionRows();
+  handlePayrollEmployeeChange();
+}
+
+/** Buka modal payroll. Tanpa argumen = buat baru. Dengan argumen = edit, form terisi otomatis. */
+function openPayrollModal(payroll) {
+  resetPayrollForm();
+  if (payroll) {
+    state.editingPayrollId = payroll.id;
+    els.payrollModalTitle.textContent = `Edit payroll — ${payroll.employeeName}`;
+    els.payrollSubmitBtn.textContent = "Simpan perubahan";
+    els.payrollEmployeeSelect.innerHTML = `<option value="${payroll.employeeId}">${escapeHtml(payroll.employeeName)} - ${escapeHtml(payroll.positionName)}</option>`;
+    els.payrollEmployeeSelect.value = payroll.employeeId;
+    els.payrollEmployeeSelect.disabled = true;
+    els.payrollBaseSalaryDisplay.value = formatRupiah(payroll.baseSalary);
+    els.payrollBaseSalaryDisplay.dataset.raw = String(payroll.baseSalary || 0);
+    els.payrollPeriod.value = payroll.period || "";
+    els.payrollAllowance.value = payroll.allowance || 0;
+    els.payrollBonus.value = payroll.bonus || 0;
+    els.payrollIncentive.value = payroll.incentive || 0;
+    state.payrollDeductionRows = (payroll.deductions || []).map((d) => ({ ...d }));
+    renderDeductionRows();
+    els.payrollStatus.value = payroll.status || "Draft";
+    els.payrollPaymentDate.value = payroll.paymentDate || "";
+    els.payrollPaymentMethod.value = payroll.paymentMethod || "Transfer";
+  }
+  updatePayrollTotals();
+  els.payrollModal.hidden = false;
+}
+
+// ------------------------------------------------------------
+// Payroll massal
+// ------------------------------------------------------------
+function openMassPayrollModal() {
+  els.massPayrollPeriod.value = "";
+  state.massPayrollRows = [];
+  els.tableMassPayroll.querySelector("tbody").innerHTML = "";
+  els.massPayrollModal.hidden = false;
+}
+
+function handleMassCalculate() {
+  const period = els.massPayrollPeriod.value;
+  if (!period) {
+    showToast("Pilih periode dulu.");
+    return;
+  }
+  const activeEmployees = state.employees.filter((e) => (e.employeeStatus || "Aktif") === "Aktif");
+  state.massPayrollRows = activeEmployees.map((e) => ({
+    employeeId: e.id,
+    employeeName: e.name,
+    positionName: positionLabel(e.positionId),
+    baseSalary: e.baseSalary || 0,
+    allowance: 0,
+    bonus: 0,
+    incentive: 0,
+    deductionTotal: 0,
+    alreadyExists: !!findExistingPayroll(e.id, period),
+  }));
+  renderMassPayrollTable();
+}
+
+function renderMassPayrollTable() {
+  const tbody = els.tableMassPayroll.querySelector("tbody");
+  tbody.innerHTML = "";
+  if (state.massPayrollRows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="table-empty">Tidak ada karyawan aktif.</td></tr>`;
+    return;
+  }
+  state.massPayrollRows.forEach((row) => {
+    const total = row.baseSalary + row.allowance + row.bonus + row.incentive - row.deductionTotal;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(row.employeeName)}</td>
+      <td>${escapeHtml(row.positionName)}</td>
+      <td>${formatRupiah(row.baseSalary)}</td>
+      <td><input type="number" min="0" class="stock-input" style="width:90px;" value="${row.allowance}" data-field="allowance" /></td>
+      <td><input type="number" min="0" class="stock-input" style="width:90px;" value="${row.bonus}" data-field="bonus" /></td>
+      <td><input type="number" min="0" class="stock-input" style="width:90px;" value="${row.incentive}" data-field="incentive" /></td>
+      <td><input type="number" min="0" class="stock-input" style="width:90px;" value="${row.deductionTotal}" data-field="deductionTotal" /></td>
+      <td><strong>${formatRupiah(total)}</strong></td>
+      <td>${row.alreadyExists ? `<span class="tag tag--dibatalkan">Sudah ada</span>` : `<span class="tag tag--selesai">Siap</span>`}</td>
+    `;
+    tr.querySelectorAll("[data-field]").forEach((input) => {
+      input.addEventListener("input", (e) => {
+        row[e.target.dataset.field] = Number(e.target.value) || 0;
+        const totalCell = tr.children[7];
+        totalCell.innerHTML = `<strong>${formatRupiah(row.baseSalary + row.allowance + row.bonus + row.incentive - row.deductionTotal)}</strong>`;
+      });
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+async function handleMassProcess() {
+  const period = els.massPayrollPeriod.value;
+  if (!period || state.massPayrollRows.length === 0) {
+    showToast("Klik \"Hitung Semua\" dulu.");
+    return;
+  }
+  let created = 0;
+  let skipped = 0;
+  for (const row of state.massPayrollRows) {
+    if (row.alreadyExists) { skipped++; continue; }
+    const totalIncome = row.baseSalary + row.allowance + row.bonus + row.incentive;
+    const netSalary = totalIncome - row.deductionTotal;
+    await addPayroll({
+      employeeId: row.employeeId,
+      employeeName: row.employeeName,
+      employeeCode: state.employees.find((e) => e.id === row.employeeId)?.employeeId || "",
+      positionName: row.positionName,
+      period,
+      baseSalary: row.baseSalary,
+      allowance: row.allowance,
+      bonus: row.bonus,
+      incentive: row.incentive,
+      totalIncome,
+      deductions: row.deductionTotal > 0 ? [{ type: "Lainnya", date: "", description: "Potongan payroll massal", amount: row.deductionTotal }] : [],
+      totalDeduction: row.deductionTotal,
+      netSalary,
+      status: "Draft",
+      paymentDate: "",
+      paymentMethod: "Transfer",
+    });
+    created++;
+  }
+  els.massPayrollModal.hidden = true;
+  navigateTo("karyawan");
+  showToast(`${created} payroll dibuat, ${skipped} dilewati (sudah ada untuk periode ini).`);
+}
+
+// ------------------------------------------------------------
 function applySettingsToForm() {
   const s = { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
   const f = els.settingsForm.elements;
@@ -2675,12 +2979,15 @@ function closeModals() {
   els.reviewDetailModal.hidden = true;
   els.contractReviewModal.hidden = true;
   els.decisionModal.hidden = true;
+  els.payrollModal.hidden = true;
+  els.massPayrollModal.hidden = true;
   state.openOrderId = null;
   resetProductForm();
   resetCustomerForm();
   resetCreateOrderForm();
   resetEmployeeForm();
   resetReviewForm();
+  resetPayrollForm();
 }
 
 function renderOrderModalBody(orderId) {
@@ -3265,7 +3572,7 @@ function bindEvents() {
   els.productSearch.addEventListener("input", (e) => { state.productSearch = e.target.value; renderProductsView(); });
 
   document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", closeModals));
-  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal, els.employeeModal, els.positionModal, els.reviewModal, els.reviewDetailModal, els.contractReviewModal, els.decisionModal].forEach((overlay) => {
+  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal, els.employeeModal, els.positionModal, els.reviewModal, els.reviewDetailModal, els.contractReviewModal, els.decisionModal, els.payrollModal, els.massPayrollModal].forEach((overlay) => {
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModals(); });
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModals(); });
@@ -3389,6 +3696,7 @@ function bindEvents() {
       els.karyawanTabData.hidden = state.karyawanTab !== "data";
       els.karyawanTabPenilaian.hidden = state.karyawanTab !== "penilaian";
       els.karyawanTabKontrak.hidden = state.karyawanTab !== "kontrak";
+      els.karyawanTabPayroll.hidden = state.karyawanTab !== "payroll";
       renderKaryawanView();
     });
   });
@@ -3571,6 +3879,72 @@ function bindEvents() {
       showToast(`Karyawan "${employee.name}" ditambahkan (${employee.employeeId}).`);
     }
   });
+
+  // ---- Payroll ----
+  els.payrollFilterPeriod.addEventListener("input", (e) => { state.payrollFilterPeriod = e.target.value; renderPayrollView(); });
+  els.payrollFilterStatus.addEventListener("change", (e) => { state.payrollFilterStatus = e.target.value; renderPayrollView(); });
+  els.btnAddPayroll.addEventListener("click", () => openPayrollModal());
+  els.btnMassPayroll.addEventListener("click", () => openMassPayrollModal());
+
+  els.payrollEmployeeSelect.addEventListener("change", handlePayrollEmployeeChange);
+  els.payrollAllowance.addEventListener("input", updatePayrollTotals);
+  els.payrollBonus.addEventListener("input", updatePayrollTotals);
+  els.payrollIncentive.addEventListener("input", updatePayrollTotals);
+  els.btnAddDeduction.addEventListener("click", () => {
+    state.payrollDeductionRows.push({ type: DEDUCTION_TYPES[0], date: toDateInputValue(new Date()), description: "", amount: 0 });
+    renderDeductionRows();
+    updatePayrollTotals();
+  });
+
+  els.payrollForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const employee = state.employees.find((emp) => emp.id === els.payrollEmployeeSelect.value);
+    if (!employee) { showToast("Pilih karyawan."); return; }
+    const period = els.payrollPeriod.value;
+    if (!period) { showToast("Periode wajib diisi."); return; }
+
+    const dup = findExistingPayroll(employee.id, period, state.editingPayrollId);
+    if (dup) {
+      showToast("Payroll karyawan ini untuk periode tersebut sudah tersedia.");
+      return;
+    }
+
+    const t = computePayrollTotals();
+    const payroll = {
+      employeeId: employee.id,
+      employeeName: employee.name,
+      employeeCode: employee.employeeId || "",
+      positionName: positionLabel(employee.positionId),
+      period,
+      baseSalary: t.baseSalary,
+      allowance: t.allowance,
+      bonus: t.bonus,
+      incentive: t.incentive,
+      totalIncome: t.totalIncome,
+      deductions: state.payrollDeductionRows.filter((r) => (r.amount || 0) > 0 || r.description).map((r) => ({ ...r })),
+      totalDeduction: t.totalDeduction,
+      netSalary: t.netSalary,
+      status: els.payrollStatus.value,
+      paymentDate: els.payrollPaymentDate.value,
+      paymentMethod: els.payrollPaymentMethod.value,
+    };
+
+    if (state.editingPayrollId) {
+      await updatePayroll(state.editingPayrollId, payroll);
+      closeModals();
+      navigateTo("karyawan");
+      showToast(`Payroll ${employee.name} diperbarui.`);
+    } else {
+      await addPayroll(payroll);
+      closeModals();
+      navigateTo("karyawan");
+      showToast(`Payroll ${employee.name} untuk ${formatPeriodLabel(period)} tersimpan.`);
+    }
+  });
+
+  els.btnMassCalculate.addEventListener("click", handleMassCalculate);
+  els.btnMassProcess.addEventListener("click", handleMassProcess);
+
   els.btnAddCustomer.addEventListener("click", () => openCustomerModal());
 
   els.customerForm.addEventListener("submit", async (e) => {
@@ -3779,6 +4153,37 @@ function cacheEls() {
   els.contractReviewBody = document.getElementById("contract-review-body");
   els.decisionModal = document.getElementById("decision-modal");
   els.decisionBody = document.getElementById("decision-body");
+
+  els.karyawanTabPayroll = document.getElementById("karyawan-tab-payroll");
+  els.payrollFilterPeriod = document.getElementById("payroll-filter-period");
+  els.payrollFilterStatus = document.getElementById("payroll-filter-status");
+  els.btnMassPayroll = document.getElementById("btn-mass-payroll");
+  els.btnAddPayroll = document.getElementById("btn-add-payroll");
+  els.tablePayrolls = document.getElementById("table-payrolls");
+  els.payrollModal = document.getElementById("payroll-modal");
+  els.payrollModalTitle = document.getElementById("payroll-modal-title");
+  els.payrollSubmitBtn = document.getElementById("payroll-submit-btn");
+  els.payrollForm = document.getElementById("payroll-form");
+  els.payrollEmployeeSelect = document.getElementById("payroll-employee-select");
+  els.payrollPeriod = document.getElementById("payroll-period");
+  els.payrollBaseSalaryDisplay = document.getElementById("payroll-base-salary-display");
+  els.payrollAllowance = document.getElementById("payroll-allowance");
+  els.payrollBonus = document.getElementById("payroll-bonus");
+  els.payrollIncentive = document.getElementById("payroll-incentive");
+  els.btnAddDeduction = document.getElementById("btn-add-deduction");
+  els.payrollDeductionsList = document.getElementById("payroll-deductions-list");
+  els.payrollDeductionsEmptyHint = document.getElementById("payroll-deductions-empty-hint");
+  els.payrollTotalIncome = document.getElementById("payroll-total-income");
+  els.payrollTotalDeduction = document.getElementById("payroll-total-deduction");
+  els.payrollNetSalary = document.getElementById("payroll-net-salary");
+  els.payrollStatus = document.getElementById("payroll-status");
+  els.payrollPaymentDate = document.getElementById("payroll-payment-date");
+  els.payrollPaymentMethod = document.getElementById("payroll-payment-method");
+  els.massPayrollModal = document.getElementById("mass-payroll-modal");
+  els.massPayrollPeriod = document.getElementById("mass-payroll-period");
+  els.btnMassCalculate = document.getElementById("btn-mass-calculate");
+  els.tableMassPayroll = document.getElementById("table-mass-payroll");
+  els.btnMassProcess = document.getElementById("btn-mass-process");
   els.customerModal = document.getElementById("customer-modal");
   els.customerModalTitle = document.getElementById("customer-modal-title");
   els.customerSubmitBtn = document.getElementById("customer-submit-btn");

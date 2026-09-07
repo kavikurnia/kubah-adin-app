@@ -1093,6 +1093,19 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 
 /* ==========================================================
+   PAYROLL — baris potongan kesalahan kerja
+   ========================================================== */
+.deduction-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border);
+  flex-wrap: wrap;
+}
+.deduction-row:last-child { border-bottom: none; }
+
+/* ==========================================================
    KALKULATOR PINTAR
    ========================================================== */
 .calc-layout {
