@@ -976,6 +976,20 @@
   </div>
 </div>
 
+<!-- ============ SLIP GAJI MODAL ============ -->
+<div class="overlay" id="slip-modal" hidden>
+  <div class="modal modal--wide">
+    <button class="modal-close" data-close-modal>&times;</button>
+    <div class="slip-sheet" id="slip-sheet"></div>
+    <div class="slip-actions">
+      <button type="button" class="btn btn--secondary" id="btn-slip-pdf">Download PDF</button>
+      <button type="button" class="btn btn--secondary" id="btn-slip-png">Download Gambar</button>
+      <button type="button" class="btn btn--primary" id="btn-slip-share">Share WhatsApp</button>
+      <button type="button" class="btn btn--primary" id="btn-slip-share-employee" hidden>Kirim ke WhatsApp Karyawan</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ CREATE ORDER MODAL ============ -->
 <div class="overlay" id="create-order-modal" hidden>
   <div class="modal modal--wide">
@@ -1145,6 +1159,8 @@
 
 <script src="firebase-config.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

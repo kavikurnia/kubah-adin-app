@@ -128,6 +128,8 @@ const state = {
   editingPayrollId: null,
   payrollDeductionRows: [],
   massPayrollRows: [],
+  viewingSlipPayroll: null,
+  viewingSlipEmployee: null,
   openOrderId: null,
   editingProductId: null,
   editingCustomerId: null,
@@ -2403,6 +2405,14 @@ function renderPayrollView() {
     editBtn.textContent = "Detail/Edit";
     editBtn.addEventListener("click", () => openPayrollModal(p));
     actionTd.appendChild(editBtn);
+
+    if (p.status === "Dibayar") {
+      const slipBtn = document.createElement("button");
+      slipBtn.className = "mini-btn mini-btn--outline";
+      slipBtn.textContent = "Slip Gaji";
+      slipBtn.addEventListener("click", () => openSlipModal(p));
+      actionTd.appendChild(slipBtn);
+    }
     tbody.appendChild(tr);
   });
 }
@@ -2608,6 +2618,186 @@ async function handleMassProcess() {
   els.massPayrollModal.hidden = true;
   navigateTo("karyawan");
   showToast(`${created} payroll dibuat, ${skipped} dilewati (sudah ada untuk periode ini).`);
+}
+
+// ------------------------------------------------------------
+// Slip Gaji
+// ------------------------------------------------------------
+function getStoreSettings() {
+  return { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
+}
+
+/** Bangun HTML lembar slip gaji (dipakai untuk preview, capture PNG, dan capture PDF — satu sumber tampilan yang sama). */
+function buildPayslipHtml(payroll) {
+  const store = getStoreSettings();
+  const deductionRows = (payroll.deductions || [])
+    .filter((d) => (d.amount || 0) > 0)
+    .map(
+      (d) => `
+      <div class="slip-deduction-item">
+        <div class="slip-row"><span>${escapeHtml(d.type)}</span><span>${formatRupiah(d.amount)}</span></div>
+        ${d.description ? `<div class="slip-deduction-desc">${escapeHtml(d.description)}</div>` : ""}
+      </div>`
+    )
+    .join("");
+
+  return `
+    <div class="slip-header">
+      <p class="slip-store-name">${escapeHtml(store.storeName)}</p>
+      <p class="slip-title">SLIP GAJI</p>
+      <p class="slip-period">${formatPeriodLabel(payroll.period)}</p>
+    </div>
+
+    <div class="slip-employee-block">
+      <div class="slip-row"><span>Nama</span><strong>${escapeHtml(payroll.employeeName)}</strong></div>
+      <div class="slip-row"><span>ID Karyawan</span><strong>${escapeHtml(payroll.employeeCode || "-")}</strong></div>
+      <div class="slip-row"><span>Posisi</span><strong>${escapeHtml(payroll.positionName || "-")}</strong></div>
+    </div>
+
+    <div class="slip-section">
+      <p class="slip-section-title">Pendapatan</p>
+      <div class="slip-row"><span>Gaji Pokok</span><span>${formatRupiah(payroll.baseSalary)}</span></div>
+      <div class="slip-row"><span>Tunjangan</span><span>${formatRupiah(payroll.allowance)}</span></div>
+      <div class="slip-row"><span>Bonus</span><span>${formatRupiah(payroll.bonus)}</span></div>
+      <div class="slip-row"><span>Insentif</span><span>${formatRupiah(payroll.incentive)}</span></div>
+      <div class="slip-row slip-row--total"><span>Total Pendapatan</span><span>${formatRupiah(payroll.totalIncome)}</span></div>
+    </div>
+
+    ${
+      (payroll.deductions || []).length > 0
+        ? `<div class="slip-section">
+      <p class="slip-section-title">Potongan Kesalahan Kerja</p>
+      ${deductionRows}
+      <div class="slip-row slip-row--total"><span>Total Potongan</span><span>${formatRupiah(payroll.totalDeduction)}</span></div>
+    </div>`
+        : ""
+    }
+
+    <div class="slip-net-block">
+      <span>Total Diterima</span>
+      <strong>${formatRupiah(payroll.netSalary)}</strong>
+    </div>
+
+    <div class="slip-footer-info">
+      <div class="slip-row"><span>Tanggal Pembayaran</span><span>${payroll.paymentDate ? formatDate(payroll.paymentDate) : "-"}</span></div>
+      <div class="slip-row"><span>Metode</span><span>${escapeHtml(payroll.paymentMethod || "-")}</span></div>
+      <div class="slip-row"><span>Status</span><span class="slip-status-lunas">LUNAS</span></div>
+    </div>
+
+    <p class="slip-brand-footer">${escapeHtml(store.storeName)}</p>
+  `;
+}
+
+function openSlipModal(payroll) {
+  const employee = state.employees.find((e) => e.id === payroll.employeeId);
+  state.viewingSlipPayroll = payroll;
+  state.viewingSlipEmployee = employee || null;
+  els.slipSheet.innerHTML = buildPayslipHtml(payroll);
+  els.btnSlipShareEmployee.hidden = !(employee && employee.phone);
+  els.slipModal.hidden = false;
+}
+
+/** "0812..." atau "+62812..." -> "62812..." untuk link wa.me. Nomor asli di Data Karyawan tidak diubah. */
+function normalizeWhatsAppNumber(phone) {
+  let digits = (phone || "").replace(/\D/g, "");
+  if (digits.startsWith("0")) digits = "62" + digits.slice(1);
+  else if (!digits.startsWith("62")) digits = "62" + digits;
+  return digits;
+}
+
+function buildPayslipWhatsAppMessage(payroll, employee) {
+  const store = getStoreSettings();
+  return `Halo ${employee?.name || payroll.employeeName},\n\nBerikut slip gaji Anda untuk periode ${formatPeriodLabel(payroll.period)}.\n\nTotal diterima:\n${formatRupiah(payroll.netSalary)}\n\nStatus:\nLUNAS\n\n${store.storeName}`;
+}
+
+async function capturePayslipCanvas() {
+  if (typeof html2canvas === "undefined") {
+    showToast("Library gagal dimuat — cek koneksi internet lalu coba lagi.");
+    return null;
+  }
+  return html2canvas(els.slipSheet, { scale: 2, backgroundColor: "#ffffff" });
+}
+
+function payslipFileNameBase(payroll) {
+  const namePart = (payroll.employeeName || "Karyawan").replace(/\s+/g, "-");
+  const periodPart = formatPeriodLabel(payroll.period).replace(/\s+/g, "-");
+  return `Slip-Gaji-${namePart}-${periodPart}`;
+}
+
+async function downloadSlipPdf(payroll) {
+  const canvas = await capturePayslipCanvas();
+  if (!canvas) return;
+  if (typeof window.jspdf === "undefined") {
+    showToast("Library PDF gagal dimuat — cek koneksi internet lalu coba lagi.");
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: "px", format: [canvas.width, canvas.height] });
+  pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
+  pdf.save(`${payslipFileNameBase(payroll)}.pdf`);
+}
+
+async function downloadSlipPng(payroll) {
+  const canvas = await capturePayslipCanvas();
+  if (!canvas) return;
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${payslipFileNameBase(payroll)}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, "image/png");
+}
+
+function generatePayslipPngBlob() {
+  return new Promise(async (resolve) => {
+    const canvas = await capturePayslipCanvas();
+    if (!canvas) { resolve(null); return; }
+    canvas.toBlob((blob) => resolve(blob), "image/png");
+  });
+}
+
+/**
+ * Share slip gaji. Tanpa targetPhone = tombol "Share WhatsApp" generik (native share / wa.me tanpa nomor).
+ * Dengan targetPhone = tombol "Kirim ke WhatsApp Karyawan" (buka chat spesifik nomor tsb).
+ */
+async function sharePayslip(payroll, employee, targetPhone) {
+  const message = buildPayslipWhatsAppMessage(payroll, employee);
+
+  if (targetPhone) {
+    const waNumber = normalizeWhatsAppNumber(targetPhone);
+    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`, "_blank");
+    showToast("Chat WhatsApp dibuka — lampirkan slip yang sudah diunduh secara manual di sana (link wa.me tidak bisa melampirkan file otomatis).");
+    return;
+  }
+
+  try {
+    const blob = await generatePayslipPngBlob();
+    if (blob) {
+      const file = new File([blob], `${payslipFileNameBase(payroll)}.png`, { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], text: message, title: "Slip Gaji" });
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn("Native share dengan file gagal/dibatalkan, coba fallback.", err);
+  }
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ text: message, title: "Slip Gaji" });
+      return;
+    } catch (err) {
+      return; // dibatalkan pengguna — tidak perlu fallback lagi
+    }
+  }
+
+  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
 }
 
 // ------------------------------------------------------------
@@ -2981,6 +3171,7 @@ function closeModals() {
   els.decisionModal.hidden = true;
   els.payrollModal.hidden = true;
   els.massPayrollModal.hidden = true;
+  els.slipModal.hidden = true;
   state.openOrderId = null;
   resetProductForm();
   resetCustomerForm();
@@ -3572,7 +3763,7 @@ function bindEvents() {
   els.productSearch.addEventListener("input", (e) => { state.productSearch = e.target.value; renderProductsView(); });
 
   document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", closeModals));
-  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal, els.employeeModal, els.positionModal, els.reviewModal, els.reviewDetailModal, els.contractReviewModal, els.decisionModal, els.payrollModal, els.massPayrollModal].forEach((overlay) => {
+  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal, els.employeeModal, els.positionModal, els.reviewModal, els.reviewDetailModal, els.contractReviewModal, els.decisionModal, els.payrollModal, els.massPayrollModal, els.slipModal].forEach((overlay) => {
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModals(); });
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModals(); });
@@ -3945,6 +4136,11 @@ function bindEvents() {
   els.btnMassCalculate.addEventListener("click", handleMassCalculate);
   els.btnMassProcess.addEventListener("click", handleMassProcess);
 
+  els.btnSlipPdf.addEventListener("click", () => downloadSlipPdf(state.viewingSlipPayroll));
+  els.btnSlipPng.addEventListener("click", () => downloadSlipPng(state.viewingSlipPayroll));
+  els.btnSlipShare.addEventListener("click", () => sharePayslip(state.viewingSlipPayroll, state.viewingSlipEmployee));
+  els.btnSlipShareEmployee.addEventListener("click", () => sharePayslip(state.viewingSlipPayroll, state.viewingSlipEmployee, state.viewingSlipEmployee?.phone));
+
   els.btnAddCustomer.addEventListener("click", () => openCustomerModal());
 
   els.customerForm.addEventListener("submit", async (e) => {
@@ -4184,6 +4380,13 @@ function cacheEls() {
   els.btnMassCalculate = document.getElementById("btn-mass-calculate");
   els.tableMassPayroll = document.getElementById("table-mass-payroll");
   els.btnMassProcess = document.getElementById("btn-mass-process");
+
+  els.slipModal = document.getElementById("slip-modal");
+  els.slipSheet = document.getElementById("slip-sheet");
+  els.btnSlipPdf = document.getElementById("btn-slip-pdf");
+  els.btnSlipPng = document.getElementById("btn-slip-png");
+  els.btnSlipShare = document.getElementById("btn-slip-share");
+  els.btnSlipShareEmployee = document.getElementById("btn-slip-share-employee");
   els.customerModal = document.getElementById("customer-modal");
   els.customerModalTitle = document.getElementById("customer-modal-title");
   els.customerSubmitBtn = document.getElementById("customer-submit-btn");

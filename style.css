@@ -1106,6 +1106,51 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .deduction-row:last-child { border-bottom: none; }
 
 /* ==========================================================
+   SLIP GAJI
+   ========================================================== */
+.slip-sheet {
+  max-width: 400px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 24px 22px;
+  color: #1a1a1a;
+}
+.slip-header { text-align: center; border-bottom: 2px solid #1a1a1a; padding-bottom: 14px; margin-bottom: 16px; }
+.slip-store-name { font-family: var(--font-display); font-size: 17px; font-weight: 700; margin: 0 0 6px; }
+.slip-title { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; margin: 0; }
+.slip-period { font-size: 12px; color: #666; margin: 4px 0 0; }
+
+.slip-employee-block { margin-bottom: 16px; }
+.slip-section { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px dashed #ccc; }
+.slip-section-title { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #888; margin: 0 0 8px; }
+
+.slip-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 3px 0; }
+.slip-row--total { font-weight: 700; border-top: 1px solid #ddd; margin-top: 4px; padding-top: 6px; }
+.slip-deduction-item { margin-bottom: 4px; }
+.slip-deduction-desc { font-size: 11px; color: #888; padding-left: 4px; }
+
+.slip-net-block {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--paper);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.slip-net-block strong { font-size: 18px; color: var(--garnet); }
+
+.slip-footer-info { margin-bottom: 14px; }
+.slip-status-lunas { color: var(--green); font-weight: 700; }
+.slip-brand-footer { text-align: center; font-size: 11px; color: #999; margin: 12px 0 0; padding-top: 12px; border-top: 1px dashed #ccc; }
+
+.slip-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+
+/* ==========================================================
    KALKULATOR PINTAR
    ========================================================== */
 .calc-layout {
