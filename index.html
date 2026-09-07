@@ -69,6 +69,11 @@
       <button class="nav-item" data-view="pelanggan">
         <span class="nav-dot"></span> Pelanggan
       </button>
+
+      <button class="nav-item" data-view="karyawan">
+        <span class="nav-dot"></span> Karyawan
+      </button>
+
       <button class="nav-item" data-view="keuangan">
         <span class="nav-dot"></span> Keuangan
       </button>
@@ -280,6 +285,80 @@
       </table>
     </section>
 
+    <!-- ---------- KARYAWAN ---------- -->
+    <section class="view" id="view-karyawan" hidden>
+      <header class="view-head">
+        <h1>Karyawan</h1>
+        <p class="view-sub">Fase 1 — Data karyawan &amp; dashboard dasar</p>
+      </header>
+
+      <div class="tabs" id="karyawan-tabs">
+        <button class="tab is-active" type="button" data-karyawan-tab="dashboard">Dashboard</button>
+        <button class="tab" type="button" data-karyawan-tab="data">Data Karyawan</button>
+      </div>
+
+      <div id="karyawan-tab-dashboard">
+        <div class="stat-row">
+          <div class="stat">
+            <span class="stat-value" id="emp-stat-total">0</span>
+            <span class="stat-label">Total karyawan</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="emp-stat-active">0</span>
+            <span class="stat-label">Karyawan aktif</span>
+          </div>
+          <div class="stat stat--amber">
+            <span class="stat-value" id="emp-stat-contract">0</span>
+            <span class="stat-label">Karyawan kontrak</span>
+          </div>
+          <div class="stat stat--red">
+            <span class="stat-value" id="emp-stat-expiring">0</span>
+            <span class="stat-label">Kontrak akan berakhir (30 hari)</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Kontrak akan berakhir</h2>
+          <ul class="action-list" id="emp-contract-alert-list"></ul>
+        </div>
+      </div>
+
+      <div id="karyawan-tab-data" hidden>
+        <div class="toolbar" style="flex-wrap:wrap;row-gap:10px;">
+          <input type="search" id="employee-search" placeholder="Cari nama / ID karyawan" />
+          <select id="employee-filter-position" class="stock-input" style="width:160px;">
+            <option value="">Semua posisi</option>
+          </select>
+          <select id="employee-filter-workstatus" class="stock-input" style="width:150px;">
+            <option value="">Semua status kerja</option>
+            <option value="Tetap">Tetap</option>
+            <option value="Kontrak">Kontrak</option>
+            <option value="Probation">Probation</option>
+            <option value="Freelance">Freelance</option>
+            <option value="Harian">Harian</option>
+            <option value="Magang">Magang</option>
+          </select>
+          <select id="employee-filter-status" class="stock-input" style="width:140px;">
+            <option value="">Semua status</option>
+            <option value="Aktif">Aktif</option>
+            <option value="Nonaktif">Nonaktif</option>
+            <option value="Resign">Resign</option>
+            <option value="Kontrak Habis">Kontrak Habis</option>
+          </select>
+          <button class="btn btn--primary" id="btn-add-employee" style="margin-left:auto;">+ Tambah Karyawan</button>
+        </div>
+
+        <div class="table-scroll">
+          <table class="table" id="table-employees">
+            <thead>
+              <tr><th></th><th>Nama</th><th>ID Karyawan</th><th>Posisi</th><th>Tanggal Masuk</th><th>Status Kerja</th><th>Gaji Pokok</th><th>Kontrak</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- ---------- KEUANGAN ---------- -->
     <section class="view" id="view-keuangan" hidden>
       <header class="view-head">
@@ -477,6 +556,122 @@
         <p class="field-hint" style="margin-top:10px;">Pratinjau ini hanya simulasi tampilan, tidak fungsional.</p>
       </aside>
     </div>
+  </div>
+</div>
+
+<!-- ============ EMPLOYEE MODAL ============ -->
+<div class="overlay" id="employee-modal" hidden>
+  <div class="modal modal--wide">
+    <button class="modal-close" data-close-modal>&times;</button>
+    <h2 id="employee-modal-title">Tambah karyawan</h2>
+
+    <form id="employee-form">
+      <div class="panel-head-row"><span style="font-size:13px;font-weight:700;">Data Pribadi</span></div>
+      <div class="form-grid">
+        <label class="field field--wide">
+          <span>Foto karyawan</span>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="variant-photo-preview" id="employee-photo-preview" style="width:64px;height:64px;">
+              <span class="variant-photo-fallback">+</span>
+              <img alt="" hidden />
+            </div>
+            <label class="btn btn--ghost photo-upload-btn" for="employee-photo-input">Upload Foto</label>
+            <input type="file" id="employee-photo-input" accept="image/jpeg,image/jpg,image/png,image/webp" hidden />
+          </div>
+        </label>
+        <label class="field"><span>Nama lengkap *</span><input type="text" name="name" required /></label>
+        <label class="field"><span>ID Karyawan</span><input type="text" id="employee-id-display" disabled placeholder="Otomatis saat disimpan" /></label>
+        <label class="field">
+          <span>Jenis kelamin</span>
+          <select name="gender"><option value="">-</option><option value="Laki-laki">Laki-laki</option><option value="Perempuan">Perempuan</option></select>
+        </label>
+        <label class="field"><span>Tempat lahir</span><input type="text" name="birthPlace" /></label>
+        <label class="field"><span>Tanggal lahir</span><input type="date" name="birthDate" /></label>
+        <label class="field"><span>Nomor HP *</span><input type="text" name="phone" required /></label>
+        <label class="field"><span>Email</span><input type="email" name="email" /></label>
+        <label class="field field--wide"><span>Alamat</span><textarea name="address" rows="2"></textarea></label>
+      </div>
+
+      <hr class="divider" />
+      <div class="panel-head-row"><span style="font-size:13px;font-weight:700;">Data Pekerjaan</span></div>
+      <div class="form-grid">
+        <label class="field">
+          <span>Posisi / Jabatan *</span>
+          <select name="positionId" id="employee-position-select" required>
+            <option value="">Pilih posisi</option>
+          </select>
+          <button type="button" class="link-btn" id="btn-add-position" style="margin-top:6px;">+ Tambah posisi baru</button>
+        </label>
+        <label class="field">
+          <span>Atasan / PIC</span>
+          <select name="supervisorId" id="employee-supervisor-select">
+            <option value="">- Tidak ada -</option>
+          </select>
+        </label>
+        <label class="field"><span>Tanggal masuk *</span><input type="date" name="joinDate" required /></label>
+        <label class="field">
+          <span>Status kerja *</span>
+          <select name="workStatus" id="employee-workstatus-select" required>
+            <option value="Tetap">Tetap</option>
+            <option value="Kontrak">Kontrak</option>
+            <option value="Probation">Probation</option>
+            <option value="Freelance">Freelance</option>
+            <option value="Harian">Harian</option>
+            <option value="Magang">Magang</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Status karyawan *</span>
+          <select name="employeeStatus" required>
+            <option value="Aktif">Aktif</option>
+            <option value="Nonaktif">Nonaktif</option>
+            <option value="Resign">Resign</option>
+            <option value="Kontrak Habis">Kontrak Habis</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="employee-contract-section" hidden>
+        <hr class="divider" />
+        <div class="panel-head-row"><span style="font-size:13px;font-weight:700;">Data Kontrak</span></div>
+        <div class="form-grid">
+          <label class="field"><span>Tanggal mulai kontrak</span><input type="date" name="contractStart" /></label>
+          <label class="field"><span>Tanggal berakhir kontrak</span><input type="date" name="contractEnd" /></label>
+          <label class="field"><span>Nomor kontrak</span><input type="text" name="contractNumber" /></label>
+          <label class="field field--wide"><span>Catatan kontrak</span><textarea name="contractNote" rows="2"></textarea></label>
+        </div>
+      </div>
+
+      <hr class="divider" />
+      <div class="panel-head-row"><span style="font-size:13px;font-weight:700;">Gaji</span></div>
+      <div class="form-grid">
+        <label class="field"><span>Gaji pokok (Rp) *</span><input type="number" name="baseSalary" min="0" required /></label>
+        <label class="field field--wide"><span>Catatan gaji</span><input type="text" name="salaryNote" /></label>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn--ghost" data-close-modal>Batal</button>
+        <button type="submit" class="btn btn--primary" id="employee-submit-btn">Simpan karyawan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ POSITION MODAL ============ -->
+<div class="overlay" id="position-modal" hidden>
+  <div class="modal">
+    <button class="modal-close" data-close-modal>&times;</button>
+    <h2>Tambah posisi baru</h2>
+    <form id="position-form">
+      <div class="form-grid">
+        <label class="field field--wide"><span>Nama posisi *</span><input type="text" name="name" required /></label>
+        <label class="field field--wide"><span>Departemen</span><input type="text" name="department" placeholder="mis. Live Commerce" /></label>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn--ghost" data-close-modal>Batal</button>
+        <button type="submit" class="btn btn--primary">Simpan posisi</button>
+      </div>
+    </form>
   </div>
 </div>
 

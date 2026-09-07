@@ -50,6 +50,15 @@ const state = {
   productImages: [],
   expandedProductIds: new Set(),
   orderItemRows: [],
+  employees: [],
+  positions: [],
+  employeeSearch: "",
+  employeeFilterPosition: "",
+  employeeFilterWorkStatus: "",
+  employeeFilterStatus: "",
+  editingEmployeeId: null,
+  employeePhoto: null, // { url, uploading, progress }
+  karyawanTab: "dashboard", // "dashboard" | "data"
   openOrderId: null,
   editingProductId: null,
   editingCustomerId: null,
@@ -67,6 +76,8 @@ const LOCAL_KEY_PRODUCTS = "atelier_demo_products";
 const LOCAL_KEY_CUSTOMERS = "atelier_demo_customers";
 const LOCAL_KEY_TRANSACTIONS = "atelier_demo_transactions";
 const LOCAL_KEY_SETTINGS = "atelier_demo_settings";
+const LOCAL_KEY_EMPLOYEES = "atelier_demo_employees";
+const LOCAL_KEY_POSITIONS = "atelier_demo_positions";
 
 let fb = null; // { db, addDoc, updateDoc, collection, doc, onSnapshot, serverTimestamp, query, orderBy, deleteDoc }
 let authInstance = null;
@@ -268,6 +279,16 @@ function subscribeFirestore() {
     if (state.view === "pengaturan") applySettingsToForm();
     renderAll();
   }));
+
+  firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "positions"), orderBy("name")), (snap) => {
+    state.positions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAll();
+  }));
+
+  firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "employees"), orderBy("name")), (snap) => {
+    state.employees = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAll();
+  }));
 }
 
 async function seedFirestore() {
@@ -287,6 +308,8 @@ async function loadDemoData() {
   const customers = JSON.parse(localStorage.getItem(LOCAL_KEY_CUSTOMERS) || "null");
   const transactions = JSON.parse(localStorage.getItem(LOCAL_KEY_TRANSACTIONS) || "null");
   const settings = JSON.parse(localStorage.getItem(LOCAL_KEY_SETTINGS) || "null");
+  const employees = JSON.parse(localStorage.getItem(LOCAL_KEY_EMPLOYEES) || "null");
+  const positions = JSON.parse(localStorage.getItem(LOCAL_KEY_POSITIONS) || "null");
 
   if (!orders || !products) {
     const seed = buildSeedData();
@@ -299,6 +322,8 @@ async function loadDemoData() {
   state.customers = customers || [];
   state.transactions = transactions || [];
   state.settings = settings || { ...DEFAULT_SETTINGS };
+  state.employees = employees || [];
+  state.positions = positions || [];
 
   // Bangun data pelanggan & pemasukan dari pesanan yang sudah ada (juga jalan tiap kali pesanan berubah).
   await syncCustomersFromOrders();
@@ -312,6 +337,8 @@ function saveDemoData() {
   localStorage.setItem(LOCAL_KEY_CUSTOMERS, JSON.stringify(state.customers));
   localStorage.setItem(LOCAL_KEY_TRANSACTIONS, JSON.stringify(state.transactions));
   localStorage.setItem(LOCAL_KEY_SETTINGS, JSON.stringify(state.settings));
+  localStorage.setItem(LOCAL_KEY_EMPLOYEES, JSON.stringify(state.employees));
+  localStorage.setItem(LOCAL_KEY_POSITIONS, JSON.stringify(state.positions));
 }
 
 /** Update satu order (status + field lain) — dipakai untuk semua aksi alur kerja. */
@@ -494,6 +521,58 @@ async function saveSettings(patch) {
 }
 
 // ------------------------------------------------------------
+// Karyawan & Posisi (Fase 1)
+// ------------------------------------------------------------
+
+/** No. ID karyawan otomatis, lanjutan dari nomor terbesar yang sudah ada (format KRY-0001). */
+function generateEmployeeId() {
+  const nums = state.employees.map((e) => {
+    const m = /KRY-(\d+)/.exec(e.employeeId || "");
+    return m ? Number(m[1]) : 0;
+  });
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  return `KRY-${String(next).padStart(4, "0")}`;
+}
+
+async function addPosition(position) {
+  if (state.mode === "firebase") {
+    const { addDoc, collection, serverTimestamp } = fb;
+    const ref = await addDoc(collection(fb.db, "positions"), { ...position, createdAt: serverTimestamp() });
+    return ref.id;
+  } else {
+    const newPosition = { ...position, id: "demo-position-" + Date.now(), createdAt: new Date().toISOString() };
+    state.positions.push(newPosition);
+    saveDemoData();
+    renderAll();
+    return newPosition.id;
+  }
+}
+
+async function addEmployee(employee) {
+  if (state.mode === "firebase") {
+    const { addDoc, collection, serverTimestamp } = fb;
+    await addDoc(collection(fb.db, "employees"), { ...employee, createdAt: serverTimestamp() });
+  } else {
+    const newEmployee = { ...employee, id: "demo-employee-" + Date.now(), createdAt: new Date().toISOString() };
+    state.employees.push(newEmployee);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+async function updateEmployee(employeeId, patch) {
+  if (state.mode === "firebase") {
+    const { doc, updateDoc } = fb;
+    await updateDoc(doc(fb.db, "employees", employeeId), patch);
+  } else {
+    const employee = state.employees.find((e) => e.id === employeeId);
+    Object.assign(employee, patch);
+    saveDemoData();
+    renderAll();
+  }
+}
+
+// ------------------------------------------------------------
 // Sinkronisasi otomatis: Pesanan → Pelanggan & Pesanan → Keuangan
 // ------------------------------------------------------------
 const customerSyncInFlight = new Set(); // no. HP yang sedang dalam proses dibuatkan data pelanggan
@@ -667,6 +746,7 @@ function renderAll() {
   if (state.view === "pesanan") renderOrdersView();
   if (state.view === "produk") renderProductsView();
   if (state.view === "pelanggan") renderPelangganView();
+  if (state.view === "karyawan") renderKaryawanView();
   if (state.view === "keuangan") renderKeuanganView();
   if (state.openOrderId) renderOrderModalBody(state.openOrderId);
 }
@@ -1277,7 +1357,228 @@ function renderKeuanganView() {
 }
 
 // ------------------------------------------------------------
-// Pengaturan
+// Karyawan (Fase 1): dashboard ringkas, data karyawan, posisi
+// ------------------------------------------------------------
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const target = new Date(dateStr);
+  const now = new Date();
+  const diffMs = new Date(target.getFullYear(), target.getMonth(), target.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round(diffMs / 86400000);
+}
+
+function positionLabel(positionId) {
+  const p = state.positions.find((pos) => pos.id === positionId);
+  return p ? p.name : "-";
+}
+
+function renderKaryawanView() {
+  renderKaryawanDashboard();
+  renderEmployeeFilterOptions();
+  renderEmployeeTable();
+}
+
+function renderKaryawanDashboard() {
+  const employees = state.employees;
+  const active = employees.filter((e) => (e.employeeStatus || "Aktif") === "Aktif").length;
+  const contractCount = employees.filter((e) => e.workStatus === "Kontrak").length;
+
+  const expiringSoon = employees
+    .filter((e) => e.workStatus === "Kontrak" && e.contractEnd)
+    .map((e) => ({ ...e, _daysLeft: daysUntil(e.contractEnd) }))
+    .filter((e) => e._daysLeft !== null && e._daysLeft <= 30)
+    .sort((a, b) => a._daysLeft - b._daysLeft);
+
+  els.empStatTotal.textContent = employees.length;
+  els.empStatActive.textContent = active;
+  els.empStatContract.textContent = contractCount;
+  els.empStatExpiring.textContent = expiringSoon.length;
+
+  els.empContractAlertList.innerHTML = "";
+  if (expiringSoon.length === 0) {
+    els.empContractAlertList.innerHTML = `<li class="action-empty"><span>Tidak ada kontrak yang akan berakhir dalam 30 hari.</span></li>`;
+  } else {
+    expiringSoon.forEach((e) => {
+      const urgencyClass = e._daysLeft <= 7 ? "tag--dibatalkan" : "tag--perlu_verifikasi";
+      const li = document.createElement("li");
+      li.innerHTML = `<span><strong>${escapeHtml(e.name)}</strong> — ${escapeHtml(positionLabel(e.positionId))} · berakhir ${formatDate(e.contractEnd)} <span class="tag ${urgencyClass}">${e._daysLeft} hari lagi</span></span>`;
+      const btn = document.createElement("button");
+      btn.className = "mini-btn";
+      btn.textContent = "Review";
+      btn.addEventListener("click", () => openEmployeeModal(e));
+      li.appendChild(btn);
+      els.empContractAlertList.appendChild(li);
+    });
+  }
+}
+
+function renderEmployeeFilterOptions() {
+  const current = els.employeeFilterPosition.value;
+  els.employeeFilterPosition.innerHTML = `<option value="">Semua posisi</option>` + state.positions.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+  els.employeeFilterPosition.value = current;
+}
+
+function renderEmployeeTable() {
+  const q = state.employeeSearch.trim().toLowerCase();
+  let filtered = state.employees.filter((e) => (e.name || "").toLowerCase().includes(q) || (e.employeeId || "").toLowerCase().includes(q));
+  if (state.employeeFilterPosition) filtered = filtered.filter((e) => e.positionId === state.employeeFilterPosition);
+  if (state.employeeFilterWorkStatus) filtered = filtered.filter((e) => e.workStatus === state.employeeFilterWorkStatus);
+  if (state.employeeFilterStatus) filtered = filtered.filter((e) => (e.employeeStatus || "Aktif") === state.employeeFilterStatus);
+
+  const tbody = els.tableEmployees.querySelector("tbody");
+  tbody.innerHTML = "";
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" class="table-empty">Belum ada karyawan.</td></tr>`;
+    return;
+  }
+
+  filtered
+    .slice()
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+    .forEach((e) => {
+      const tr = document.createElement("tr");
+      const initials = escapeHtml((e.name || "?").charAt(0).toUpperCase());
+      const thumbHtml = `
+        <div class="table-thumb-wrap">
+          <span class="table-thumb-fallback">${initials}</span>
+          ${e.photoUrl ? `<img src="${escapeHtml(e.photoUrl)}" alt="${escapeHtml(e.name)}" class="table-thumb-img" onerror="this.style.display='none'" />` : ""}
+        </div>`;
+
+      let contractInfo = `<span class="text-muted">-</span>`;
+      if (e.workStatus === "Kontrak" && e.contractEnd) {
+        const d = daysUntil(e.contractEnd);
+        const cls = d < 0 ? "tag--dibatalkan" : d <= 7 ? "tag--dibatalkan" : d <= 30 ? "tag--perlu_verifikasi" : "tag--selesai";
+        contractInfo = `<span class="tag ${cls}">${d < 0 ? "Berakhir" : d + " hari lagi"}</span>`;
+      }
+
+      const empStatus = e.employeeStatus || "Aktif";
+      const statusTagClass = empStatus === "Aktif" ? "tag--selesai" : empStatus === "Resign" || empStatus === "Nonaktif" ? "tag--dibatalkan" : "tag--menunggu_pembayaran";
+
+      tr.innerHTML = `
+        <td>${thumbHtml}</td>
+        <td><strong>${escapeHtml(e.name || "-")}</strong></td>
+        <td>${escapeHtml(e.employeeId || "-")}</td>
+        <td>${escapeHtml(positionLabel(e.positionId))}</td>
+        <td>${formatDate(e.joinDate)}</td>
+        <td>${escapeHtml(e.workStatus || "-")}</td>
+        <td>${formatRupiah(e.baseSalary)}</td>
+        <td>${contractInfo}</td>
+        <td><span class="tag ${statusTagClass}">${escapeHtml(empStatus)}</span></td>
+        <td></td>
+      `;
+      const actionTd = tr.querySelector("td:last-child");
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn btn--ghost";
+      editBtn.style.cssText = "padding:5px 10px;font-size:12px;margin-right:6px;";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => openEmployeeModal(e));
+      actionTd.appendChild(editBtn);
+
+      if (empStatus === "Aktif") {
+        const deactivateBtn = document.createElement("button");
+        deactivateBtn.className = "btn btn--danger";
+        deactivateBtn.style.cssText = "padding:5px 10px;font-size:12px;";
+        deactivateBtn.textContent = "Nonaktifkan";
+        deactivateBtn.addEventListener("click", async () => {
+          if (confirm(`Nonaktifkan karyawan "${e.name}"? Data & riwayatnya tetap tersimpan.`)) {
+            await updateEmployee(e.id, { employeeStatus: "Nonaktif" });
+            showToast(`${e.name} dinonaktifkan.`);
+          }
+        });
+        actionTd.appendChild(deactivateBtn);
+      }
+      tbody.appendChild(tr);
+    });
+}
+
+function populateEmployeeFormDropdowns(excludeEmployeeId) {
+  const currentPos = els.employeePositionSelect.value;
+  els.employeePositionSelect.innerHTML =
+    `<option value="">Pilih posisi</option>` +
+    state.positions.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}${p.department ? " — " + escapeHtml(p.department) : ""}</option>`).join("");
+  els.employeePositionSelect.value = currentPos;
+
+  const currentSup = els.employeeSupervisorSelect.value;
+  els.employeeSupervisorSelect.innerHTML =
+    `<option value="">- Tidak ada -</option>` +
+    state.employees.filter((e) => e.id !== excludeEmployeeId).map((e) => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join("");
+  els.employeeSupervisorSelect.value = currentSup;
+}
+
+function toggleEmployeeContractSection() {
+  els.employeeContractSection.hidden = els.employeeWorkStatusSelect.value !== "Kontrak";
+}
+
+function renderEmployeePhotoPreview() {
+  const box = els.employeePhotoPreview;
+  const imgEl = box.querySelector("img");
+  const fallbackEl = box.querySelector(".variant-photo-fallback");
+  if (state.employeePhoto?.uploading) {
+    imgEl.hidden = true;
+    fallbackEl.hidden = false;
+    fallbackEl.textContent = (state.employeePhoto.progress ?? 0) + "%";
+  } else if (state.employeePhoto?.url) {
+    imgEl.src = state.employeePhoto.url;
+    imgEl.hidden = false;
+    imgEl.onerror = () => { imgEl.hidden = true; fallbackEl.hidden = false; fallbackEl.textContent = "+"; };
+    fallbackEl.hidden = true;
+  } else {
+    imgEl.hidden = true;
+    fallbackEl.hidden = false;
+    fallbackEl.textContent = "+";
+  }
+}
+
+function resetEmployeeForm() {
+  els.employeeForm.reset();
+  state.editingEmployeeId = null;
+  state.employeePhoto = null;
+  els.employeeModalTitle.textContent = "Tambah karyawan";
+  els.employeeSubmitBtn.textContent = "Simpan karyawan";
+  els.employeeIdDisplay.value = "";
+  renderEmployeePhotoPreview();
+  populateEmployeeFormDropdowns();
+  toggleEmployeeContractSection();
+}
+
+/** Buka modal karyawan. Tanpa argumen = tambah baru. Dengan argumen = edit, form terisi otomatis. */
+function openEmployeeModal(employee) {
+  resetEmployeeForm();
+  if (employee) {
+    state.editingEmployeeId = employee.id;
+    els.employeeModalTitle.textContent = `Edit karyawan — ${employee.name}`;
+    els.employeeSubmitBtn.textContent = "Simpan perubahan";
+    els.employeeIdDisplay.value = employee.employeeId || "";
+
+    const f = els.employeeForm.elements;
+    f["name"].value = employee.name || "";
+    f["gender"].value = employee.gender || "";
+    f["birthPlace"].value = employee.birthPlace || "";
+    f["birthDate"].value = employee.birthDate || "";
+    f["phone"].value = employee.phone || "";
+    f["email"].value = employee.email || "";
+    f["address"].value = employee.address || "";
+    f["joinDate"].value = employee.joinDate || "";
+    f["workStatus"].value = employee.workStatus || "Tetap";
+    f["employeeStatus"].value = employee.employeeStatus || "Aktif";
+    f["contractStart"].value = employee.contractStart || "";
+    f["contractEnd"].value = employee.contractEnd || "";
+    f["contractNumber"].value = employee.contractNumber || "";
+    f["contractNote"].value = employee.contractNote || "";
+    f["baseSalary"].value = employee.baseSalary ?? "";
+    f["salaryNote"].value = employee.salaryNote || "";
+
+    populateEmployeeFormDropdowns(employee.id);
+    f["positionId"].value = employee.positionId || "";
+    f["supervisorId"].value = employee.supervisorId || "";
+
+    if (employee.photoUrl) state.employeePhoto = { url: employee.photoUrl };
+    renderEmployeePhotoPreview();
+    toggleEmployeeContractSection();
+  }
+  els.employeeModal.hidden = false;
+}
+
 // ------------------------------------------------------------
 function applySettingsToForm() {
   const s = { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
@@ -1641,10 +1942,13 @@ function closeModals() {
   els.customerModal.hidden = true;
   els.transactionModal.hidden = true;
   els.createOrderModal.hidden = true;
+  els.employeeModal.hidden = true;
+  els.positionModal.hidden = true;
   state.openOrderId = null;
   resetProductForm();
   resetCustomerForm();
   resetCreateOrderForm();
+  resetEmployeeForm();
 }
 
 function renderOrderModalBody(orderId) {
@@ -2229,7 +2533,7 @@ function bindEvents() {
   els.productSearch.addEventListener("input", (e) => { state.productSearch = e.target.value; renderProductsView(); });
 
   document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", closeModals));
-  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal].forEach((overlay) => {
+  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal, els.employeeModal, els.positionModal].forEach((overlay) => {
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModals(); });
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModals(); });
@@ -2343,6 +2647,118 @@ function bindEvents() {
 
   // ---- Pelanggan ----
   els.customerSearch.addEventListener("input", (e) => { state.customerSearch = e.target.value; renderPelangganView(); });
+
+  // ---- Karyawan ----
+  els.karyawanTabs.querySelectorAll(".tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.karyawanTab = btn.dataset.karyawanTab;
+      els.karyawanTabs.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-active", t === btn));
+      els.karyawanTabDashboard.hidden = state.karyawanTab !== "dashboard";
+      els.karyawanTabData.hidden = state.karyawanTab !== "data";
+      renderKaryawanView();
+    });
+  });
+
+  els.employeeSearch.addEventListener("input", (e) => { state.employeeSearch = e.target.value; renderEmployeeTable(); });
+  els.employeeFilterPosition.addEventListener("change", (e) => { state.employeeFilterPosition = e.target.value; renderEmployeeTable(); });
+  els.employeeFilterWorkStatus.addEventListener("change", (e) => { state.employeeFilterWorkStatus = e.target.value; renderEmployeeTable(); });
+  els.employeeFilterStatus.addEventListener("change", (e) => { state.employeeFilterStatus = e.target.value; renderEmployeeTable(); });
+
+  els.btnAddEmployee.addEventListener("click", () => openEmployeeModal());
+  els.employeeWorkStatusSelect.addEventListener("change", toggleEmployeeContractSection);
+
+  els.employeePhotoInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    state.employeePhoto = { uploading: true, progress: 0 };
+    renderEmployeePhotoPreview();
+    try {
+      const url = await uploadImageFile(file, "employees", (pct) => {
+        state.employeePhoto.progress = pct;
+        renderEmployeePhotoPreview();
+      });
+      state.employeePhoto = { url };
+      renderEmployeePhotoPreview();
+    } catch (err) {
+      showToast(err.message || "Gagal upload foto karyawan.");
+      state.employeePhoto = null;
+      renderEmployeePhotoPreview();
+    }
+  });
+
+  els.btnAddPosition.addEventListener("click", () => {
+    els.positionForm.reset();
+    els.positionModal.hidden = false;
+  });
+
+  els.positionForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(els.positionForm);
+    const position = { name: f.get("name").trim(), department: f.get("department").trim() };
+    const newId = await addPosition(position);
+    els.positionModal.hidden = true;
+    populateEmployeeFormDropdowns(state.editingEmployeeId);
+    els.employeePositionSelect.value = newId;
+    showToast(`Posisi "${position.name}" ditambahkan.`);
+  });
+
+  els.employeeForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (state.employeePhoto?.uploading) {
+      showToast("Tunggu upload foto selesai sebelum menyimpan.");
+      return;
+    }
+    const f = new FormData(els.employeeForm);
+    if (!f.get("positionId")) {
+      showToast("Posisi/Jabatan wajib dipilih.");
+      return;
+    }
+    const workStatus = f.get("workStatus");
+    if (workStatus === "Kontrak") {
+      const start = f.get("contractStart");
+      const end = f.get("contractEnd");
+      if (start && end && new Date(end) < new Date(start)) {
+        showToast("Tanggal berakhir kontrak tidak boleh sebelum tanggal mulai.");
+        return;
+      }
+    }
+
+    const employee = {
+      name: f.get("name").trim(),
+      gender: f.get("gender"),
+      birthPlace: f.get("birthPlace").trim(),
+      birthDate: f.get("birthDate"),
+      phone: f.get("phone").trim(),
+      email: f.get("email").trim(),
+      address: f.get("address").trim(),
+      positionId: f.get("positionId"),
+      supervisorId: f.get("supervisorId") || "",
+      joinDate: f.get("joinDate"),
+      workStatus,
+      employeeStatus: f.get("employeeStatus"),
+      contractStart: workStatus === "Kontrak" ? f.get("contractStart") : "",
+      contractEnd: workStatus === "Kontrak" ? f.get("contractEnd") : "",
+      contractNumber: workStatus === "Kontrak" ? f.get("contractNumber").trim() : "",
+      contractNote: workStatus === "Kontrak" ? f.get("contractNote").trim() : "",
+      baseSalary: Number(f.get("baseSalary")) || 0,
+      salaryNote: f.get("salaryNote").trim(),
+      photoUrl: state.employeePhoto?.url || "",
+    };
+
+    if (state.editingEmployeeId) {
+      await updateEmployee(state.editingEmployeeId, employee);
+      closeModals();
+      navigateTo("karyawan");
+      showToast(`Data karyawan "${employee.name}" diperbarui.`);
+    } else {
+      employee.employeeId = generateEmployeeId();
+      await addEmployee(employee);
+      closeModals();
+      navigateTo("karyawan");
+      showToast(`Karyawan "${employee.name}" ditambahkan (${employee.employeeId}).`);
+    }
+  });
   els.btnAddCustomer.addEventListener("click", () => openCustomerModal());
 
   els.customerForm.addEventListener("submit", async (e) => {
@@ -2487,6 +2903,35 @@ function cacheEls() {
   els.customerSearch = document.getElementById("customer-search");
   els.btnAddCustomer = document.getElementById("btn-add-customer");
   els.tableCustomers = document.getElementById("table-customers");
+
+  els.karyawanTabs = document.getElementById("karyawan-tabs");
+  els.karyawanTabDashboard = document.getElementById("karyawan-tab-dashboard");
+  els.karyawanTabData = document.getElementById("karyawan-tab-data");
+  els.empStatTotal = document.getElementById("emp-stat-total");
+  els.empStatActive = document.getElementById("emp-stat-active");
+  els.empStatContract = document.getElementById("emp-stat-contract");
+  els.empStatExpiring = document.getElementById("emp-stat-expiring");
+  els.empContractAlertList = document.getElementById("emp-contract-alert-list");
+  els.employeeSearch = document.getElementById("employee-search");
+  els.employeeFilterPosition = document.getElementById("employee-filter-position");
+  els.employeeFilterWorkStatus = document.getElementById("employee-filter-workstatus");
+  els.employeeFilterStatus = document.getElementById("employee-filter-status");
+  els.btnAddEmployee = document.getElementById("btn-add-employee");
+  els.tableEmployees = document.getElementById("table-employees");
+  els.employeeModal = document.getElementById("employee-modal");
+  els.employeeModalTitle = document.getElementById("employee-modal-title");
+  els.employeeSubmitBtn = document.getElementById("employee-submit-btn");
+  els.employeeForm = document.getElementById("employee-form");
+  els.employeeIdDisplay = document.getElementById("employee-id-display");
+  els.employeePhotoPreview = document.getElementById("employee-photo-preview");
+  els.employeePhotoInput = document.getElementById("employee-photo-input");
+  els.employeePositionSelect = document.getElementById("employee-position-select");
+  els.employeeSupervisorSelect = document.getElementById("employee-supervisor-select");
+  els.employeeWorkStatusSelect = document.getElementById("employee-workstatus-select");
+  els.employeeContractSection = document.getElementById("employee-contract-section");
+  els.btnAddPosition = document.getElementById("btn-add-position");
+  els.positionModal = document.getElementById("position-modal");
+  els.positionForm = document.getElementById("position-form");
   els.customerModal = document.getElementById("customer-modal");
   els.customerModalTitle = document.getElementById("customer-modal-title");
   els.customerSubmitBtn = document.getElementById("customer-submit-btn");
