@@ -1454,6 +1454,7 @@ function renderKaryawanView() {
   renderEmployeeFilterOptions();
   renderEmployeeTable();
   renderReviewListView();
+  renderContractView();
 }
 
 function renderKaryawanDashboard() {
@@ -1483,7 +1484,7 @@ function renderKaryawanDashboard() {
       const btn = document.createElement("button");
       btn.className = "mini-btn";
       btn.textContent = "Review";
-      btn.addEventListener("click", () => openEmployeeModal(e));
+      btn.addEventListener("click", () => openContractReviewModal(e));
       li.appendChild(btn);
       els.empContractAlertList.appendChild(li);
     });
@@ -1912,6 +1913,247 @@ function openReviewDetailModal(review) {
 }
 
 // ------------------------------------------------------------
+// Kontrak
+// ------------------------------------------------------------
+/** Status kontrak: turunan tanggal, kecuali ada keputusan eksplisit "Tidak Diperpanjang". */
+function getContractStatus(employee) {
+  if (employee.contractDecision === "tidak_diperpanjang") return "Tidak Diperpanjang";
+  if (!employee.contractEnd) return "Aktif";
+  const days = daysUntil(employee.contractEnd);
+  if (days < 0) return "Berakhir";
+  if (days <= 30) return "Akan Berakhir";
+  if (employee.contractDecision === "diperpanjang") return "Diperpanjang";
+  return "Aktif";
+}
+
+function contractStatusBadgeClass(status) {
+  switch (status) {
+    case "Aktif":
+    case "Diperpanjang":
+      return "tag--selesai";
+    case "Akan Berakhir":
+      return "tag--perlu_verifikasi";
+    default:
+      return "tag--dibatalkan"; // Berakhir / Tidak Diperpanjang
+  }
+}
+
+function getLatestReviewForEmployee(employeeId) {
+  const reviews = state.performanceReviews.filter((r) => r.employeeId === employeeId);
+  if (reviews.length === 0) return null;
+  return reviews.slice().sort((a, b) => toJsDate(b.createdAt) - toJsDate(a.createdAt))[0];
+}
+
+function renderContractView() {
+  const contractEmployees = state.employees.filter((e) => e.workStatus === "Kontrak" && e.contractEnd);
+  const tbody = els.tableContracts.querySelector("tbody");
+  tbody.innerHTML = "";
+  if (contractEmployees.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="table-empty">Belum ada karyawan berstatus kontrak.</td></tr>`;
+    return;
+  }
+
+  contractEmployees
+    .slice()
+    .sort((a, b) => daysUntil(a.contractEnd) - daysUntil(b.contractEnd))
+    .forEach((e) => {
+      const days = daysUntil(e.contractEnd);
+      const status = getContractStatus(e);
+      const latestReview = getLatestReviewForEmployee(e.id);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><strong>${escapeHtml(e.name)}</strong></td>
+        <td>${escapeHtml(positionLabel(e.positionId))}</td>
+        <td>${formatDate(e.contractStart)}</td>
+        <td>${formatDate(e.contractEnd)}</td>
+        <td>${days < 0 ? "Berakhir" : days + " hari"}</td>
+        <td><span class="tag ${contractStatusBadgeClass(status)}">${escapeHtml(status)}</span></td>
+        <td>${latestReview ? Number(latestReview.finalScore).toFixed(2) + " / 5" : "-"}</td>
+        <td>${latestReview ? escapeHtml(latestReview.recommendation) : "-"}</td>
+        <td></td>
+      `;
+      const actionTd = tr.querySelector("td:last-child");
+      const reviewBtn = document.createElement("button");
+      reviewBtn.className = "mini-btn";
+      reviewBtn.textContent = "Review";
+      reviewBtn.addEventListener("click", () => openContractReviewModal(e));
+      actionTd.appendChild(reviewBtn);
+      tbody.appendChild(tr);
+    });
+}
+
+function openContractReviewModal(employee) {
+  renderContractReviewBody(employee);
+  els.contractReviewModal.hidden = false;
+}
+
+function renderContractReviewBody(employee) {
+  const latestReview = getLatestReviewForEmployee(employee.id);
+  const days = daysUntil(employee.contractEnd);
+  const status = getContractStatus(employee);
+
+  const reviewInfoHtml = latestReview
+    ? `
+      <div class="od-block">
+        <h3>Penilaian terakhir</h3>
+        <p><strong>${Number(latestReview.finalScore).toFixed(2)} / 5</strong> — <span class="tag ${categoryBadgeClass(latestReview.category)}">${escapeHtml(latestReview.category)}</span></p>
+        <p class="text-muted">Rekomendasi: <strong>${escapeHtml(latestReview.recommendation)}</strong></p>
+        ${latestReview.managerNotes ? `<p class="text-muted">Catatan: ${escapeHtml(latestReview.managerNotes)}</p>` : ""}
+      </div>`
+    : `<div class="od-block"><h3>Penilaian terakhir</h3><p class="text-muted">Belum ada penilaian kinerja untuk karyawan ini.</p></div>`;
+
+  const historyHtml = (employee.contractHistory || []).length
+    ? `<div class="od-history"><strong>Riwayat kontrak</strong><ul>${employee.contractHistory
+        .slice()
+        .reverse()
+        .map((h) => `<li>${formatDate(h.startDate)} – ${formatDate(h.endDate)} · ${escapeHtml(h.decision || "-")}${h.decisionNote ? " — " + escapeHtml(h.decisionNote) : ""}</li>`)
+        .join("")}</ul></div>`
+    : "";
+
+  els.contractReviewBody.innerHTML = `
+    <div class="od-head">
+      <div>
+        <h2>${escapeHtml(employee.name)}</h2>
+        <span class="tag ${contractStatusBadgeClass(status)}">${escapeHtml(status)}</span>
+      </div>
+    </div>
+
+    <div class="od-cols">
+      <div class="od-block">
+        <h3>Data kontrak</h3>
+        <p><strong>${escapeHtml(positionLabel(employee.positionId))}</strong></p>
+        <p>Mulai: ${formatDate(employee.contractStart)}</p>
+        <p>Berakhir: ${formatDate(employee.contractEnd)} (${days < 0 ? "sudah berakhir" : days + " hari lagi"})</p>
+        <p>Gaji sekarang: ${formatRupiah(employee.baseSalary)}</p>
+      </div>
+      ${reviewInfoHtml}
+    </div>
+
+    <div class="od-action-block">
+      <h3 style="margin:0 0 10px;font-size:13px;">Keputusan</h3>
+      <div class="od-action-row">
+        <button type="button" class="btn btn--primary" data-decision="perpanjang">Perpanjang Kontrak</button>
+        <button type="button" class="btn btn--ghost" data-decision="tidak_perpanjang">Tidak Perpanjang</button>
+        <button type="button" class="btn btn--ghost" data-decision="evaluasi_lagi">Evaluasi Lagi</button>
+      </div>
+      <div id="contract-decision-form"></div>
+    </div>
+
+    ${historyHtml}
+  `;
+
+  els.contractReviewBody.querySelectorAll("[data-decision]").forEach((btn) => {
+    btn.addEventListener("click", () => renderContractDecisionForm(employee, btn.dataset.decision));
+  });
+}
+
+function renderContractDecisionForm(employee, decision) {
+  const container = document.getElementById("contract-decision-form");
+
+  if (decision === "evaluasi_lagi") {
+    container.innerHTML = "";
+    showToast("Baik — karyawan ini akan dievaluasi lagi nanti. Tidak ada perubahan kontrak.");
+    return;
+  }
+
+  if (decision === "perpanjang") {
+    container.innerHTML = `
+      <div class="form-grid" style="margin-top:14px;">
+        <label class="field">
+          <span>Durasi</span>
+          <select id="cd-duration">
+            <option value="3">3 Bulan</option>
+            <option value="6">6 Bulan</option>
+            <option value="12">12 Bulan</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <label class="field"><span>Tanggal Mulai Baru</span><input type="date" id="cd-new-start" value="${employee.contractEnd || ""}" /></label>
+        <label class="field"><span>Tanggal Berakhir Baru</span><input type="date" id="cd-new-end" /></label>
+        <label class="field field--wide"><span>Catatan</span><textarea id="cd-note" rows="2"></textarea></label>
+      </div>
+      <button type="button" class="btn btn--primary" id="cd-confirm-btn" style="margin-top:10px;">Konfirmasi Perpanjangan</button>
+    `;
+    const durationSelect = document.getElementById("cd-duration");
+    const startInput = document.getElementById("cd-new-start");
+    const endInput = document.getElementById("cd-new-end");
+    const recalcEnd = () => {
+      if (durationSelect.value === "custom" || !startInput.value) return;
+      const d = new Date(startInput.value);
+      d.setMonth(d.getMonth() + Number(durationSelect.value));
+      d.setDate(d.getDate() - 1);
+      endInput.value = toDateInputValue(d);
+    };
+    durationSelect.addEventListener("change", recalcEnd);
+    startInput.addEventListener("change", recalcEnd);
+    recalcEnd();
+
+    document.getElementById("cd-confirm-btn").addEventListener("click", async () => {
+      const newStart = startInput.value;
+      const newEnd = endInput.value;
+      if (!newStart || !newEnd) { showToast("Tanggal mulai dan berakhir wajib diisi."); return; }
+      if (new Date(newEnd) < new Date(newStart)) { showToast("Tanggal berakhir tidak boleh sebelum tanggal mulai."); return; }
+
+      const historyEntry = {
+        startDate: employee.contractStart || "",
+        endDate: employee.contractEnd || "",
+        contractNumber: employee.contractNumber || "",
+        note: employee.contractNote || "",
+        decision: "Diperpanjang",
+        decisionNote: document.getElementById("cd-note").value.trim(),
+        decidedAt: new Date().toISOString(),
+        decidedBy: authInstance?.currentUser?.email || "admin",
+      };
+      await updateEmployee(employee.id, {
+        contractStart: newStart,
+        contractEnd: newEnd,
+        contractDecision: "diperpanjang",
+        employeeStatus: "Aktif",
+        contractHistory: [...(employee.contractHistory || []), historyEntry],
+      });
+      els.contractReviewModal.hidden = true;
+      showToast(`Kontrak ${employee.name} diperpanjang sampai ${formatDate(newEnd)}.`);
+    });
+  }
+
+  if (decision === "tidak_perpanjang") {
+    container.innerHTML = `
+      <div class="form-grid" style="margin-top:14px;">
+        <label class="field"><span>Tanggal Berakhir</span><input type="date" id="cd-end-date" value="${employee.contractEnd || ""}" /></label>
+        <label class="field field--wide"><span>Alasan *</span><input type="text" id="cd-reason" required /></label>
+        <label class="field field--wide"><span>Catatan</span><textarea id="cd-note2" rows="2"></textarea></label>
+      </div>
+      <button type="button" class="btn btn--danger" id="cd-confirm-btn2" style="margin-top:10px;">Konfirmasi Tidak Perpanjang</button>
+    `;
+    document.getElementById("cd-confirm-btn2").addEventListener("click", async () => {
+      const reason = document.getElementById("cd-reason").value.trim();
+      if (!reason) { showToast("Alasan wajib diisi."); return; }
+      const noteVal = document.getElementById("cd-note2").value.trim();
+      const endDate = document.getElementById("cd-end-date").value || employee.contractEnd;
+
+      const historyEntry = {
+        startDate: employee.contractStart || "",
+        endDate,
+        contractNumber: employee.contractNumber || "",
+        note: employee.contractNote || "",
+        decision: "Tidak Diperpanjang",
+        decisionNote: noteVal ? `${reason} — ${noteVal}` : reason,
+        decidedAt: new Date().toISOString(),
+        decidedBy: authInstance?.currentUser?.email || "admin",
+      };
+      await updateEmployee(employee.id, {
+        contractEnd: endDate,
+        contractDecision: "tidak_diperpanjang",
+        contractEndReason: reason,
+        contractHistory: [...(employee.contractHistory || []), historyEntry],
+      });
+      els.contractReviewModal.hidden = true;
+      showToast(`Keputusan tidak memperpanjang kontrak ${employee.name} disimpan.`);
+    });
+  }
+}
+
+// ------------------------------------------------------------
 function applySettingsToForm() {
   const s = { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
   const f = els.settingsForm.elements;
@@ -2278,6 +2520,7 @@ function closeModals() {
   els.positionModal.hidden = true;
   els.reviewModal.hidden = true;
   els.reviewDetailModal.hidden = true;
+  els.contractReviewModal.hidden = true;
   state.openOrderId = null;
   resetProductForm();
   resetCustomerForm();
@@ -2868,7 +3111,7 @@ function bindEvents() {
   els.productSearch.addEventListener("input", (e) => { state.productSearch = e.target.value; renderProductsView(); });
 
   document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", closeModals));
-  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal, els.employeeModal, els.positionModal, els.reviewModal, els.reviewDetailModal].forEach((overlay) => {
+  [els.orderModal, els.productModal, els.customerModal, els.transactionModal, els.createOrderModal, els.employeeModal, els.positionModal, els.reviewModal, els.reviewDetailModal, els.contractReviewModal].forEach((overlay) => {
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModals(); });
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModals(); });
@@ -2991,6 +3234,7 @@ function bindEvents() {
       els.karyawanTabDashboard.hidden = state.karyawanTab !== "dashboard";
       els.karyawanTabData.hidden = state.karyawanTab !== "data";
       els.karyawanTabPenilaian.hidden = state.karyawanTab !== "penilaian";
+      els.karyawanTabKontrak.hidden = state.karyawanTab !== "kontrak";
       renderKaryawanView();
     });
   });
@@ -3374,6 +3618,11 @@ function cacheEls() {
   els.reviewCategoryBadge = document.getElementById("review-category-badge");
   els.reviewDetailModal = document.getElementById("review-detail-modal");
   els.reviewDetailBody = document.getElementById("review-detail-body");
+
+  els.karyawanTabKontrak = document.getElementById("karyawan-tab-kontrak");
+  els.tableContracts = document.getElementById("table-contracts");
+  els.contractReviewModal = document.getElementById("contract-review-modal");
+  els.contractReviewBody = document.getElementById("contract-review-body");
   els.customerModal = document.getElementById("customer-modal");
   els.customerModalTitle = document.getElementById("customer-modal-title");
   els.customerSubmitBtn = document.getElementById("customer-submit-btn");

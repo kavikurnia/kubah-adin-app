@@ -296,6 +296,7 @@
         <button class="tab is-active" type="button" data-karyawan-tab="dashboard">Dashboard</button>
         <button class="tab" type="button" data-karyawan-tab="data">Data Karyawan</button>
         <button class="tab" type="button" data-karyawan-tab="penilaian">Penilaian Kinerja</button>
+        <button class="tab" type="button" data-karyawan-tab="kontrak">Kontrak</button>
       </div>
 
       <div id="karyawan-tab-dashboard">
@@ -397,6 +398,22 @@
           <table class="table" id="table-reviews">
             <thead>
               <tr><th>Nama Karyawan</th><th>Posisi</th><th>Periode</th><th>Nilai Akhir</th><th>Kategori</th><th>Rekomendasi</th><th>Tanggal Penilaian</th><th></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="karyawan-tab-kontrak" hidden>
+        <header class="view-head" style="margin-bottom:20px;">
+          <h1 style="font-size:20px;">Kontrak Karyawan</h1>
+          <p class="view-sub">Pantau masa kontrak, tinjau kinerja, dan tentukan keputusan perpanjangan.</p>
+        </header>
+
+        <div class="table-scroll">
+          <table class="table" id="table-contracts">
+            <thead>
+              <tr><th>Nama</th><th>Posisi</th><th>Mulai</th><th>Berakhir</th><th>Sisa Hari</th><th>Status</th><th>Nilai Terakhir</th><th>Rekomendasi</th><th></th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -814,6 +831,14 @@
   <div class="modal modal--wide">
     <button class="modal-close" data-close-modal>&times;</button>
     <div id="review-detail-body"></div>
+  </div>
+</div>
+
+<!-- ============ CONTRACT REVIEW MODAL ============ -->
+<div class="overlay" id="contract-review-modal" hidden>
+  <div class="modal modal--wide">
+    <button class="modal-close" data-close-modal>&times;</button>
+    <div id="contract-review-body"></div>
   </div>
 </div>
 
