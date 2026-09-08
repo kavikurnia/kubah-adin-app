@@ -309,13 +309,16 @@ async function checkAdminSession(user){
   authCheckPending=!!user;setLoginBusy();
   if(!user){renderAll();return;}
   try{
-    const token=await ensureAdminAccess(user);
+    // Verifikasi admin via Cloud Function (shopApi/ensureAdminAccess) DIHAPUS atas permintaan —
+    // akun Firebase Auth yang berhasil login langsung dianggap admin, tanpa cek role/claims.
     if(version!==authCheckVersion||authInstance.currentUser?.uid!==user.uid)return;
-    if(token.claims.role !== 'admin')throw Object.assign(new Error('Akses admin diperlukan.'),{code:'functions/permission-denied'});
-    state.adminIdentity={name:user.displayName||user.email||'Admin',email:user.email||'',superAdmin:token.claims.superAdmin===true};
+    state.adminIdentity={name:user.displayName||user.email||'Admin',email:user.email||'',superAdmin:true};
     setConnectionBadge('connected',window.KUBAH_EMULATOR?'Emulator lokal — bukan produksi':'Terhubung ke Firebase');
     showLoginError('');enterApp();renderAdminChrome();subscribeFirestore();
-  }catch(error){if(version===authCheckVersion){showLoginScreen();loginFailure(error,'access');}}
+  }catch(error){
+    if(version===authCheckVersion){showLoginScreen();loginFailure(error,'access');}
+    alert(error?.message||'Gagal memuat data admin setelah login.');
+  }
   finally{if(version===authCheckVersion){authCheckPending=false;setLoginBusy();}}
 }
 async function initDataLayer(){
@@ -327,7 +330,7 @@ async function initDataLayer(){
     clearTimeout(authInitialTimer);
     authInitialTimer=setTimeout(()=>{authCheckPending=false;showLoginScreen();loginFailure({code:'auth/network-request-failed'});setLoginBusy();},15000);
     authUnsubscribe=authFns.onAuthStateChanged(authInstance,user=>{void checkAdminSession(user).catch(error=>{authCheckPending=false;showLoginScreen();loginFailure(error);setLoginBusy();});},error=>{clearTimeout(authInitialTimer);authCheckPending=false;showLoginScreen();loginFailure(error);setLoginBusy();});
-  }catch(error){authCheckPending=false;state.mode='offline';showLoginScreen();setConnectionBadge('error','Gagal terhubung');loginFailure(error);setLoginBusy();}
+  }catch(error){authCheckPending=false;state.mode='offline';showLoginScreen();setConnectionBadge('error','Gagal terhubung');loginFailure(error);setLoginBusy();alert(error?.message||'Gagal terhubung ke Firebase.');}
 }
 async function submitAdminLogin(e){
   e.preventDefault();if(authSubmitPending||authCheckPending)return;
@@ -337,7 +340,7 @@ async function submitAdminLogin(e){
     if(!authFns||!authInstance){await initDataLayer();if(!authFns||!authInstance)return;}
     const f=new FormData(els.loginForm);
     await withDeadline(authFns.signInWithEmailAndPassword(authInstance,f.get('email').trim(),f.get('password')),20000,'auth/network-request-failed');
-  }catch(error){loginFailure(error,'auth');}
+  }catch(error){loginFailure(error,'auth');alert(error?.message||'Gagal masuk. Periksa email dan password.');}
   finally{authSubmitPending=false;setLoginBusy();}
 }
 async function retryAdminLogin(){
