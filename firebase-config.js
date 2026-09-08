@@ -13,8 +13,3 @@ if (window.KUBAH_EMULATOR) window.FIREBASE_CONFIG = {
   apiKey:'demo-api-key', projectId:'demo-kubah-nabawi', authDomain:'demo-kubah-nabawi.firebaseapp.com',
   storageBucket:'demo-kubah-nabawi.appspot.com', appId:'demo-app-id'
 };
-
-// Harus sama dengan region backend Functions yang telah di-deploy.
-window.KUBAH_FUNCTIONS_REGION = 'asia-southeast2';
-
-window.KUBAH_FREE=true;

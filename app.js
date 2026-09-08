@@ -1,57 +1,4 @@
-// BEGIN BUNDLED ADMIN CLIENT
-const {connect:connectShop,api:shopApi,ensureAdminAccess,withDeadline}=(()=>{
-const VERSION='10.12.2';
-const money=n=>n===null||n===undefined?'Menunggu konfirmasi':new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n);
-const date=n=>n?new Date(n?.toDate?n.toDate():n).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'medium',timeStyle:'short'})+' WIB':'—';
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const safeURL=v=>{try{const u=new URL(v);return u.protocol==='https:'?u.href:'';}catch{return '';}};
-const $=s=>document.querySelector(s);
-const label=s=>({belum_dibayar:'Belum dibayar',perlu_verifikasi:'Menunggu verifikasi',lunas:'Lunas',menunggu_pembayaran:'Menunggu pembayaran',diproses:'Diproses',dikirim:'Dikirim',selesai:'Selesai',dibatalkan:'Dibatalkan',menunggu:'Menunggu persetujuan',disetujui:'Disetujui',ditolak:'Ditolak',dinonaktifkan:'Dinonaktifkan',diterima_kurir:'Uang diterima kurir',disetor_kurir:'Uang disetor kurir',setoran_diverifikasi:'Setoran diverifikasi',refund_menunggu:'Menunggu refund',refund_selesai:'Refund selesai',perlu_rekonsiliasi:'Pembayaran perlu ditinjau admin'}[s]||s||'Belum mengajukan');
-function withDeadline(promise,ms=15000,code='functions/deadline-exceeded'){
-  let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error('Batas waktu koneksi terlampaui.'),{code})),ms);})]).finally(()=>clearTimeout(timer));
-}
-let ready;
-function connect(){return ready??=(async()=>{
-  const [appSDK,auth,fs,fn,storage]=await withDeadline(Promise.all(['app','auth','firestore','functions','storage'].map(m=>import(`https://www.gstatic.com/firebasejs/${VERSION}/firebase-${m}.js`))),15000,'auth/network-request-failed');
-  if(!window.FIREBASE_CONFIG?.apiKey||!window.FIREBASE_CONFIG?.projectId)throw Object.assign(new Error('Konfigurasi Firebase belum lengkap.'),{code:'auth/invalid-api-key'});
-  const local=['localhost','127.0.0.1','[::1]'].includes(location.hostname);
-  if(!local&&(window.KUBAH_EMULATOR||window.FIREBASE_CONFIG.projectId.startsWith('demo-')))throw Object.assign(new Error('Konfigurasi emulator tidak boleh dipakai pada website live.'),{code:'auth/emulator-config-on-live'});
-  const app=appSDK.getApps()[0]||appSDK.initializeApp(window.FIREBASE_CONFIG);
-  const a=auth.getAuth(app),db=fs.getFirestore(app),functions=fn.getFunctions(app,window.KUBAH_FUNCTIONS_REGION||'asia-southeast2'),bucket=storage.getStorage(app);
-  if(window.KUBAH_EMULATOR&&!window.__kubahEmulators){
-    auth.connectAuthEmulator(a,'http://127.0.0.1:9099',{disableWarnings:true});fs.connectFirestoreEmulator(db,'127.0.0.1',8080);fn.connectFunctionsEmulator(functions,'127.0.0.1',5001);storage.connectStorageEmulator(bucket,'127.0.0.1',9199);window.__kubahEmulators=true;
-  }
-  return {app,auth,a,db,fs,functions,fn,storage,bucket};
-})().catch(error=>{ready=undefined;throw error;});}
-async function api(action,data={}){
-  const c=await connect();
-  // Pertahankan code dari SDK; browser tidak dapat membedakan 404/CORS saat respons diblokir.
-  return (await c.fn.httpsCallable(c.functions,'shopApi',{timeout:action==='adminAccess'?15000:60000})({action,...data})).data;
-}
-async function ensureAdminAccess(user){
-  await api('adminAccess');
-  const token=await withDeadline(user.getIdTokenResult(true),15000,'auth/network-request-failed');
-  const c=await connect();
-  if(c.a.currentUser?.uid!==user.uid)throw Error('Sesi login berubah. Silakan masuk kembali.');
-  return token;
-}
-async function upload(orderId,file,onProgress=()=>{}){
-  const c=await connect();if(!c.a.currentUser)throw Error('Silakan masuk.');
-  if(!file||!['image/jpeg','image/png','image/webp','video/mp4'].includes(file.type)||file.size<=0||file.size>20*1024*1024)throw Error('Gunakan JPG, PNG, WEBP, atau MP4 maksimal 20 MB.');
-  const path=`evidence/${orderId}/${c.a.currentUser.uid}/${crypto.randomUUID()}`;
-  const task=c.storage.uploadBytesResumable(c.storage.ref(c.bucket,path),file,{contentType:file.type});
-  await new Promise((resolve,reject)=>task.on('state_changed',s=>onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,resolve));return path;
-}
-async function viewEvidence(path){const c=await connect();const blob=await c.storage.getBlob(c.storage.ref(c.bucket,path),20*1024*1024);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
-async function login(email,password,register=false){const c=await connect();return register?c.auth.createUserWithEmailAndPassword(c.a,email,password):c.auth.signInWithEmailAndPassword(c.a,email,password);}
-async function logout(){const c=await connect();return c.auth.signOut(c.a);}
-function formValues(form){return Object.fromEntries(new FormData(form));}
-function message(text,error=false){const el=document.getElementById('notice');if(el){el.hidden=false;el.className=error?'notice error':'notice';el.textContent=text;}}
-async function busy(button,fn){const text=button?.textContent;if(button){button.disabled=true;button.textContent='Memproses…';}try{return await fn();}catch(e){message(e.message,true);return undefined;}finally{if(button){button.disabled=false;button.textContent=text;}}}
-
-return {connect,api,ensureAdminAccess,withDeadline};
-})();
-// END BUNDLED ADMIN CLIENT
+import {connect as connectShop, api as shopApi} from './shop-client.js';
 // ============================================================
 // Admin Dashboard — Prototipe Interaktif
 // ============================================================
@@ -141,7 +88,6 @@ const DEFAULT_SETTINGS = {
   address: "",
   phone: "",
   logoUrl: "",
-  storeUrl: "",
 };
 
 const state = {
@@ -152,10 +98,6 @@ const state = {
   transactions: [],
   settings: { ...DEFAULT_SETTINGS },
   orderTab: "semua",
-  orderChannel: "semua",
-  recentTab: "semua",
-  deliverySlots: [], resellers: [], claims: [], ecommerce: null, adminIdentity: null,
-  ready: {orders:false,transactions:false,slots:false,resellers:false,claims:false,ecommerce:false},
   orderSearch: "",
   productSearch: "",
   customerSearch: "",
@@ -275,99 +217,30 @@ async function uploadImageFile(file, pathPrefix, onProgress) {
   });
 }
 
-let authSubmitPending=false,authCheckPending=false,authCheckVersion=0,authUnsubscribe=null,authInitialTimer=null;
-function setLoginBusy(){
-  const busy=authSubmitPending||authCheckPending;
-  els.loginSubmitBtn.disabled=busy;els.loginSubmitBtn.textContent=busy?'Memeriksa…':'Masuk';
-  document.getElementById('login-retry').disabled=busy;
-  document.getElementById('login-status').hidden=!busy;
-  document.getElementById('login-status').textContent=authSubmitPending?'Memeriksa email dan password…':'Memeriksa izin admin…';
-}
-function loginFailure(error,phase='auth'){
-  const code=typeof error?.code==='string'&&/^[a-z-]+\/[a-z-]+$/.test(error.code)?error.code:'';
-  let text;
-  if(phase==='auth'||code.startsWith('auth/'))text=mapAuthErrorMessage(code);
-  else if(code==='functions/permission-denied')text='Email dan password diterima, tetapi akses admin ditolak. Pemilik Firebase perlu memeriksa peran admin pada UID akun ini dan apakah akun dinonaktifkan.';
-  else if(code==='functions/unauthenticated')text='Sesi login tidak berlaku. Masuk kembali dengan akun Anda.';
-  else if(code==='functions/failed-precondition')text='Pemeriksaan admin ditolak oleh konfigurasi backend. Pastikan versi backend terbaru sudah dipasang dan peran akun sudah ditetapkan.';
-  else text='Autentikasi akun berhasil, tetapi backend admin belum dapat dihubungi. Periksa deployment shopApi, project, region, serta respons endpoint/IAM/CORS. Coba lagi setelah backend tersedia.';
-  showLoginError(text+(code?' ['+code+']':''));document.getElementById('login-retry').hidden=false;
-}
-function clearAdminSession(){
-  state.adminIdentity=null;state.deliverySlots=[];state.resellers=[];state.claims=[];state.ecommerce=null;
-  Object.keys(state.ready).forEach(k=>state.ready[k]=false);
-  clearTimeout(moduleTimer);document.getElementById('operational-frame').onload=null;
-  document.getElementById('operational-frame').src='about:blank';toggleDrawer(false);
-  firestoreUnsubscribers.forEach(unsub=>unsub());firestoreUnsubscribers=[];
-  document.querySelectorAll('.overlay').forEach(el=>el.hidden=true);state.openOrderId=null;
-  for(const key of ['orders','products','customers','transactions','employees','positions','performanceReviews','payrolls'])state[key]=[];
-  showLoginScreen();
-}
-
-// Allowlist email admin — SATU-SATUNYA gerbang keamanan sekarang bahwa role/claims-check
-// via Cloud Function dihapus. Akun mana pun yang login TAPI emailnya tidak ada di daftar
-// ini (termasuk akun yang didaftarkan sendiri lewat toko.html) akan ditolak & di-logout otomatis.
-const ADMIN_ALLOWED_EMAILS = ['kubahnabawiofficialshop@gmail.com'];
-
-async function checkAdminSession(user){
-  clearTimeout(authInitialTimer);const version=++authCheckVersion;
-  clearAdminSession();showLoginError('');document.getElementById('login-retry').hidden=true;
-  authCheckPending=!!user;setLoginBusy();
-  if(!user){renderAll();return;}
-
-  const userEmail=(user.email||'').toLowerCase().trim();
-  if(!ADMIN_ALLOWED_EMAILS.includes(userEmail)){
-    try{await authFns.signOut(authInstance);}catch{}
-    if(version===authCheckVersion){
+async function initDataLayer() {
+  state.mode = "firebase";
+  try {
+    const c = await connectShop();
+    fbApp = c.app; fb = { db: c.db, ...c.fs }; authInstance = c.a; authFns = c.auth;
+    storageInstance = c.bucket; storageFns = c.storage;
+    authFns.onAuthStateChanged(authInstance, async (user) => {
+      firestoreUnsubscribers.forEach(unsub => unsub()); firestoreUnsubscribers = [];
       showLoginScreen();
-      loginFailure(Object.assign(new Error('Akun ini tidak terdaftar sebagai admin toko.'),{code:'functions/permission-denied'}),'access');
-      authCheckPending=false;setLoginBusy();
-    }
-    alert('Akun ini tidak terdaftar sebagai admin toko.');
-    return;
+      for (const key of ['orders','products','customers','transactions','employees','positions','performanceReviews','payrolls']) state[key] = [];
+      if (!user) { renderAll(); return; }
+      try {
+        const token = await user.getIdTokenResult(true);
+        if (token.claims.role !== 'admin') { showLoginError('Akun ini bukan admin. Masuk melalui toko.html untuk belanja.'); return; }
+        setConnectionBadge('connected', window.KUBAH_EMULATOR ? 'Emulator lokal — bukan produksi' : 'Terhubung ke Firebase');
+        showLoginError(''); enterApp(); subscribeFirestore();
+      } catch (err) { showLoginError('Pemeriksaan akses gagal. Muat ulang untuk mencoba lagi.'); }
+    });
+  } catch (err) {
+    state.mode = 'offline'; showLoginScreen(); setConnectionBadge('error', 'Gagal terhubung');
+    showLoginError('Firebase tidak dapat terhubung. Tidak ada mode demo otomatis. Periksa koneksi lalu muat ulang.');
   }
+}
 
-  try{
-    // Verifikasi admin via Cloud Function (shopApi/ensureAdminAccess) DIHAPUS atas permintaan —
-    // gerbangnya sekarang allowlist email di atas, bukan role/claims dari backend.
-    if(version!==authCheckVersion||authInstance.currentUser?.uid!==user.uid)return;
-    state.adminIdentity={name:user.displayName||user.email||'Admin',email:user.email||'',superAdmin:true};
-    setConnectionBadge('connected',window.KUBAH_EMULATOR?'Emulator lokal — bukan produksi':'Terhubung ke Firebase');
-    showLoginError('');enterApp();renderAdminChrome();subscribeFirestore();
-  }catch(error){
-    if(version===authCheckVersion){showLoginScreen();loginFailure(error,'access');}
-    alert(error?.message||'Gagal memuat data admin setelah login.');
-  }
-  finally{if(version===authCheckVersion){authCheckPending=false;setLoginBusy();}}
-}
-async function initDataLayer(){
-  state.mode='firebase';authUnsubscribe?.();authUnsubscribe=null;
-  authCheckPending=true;showLoginScreen();setLoginBusy();
-  try{
-    const c=await connectShop();
-    fbApp=c.app;fb={db:c.db,...c.fs};authInstance=c.a;authFns=c.auth;storageInstance=c.bucket;storageFns=c.storage;
-    clearTimeout(authInitialTimer);
-    authInitialTimer=setTimeout(()=>{authCheckPending=false;showLoginScreen();loginFailure({code:'auth/network-request-failed'});setLoginBusy();},15000);
-    authUnsubscribe=authFns.onAuthStateChanged(authInstance,user=>{void checkAdminSession(user).catch(error=>{authCheckPending=false;showLoginScreen();loginFailure(error);setLoginBusy();});},error=>{clearTimeout(authInitialTimer);authCheckPending=false;showLoginScreen();loginFailure(error);setLoginBusy();});
-  }catch(error){authCheckPending=false;state.mode='offline';showLoginScreen();setConnectionBadge('error','Gagal terhubung');loginFailure(error);setLoginBusy();alert(error?.message||'Gagal terhubung ke Firebase.');}
-}
-async function submitAdminLogin(e){
-  e.preventDefault();if(authSubmitPending||authCheckPending)return;
-  showLoginError('');document.getElementById('login-retry').hidden=true;
-  authSubmitPending=true;setLoginBusy();
-  try{
-    if(!authFns||!authInstance){await initDataLayer();if(!authFns||!authInstance)return;}
-    const f=new FormData(els.loginForm);
-    await withDeadline(authFns.signInWithEmailAndPassword(authInstance,f.get('email').trim(),f.get('password')),20000,'auth/network-request-failed');
-  }catch(error){loginFailure(error,'auth');alert(error?.message||'Gagal masuk. Periksa email dan password.');}
-  finally{authSubmitPending=false;setLoginBusy();}
-}
-async function retryAdminLogin(){
-  if(authSubmitPending||authCheckPending)return;
-  if(authInstance?.currentUser)await checkAdminSession(authInstance.currentUser);
-  else if(!authFns)await initDataLayer();
-  else {showLoginError('Silakan masukkan email dan password, lalu tekan Masuk.');document.getElementById('login-retry').hidden=true;}
-}
 
 /** Tampilkan dashboard, sembunyikan layar login. */
 function enterApp() {
@@ -380,7 +253,6 @@ function showLoginScreen() {
   els.appRoot.hidden = true;
   els.authScreen.hidden = false;
   els.authChecking.hidden = true;
-  document.getElementById('bootstrap-retry').hidden=true;
   els.loginForm.hidden = false;
 }
 
@@ -408,17 +280,9 @@ function mapAuthErrorMessage(code) {
     case "auth/too-many-requests":
       return "Terlalu banyak percobaan gagal. Coba lagi beberapa saat lagi.";
     case "auth/network-request-failed":
-      return "Gagal terhubung ke Firebase. Periksa koneksi internet. Tidak ada mode demo otomatis.";
-    case 'auth/operation-not-allowed': return 'Login Email/Password belum diaktifkan pada proyek Firebase ini.';
-    case 'auth/unauthorized-domain': return 'Domain website belum diizinkan di Firebase Authentication.';
-    case 'auth/invalid-api-key':
-    case 'auth/app-not-authorized':
-    case 'auth/configuration-not-found':
-    case 'auth/invalid-app-credential': return 'Konfigurasi Firebase atau izin API key belum sesuai. Periksa proyek dan pembatasan API key.';
-    case 'auth/emulator-config-on-live': return 'Konfigurasi emulator ditemukan di website live. Gunakan konfigurasi Firebase proyek yang benar.';
-    case 'auth/user-token-expired':
-    case 'auth/invalid-user-token': return 'Sesi akun kedaluwarsa. Masuk kembali.';
-    default: return 'Autentikasi belum berhasil. Periksa kode error yang ditampilkan; kegagalan ini belum tentu karena password.';
+      return "Gagal terhubung ke server. Periksa koneksi internet kamu.";
+    default:
+      return "Gagal masuk. Periksa kembali email dan password kamu.";
   }
 }
 
@@ -434,13 +298,7 @@ function subscribeFirestore() {
     showToast('Data gagal disinkronkan. Periksa koneksi dan izin akses.');
   });
 
-  for(const [collectionName,stateKey,readyKey] of [['resellers','resellers','resellers'],['claims','claims','claims'],['deliverySlots','deliverySlots','slots']]){
-    firestoreUnsubscribers.push(fb.onSnapshot(collection(fb.db,collectionName),snap=>{state[stateKey]=snap.docs.map(d=>({...d.data(),id:d.id}));state.ready[readyKey]=true;renderAll();},()=>{state.ready[readyKey]=false;setConnectionBadge('error','Dukungan modul belum tersedia');renderAll();}));
-  }
-  firestoreUnsubscribers.push(fb.onSnapshot(doc(fb.db,'settings','ecommerce'),snap=>{state.ecommerce=snap.exists()?snap.data():null;state.ready.ecommerce=true;renderAll();},()=>{state.ready.ecommerce=false;renderAll();}));
-
   firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "orders"), orderBy("createdAt", "desc")), (snap) => {
-    state.ready.orders=true;
     state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     // Pesanan kosong adalah kondisi sah; jangan membuat data contoh atau jurnal dari browser.
     renderAll();
@@ -457,7 +315,6 @@ function subscribeFirestore() {
   }));
 
   firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "transactions"), orderBy("date", "desc")), (snap) => {
-    state.ready.transactions=true;
     state.transactions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAll();
   }));
@@ -549,16 +406,15 @@ async function updateOrder(orderId, patch, historyLabel) {
   if (order?.schemaVersion === 2) {
     window.location.href = 'admin-website.html#orders/' + encodeURIComponent(orderId); return;
   }
-  const { doc, updateDoc } = fb;
-  const history = [...(order?.statusHistory || []), { status: historyLabel || patch.status, at: new Date().toISOString() }];
-  await updateDoc(doc(fb.db, "orders", orderId), { ...patch, statusHistory: history });
+  await shopApi('orderAction', { orderId, operation: 'legacy', ...patch });
 }
 
 
 /** Buat pesanan baru secara manual (dipakai form "Buat pesanan"). */
 async function addOrder(order) {
-  const { addDoc, collection, serverTimestamp } = fb;
-  await addDoc(collection(fb.db, "orders"), { ...order, createdAt: serverTimestamp() });
+  state.manualOrderKey ||= crypto.randomUUID();
+  const result = await shopApi('legacyManualOrder', { ...order, key: state.manualOrderKey });
+  order.invoiceNo = result.invoiceNo; state.manualOrderKey = null;
 }
 
 
@@ -579,22 +435,18 @@ function generateInvoiceNo() {
 }
 
 /** Tambah produk baru. */
-async function addProduct(product) {
-  const { addDoc, collection, serverTimestamp } = fb;
-  await addDoc(collection(fb.db, "products"), { ...product, createdAt: serverTimestamp() });
-}
+async function addProduct(product) { return shopApi('saveProduct', {product}); }
 
 
 async function deleteProduct(productId) {
-  const { doc, updateDoc } = fb;
-  await updateDoc(doc(fb.db, "products", productId), { status: 'nonaktif' });
+  const product = state.products.find(p => p.id === productId);
+  await shopApi('saveProduct', {productId, expectedRevision: product.revision || 0, product: {...product, status:'nonaktif'}});
 }
 
 
 /** Update produk yang sudah ada (dipakai oleh form Edit). */
 async function updateProduct(productId, patch) {
-  const { doc, updateDoc } = fb;
-  await updateDoc(doc(fb.db, "products", productId), patch);
+  return shopApi('saveProduct', {productId, expectedRevision: state.editingProductRevision || 0, product: patch});
 }
 
 
@@ -675,8 +527,6 @@ async function addTransaction(tx) {
 
 /** Simpan profil toko (dipakai form Pengaturan). */
 async function saveSettings(patch) {
-  if(patch.storeUrl?.trim()&&!safeStoreUrl(patch.storeUrl))throw Error('Alamat Website Pembeli harus URL http/https tanpa kredensial atau token.');
-  if('storeUrl' in patch)patch.storeUrl=safeStoreUrl(patch.storeUrl);
   const merged = { ...DEFAULT_SETTINGS, ...(state.settings || {}), ...patch };
   if (state.mode === "firebase") {
     const { doc, setDoc } = fb;
@@ -867,11 +717,11 @@ const formatDate = (iso) => {
   if (!iso) return "-";
   const d = iso?.toDate ? iso.toDate() : new Date(iso);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("id-ID", { timeZone:"Asia/Jakarta", day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 };
 /** Konversi Firestore Timestamp atau string ISO menjadi objek Date JS. */
 const toJsDate = (input) => (input?.toDate ? input.toDate() : new Date(input));
-const isToday = (input) => jakartaDay(input) === jakartaDay();
+const isToday = (input) => toJsDate(input).toDateString() === new Date().toDateString();
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c]));
 }
@@ -948,8 +798,7 @@ function showToast(msg) {
 // 3. RENDER
 // ============================================================
 function renderAll() {
-  renderNavBadge(); renderAdminChrome();
-  if (state.view === "pencarian") renderSearchResults();
+  renderNavBadge();
   if (state.view === "dashboard") renderDashboard();
   if (state.view === "pesanan") renderOrdersView();
   if (state.view === "produk") renderProductsView();
@@ -959,153 +808,138 @@ function renderAll() {
   if (state.openOrderId) renderOrderModalBody(state.openOrderId);
 }
 
-const DASHBOARD_ZONE='Asia/Jakarta';
-function jakartaDay(input=new Date()) { const d=toJsDate(input);return Number.isNaN(+d)?'':new Date(+d+7*3600000).toISOString().slice(0,10); }
-function jakartaDateLabel(input,options={day:'numeric',month:'long',year:'numeric'}) {return toJsDate(input).toLocaleDateString('id-ID',{...options,timeZone:DASHBOARD_ZONE});}
-function safeStoreUrl(value) {
-  try {const u=new URL(String(value||'').trim());if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return '';for(const key of u.searchParams.keys())if(/^(token|access_token|id_token|password|auth)$/i.test(key))return '';return u.href;}catch{return '';}
-}
-function claimNeedsAction(c) {
-  if(['ditolak','selesai','ditutup'].includes(c.status))return false;
-  if(c.status==='refund')return c.refundPaid!==true;
-  if(c.status==='retur')return !c.returnInspected||c.refundAmount>0&&!c.refundPaid;
-  if(c.status==='penggantian')return !c.returnInspected||!c.fulfilled||c.refundAmount>0&&!c.refundPaid;
-  if(c.status==='kirim_kekurangan')return !c.fulfilled||c.refundAmount>0&&!c.refundPaid;
-  return true;
-}
-function readyToShip(o){return o.status==='diproses'&&o.shippingMethod!=='pickup'&&(o.schemaVersion!==2||(['Dikemas','Menunggu kurir','Siap dikirim'].includes(o.detailStatus)&&(o.paymentStatus==='lunas'||o.cashConfirmed&&String(o.paymentMethod).startsWith('cash_'))));}
-function outstandingCourierCash(orders){return orders.filter(o=>o.paymentMethod==='cash_store'&&['diterima_kurir','disetor_kurir'].includes(o.cashStatus)&&o.paidAmount>0).reduce((n,o)=>n+Number(o.paidAmount),0);}
-function orderChannel(o){return o.source==='website'?'website':o.source==='admin'?'admin':'historis';}
-function salesEntries(orders,transactions) {
-  const lookup=new Map();orders.forEach(o=>{lookup.set(o.id,o);if(o.invoiceNo)lookup.set(o.invoiceNo,o);});
-  const result=new Map();
-  const sorted=[...transactions].sort((a,b)=>Number(String(b.id).startsWith('income_'))-Number(String(a.id).startsWith('income_')));
-  for(const t of sorted){
-    if(t.type!=='masuk'||!(Number(t.amount)>0)||(!t.orderId&&t.category!=='Penjualan'))continue;
-    const o=lookup.get(t.orderId);if(o?.status==='dibatalkan')continue;
-    const key=t.orderId?'order:'+(o?.id||t.orderId):'manual:'+t.id;
-    if(!result.has(key))result.set(key,{amount:Number(t.amount),at:t.createdAt||t.date,orderId:t.orderId});
-  }
-  return [...result.values()];
-}
-function getDashboardDateRange(now=new Date()) {
-  const today=jakartaDay(now),selected=state.dashPeriod==='custom'&&/^\d{4}-\d{2}-\d{2}$/.test(state.dashCustomDate)?state.dashCustomDate:today;
-  const dayStart=new Date(selected+'T00:00:00+07:00'),end=new Date(+dayStart+86400000);
-  const count=state.dashPeriod==='7d'?7:state.dashPeriod==='30d'?30:1,start=new Date(+dayStart-(count-1)*86400000);
-  const label=count===1?jakartaDateLabel(start):`${jakartaDateLabel(start)} – ${jakartaDateLabel(new Date(+end-1))}`;
-  return {start,end,label};
-}
-function isWithinRange(input,start,end){const date=typeof input==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(input)?new Date(input+'T00:00:00+07:00'):toJsDate(input);return date>=start&&date<end;}
-function activityCounts(){return {reseller:state.resellers.filter(r=>r.status==='menunggu').length,claims:state.claims.filter(claimNeedsAction).length,payment:state.orders.filter(o=>o.status==='perlu_verifikasi').length};}
 function renderNavBadge() {
-  const counts=activityCounts();
-  for(const [key,value,ready] of [['pesanan',state.orders.filter(o=>!['selesai','dibatalkan'].includes(o.status)).length,state.ready.orders],['reseller',counts.reseller,state.ready.resellers],['retur',counts.claims,state.ready.claims]]){
-    const badge=document.getElementById('nav-badge-'+key);badge.textContent=value;badge.hidden=!ready||!value;badge.style.removeProperty('display');
+  const count = state.orders.filter((o) => o.status === "perlu_verifikasi").length;
+  els.navBadgePesanan.textContent = count;
+  els.navBadgePesanan.style.display = count > 0 ? "inline-block" : "none";
+}
+
+/** Hitung rentang tanggal [start, end) dan label tampilan sesuai filter periode dashboard yang aktif. */
+function getDashboardDateRange() {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endExclusive = new Date(startOfToday);
+  endExclusive.setDate(endExclusive.getDate() + 1);
+
+  if (state.dashPeriod === "7d") {
+    const start = new Date(startOfToday);
+    start.setDate(start.getDate() - 6);
+    return { start, end: endExclusive, label: `7 hari terakhir — ${formatDate(start)} s/d ${formatDate(now)}` };
   }
+  if (state.dashPeriod === "30d") {
+    const start = new Date(startOfToday);
+    start.setDate(start.getDate() - 29);
+    return { start, end: endExclusive, label: `30 hari terakhir — ${formatDate(start)} s/d ${formatDate(now)}` };
+  }
+  if (state.dashPeriod === "custom" && state.dashCustomDate) {
+    const [y, m, d] = state.dashCustomDate.split("-").map(Number);
+    const start = new Date(y, m - 1, d);
+    const end = new Date(y, m - 1, d + 1);
+    return { start, end, label: formatDate(start) };
+  }
+  // default: hari ini
+  return { start: startOfToday, end: endExclusive, label: now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) };
 }
-function renderAdminChrome() {
-  const s=state.settings||{},u=state.adminIdentity;
-  document.getElementById('sidebar-store-name').textContent=s.storeName||'KUBAH NABAWI';
-  const logo=document.getElementById('sidebar-logo'),url=safeStoreUrl(s.logoUrl);if(url&&logo.getAttribute('src')!==url)logo.src=url;logo.hidden=!url;document.getElementById('sidebar-monogram').hidden=!!url;
-  logo.onerror=()=>{logo.hidden=true;document.getElementById('sidebar-monogram').hidden=false;};
-  document.getElementById('admin-display-name').textContent=u?.name||'Admin';document.getElementById('admin-display-name').title=u?.email||'';
-  document.getElementById('admin-initial').textContent=(u?.name||'A').trim().slice(0,1).toUpperCase();document.getElementById('admin-role').textContent=u?.superAdmin?'Super Admin':'Administrator';
-  const storeLink=document.getElementById('view-store'),storeUrl=safeStoreUrl(s.storeUrl);storeLink.href=storeUrl||'#pengaturan';storeLink.dataset.configured=storeUrl?'true':'false';
-  const counts=activityCounts(),rows=[['reseller',counts.reseller,'pengajuan reseller menunggu',state.ready.resellers],['retur',counts.claims,'komplain belum selesai',state.ready.claims],['payment',counts.payment,'pembayaran perlu verifikasi',state.ready.orders]];
-  document.getElementById('notification-dot').hidden=!rows.some(r=>r[3]&&r[1]>0);
-  const panel=document.getElementById('notification-items');panel.innerHTML=rows.filter(r=>r[3]&&r[1]>0).map(r=>`<button data-activity="${r[0]}"><strong>${r[1]}</strong> ${r[2]} <span aria-hidden="true">›</span></button>`).join('')||'<p>Tidak ada tindak lanjut pada data yang sudah tersinkron.</p>';
-  panel.querySelectorAll('[data-activity]').forEach(b=>b.onclick=()=>followActivity(b.dataset.activity));
+
+function isWithinRange(dateInput, start, end) {
+  const d = toJsDate(dateInput);
+  return d >= start && d < end;
 }
-function followActivity(target){document.getElementById('notification-panel').hidden=true;document.getElementById('notifications-toggle').setAttribute('aria-expanded','false');if(target==='payment'){state.orderTab='perlu_verifikasi';state.orderChannel='semua';document.getElementById('order-channel').value='semua';navigateTo('pesanan');}else navigateTo(target);}
+
 function renderDashboard() {
-  const {start,end,label}=getDashboardDateRange(),orders=state.orders,counts=activityCounts();
-  const money=salesEntries(orders,state.transactions).filter(t=>isWithinRange(t.at,start,end)).reduce((n,t)=>n+t.amount,0);
-  els.statRevenue.textContent=state.ready.orders&&state.ready.transactions?formatRupiah(money):'Belum tersedia';
-  document.getElementById('sales-period-label').textContent=state.dashPeriod==='today'?'Penjualan Hari Ini':'Penjualan Periode Ini';
-  els.statNewOrders.textContent=state.ready.orders?orders.filter(o=>isWithinRange(o.createdAt,start,end)).length:'—';
-  document.getElementById('stat-ready').textContent=state.ready.orders?orders.filter(readyToShip).length:'—';
-  const cashReady=state.ready.orders&&state.ready.ecommerce&&!!state.ecommerce;
-  const cash=outstandingCourierCash(orders);
-  document.getElementById('stat-cash').textContent=cashReady?formatRupiah(cash):'Belum tersedia';
-  document.getElementById('stat-cash').title=cashReady?'Dana diterima kurir dan belum diverifikasi setorannya, seluruh tanggal.':'Data penerimaan dan setoran kurir belum tersedia.';
-  els.statVerify.textContent=state.ready.orders?counts.payment:'—';els.statLowstock.textContent=state.products.filter(p=>p.status==='aktif'&&Number(p.totalStock)<=5).length;
-  document.getElementById('follow-resellers').textContent=state.ready.resellers?counts.reseller:'—';document.getElementById('follow-claims').textContent=state.ready.claims?counts.claims:'—';
-  els.todayDate.textContent=label+' · WIB';
-  document.querySelector('#dash-period-select option[value="today"]').textContent=jakartaDateLabel(new Date());
-  document.getElementById('dashboard-definition').textContent='Penjualan: penerimaan penjualan tercatat pada periode terpilih, sebelum refund; jurnal pesanan dihitung sekali dan pesanan batal dikecualikan. Pesanan Baru: dibuat dalam periode. Siap Dikirim: pesanan dikemas/menunggu kurir (pesanan lama: diproses), di seluruh tanggal. Tunai: dana yang telah diterima kurir dan belum diverifikasi setorannya, di seluruh tanggal.';
-  const recent=orders.filter(o=>isWithinRange(o.createdAt,start,end)&&(state.recentTab==='semua'||o.status===state.recentTab)).sort((a,b)=>toJsDate(b.createdAt)-toJsDate(a.createdAt)).slice(0,5);
-  const tbody=els.tableRecentOrders.querySelector('tbody');tbody.innerHTML=recent.map(o=>{
-    const shipping={store:'Kurir Toko',pickup:'Ambil di Gudang',regular:'Reguler',instant:'Instan',cargo:'Kargo'}[o.shippingMethod]||o.courier||'Belum diatur';
-    const badge=o.promoApplied===true&&o.shippingMethod==='store'&&o.shippingState==='confirmed'&&o.shippingCost===0?'<span class="promo-badge">Gratis ongkir</span>':'';
-    const status=o.detailStatus==='Menunggu kurir'?'Menunggu Kurir':o.shippingMethod==='pickup'&&o.status==='diproses'?'Siap Diambil':STATUS_META[o.status]?.label||o.status||'Belum tersedia';
-    return `<tr data-recent-order="${escapeHtml(o.id)}"><td><button class="invoice-link" data-order-detail="${escapeHtml(o.id)}" title="${escapeHtml(o.invoiceNo)}">${escapeHtml(o.invoiceNo||o.id)}</button></td><td>${escapeHtml(o.customerName)}${o.usesReseller?'<small class="reseller-label">Reseller</small>':''}</td><td>${escapeHtml(shipping)} ${badge}</td><td>${o.total==null?'Menunggu konfirmasi':formatRupiah(o.total)}</td><td><span class="tag tag--${escapeHtml(o.status)}">${escapeHtml(status)}</span></td><td><button class="row-more" data-order-detail="${escapeHtml(o.id)}" aria-label="Detail pesanan ${escapeHtml(o.invoiceNo||o.id)}">⋮</button></td></tr>`;
-  }).join('')||`<tr><td colspan="6" class="table-empty">${state.ready.orders?'Belum ada pesanan pada periode dan status ini.':'Data pesanan belum tersedia.'}</td></tr>`;
-  tbody.querySelectorAll('[data-recent-order]').forEach(row=>row.onclick=()=>openOrderModal(row.dataset.recentOrder));
-  document.querySelectorAll('[data-recent]').forEach(b=>{const active=b.dataset.recent===state.recentTab;b.classList.toggle('is-active',active);b.setAttribute('aria-pressed',String(active));});
-  document.getElementById('schedule-date').textContent=(state.dashPeriod==='today'?'Hari ini, ':'')+label;
-  const slots=state.deliverySlots.filter(s=>s.enabled&&isWithinRange(s.startAt,start,end)).sort((a,b)=>Date.parse(a.startAt)-Date.parse(b.startAt));
-  const time=v=>new Date(v).toLocaleTimeString('id-ID',{timeZone:DASHBOARD_ZONE,hour:'2-digit',minute:'2-digit'}).replace(':','.');
-  document.getElementById('delivery-slots').innerHTML=state.ready.slots?(slots.map((slot,i)=>{const used=Number(slot.used)||0,cap=Number(slot.capacity)||0;return `<article class="slot-card"><div><strong>${state.dashPeriod==='7d'||state.dashPeriod==='30d'?escapeHtml(jakartaDateLabel(slot.startAt,{day:'numeric',month:'short'}))+' · ':''}${time(slot.startAt)} – ${time(slot.endAt)}</strong><small>${used}/${cap} pengiriman</small></div><progress class="slot-progress tone-${i%3}" value="${Math.min(used,cap)}" max="${Math.max(cap,1)}" aria-label="Kuota ${time(slot.startAt)}: ${used} dari ${cap}"></progress></article>`;}).join('')||'<div class="dashboard-empty"><p>Belum ada jadwal aktif pada periode ini.</p><button class="btn btn--outline" id="add-empty-slot">Tambah Jadwal</button></div>'):'<p class="dashboard-empty">Jadwal belum tersedia. Periksa koneksi dan izin Firebase.</p>';
-  document.getElementById('add-empty-slot')?.addEventListener('click',()=>navigateTo('jadwal'));
-  const c=state.ecommerce,free=c?.freeShipping;
-  document.getElementById('free-shipping-summary').innerHTML=state.ready.ecommerce&&free?`${free.enabled===false?'<p class="promo-disabled">Promo nonaktif</p>':''}<p>Minimal ${Number(free.minPcs)===20?'1 kodi (20 pcs)':escapeHtml(free.minPcs)+' pcs'}</p><p>Maksimal ${escapeHtml(free.maxKm)} km dari gudang</p><small>${c.routeProvider==='google'?'Jarak diverifikasi backend Google Routes.':'Jarak rute memerlukan verifikasi admin.'}</small>`:'<p>Konfigurasi promo belum tersedia.</p>';
-  const pending=orders.filter(o=>o.schemaVersion===2&&o.shippingState!=='confirmed'&&o.status!=='dibatalkan').length;
-  els.actionList.innerHTML=pending?`<li>${pending} pesanan masih menunggu konfirmasi ongkir.</li>`:'<li>Tidak ada ongkir yang menunggu konfirmasi pada data tersinkron.</li>';
+  const { start, end, label } = getDashboardDateRange();
+  const periodOrders = state.orders.filter((o) => isWithinRange(o.createdAt, start, end));
+
+  const newInPeriod = periodOrders.length;
+  const needVerifyInPeriod = periodOrders.filter((o) => o.status === "perlu_verifikasi").length;
+  const revenueInPeriod = periodOrders.filter((o) => o.status !== "dibatalkan").reduce((s, o) => s + o.total, 0);
+  const lowStockProducts = state.products.filter((p) => p.totalStock <= 5 && p.status === "aktif");
+
+  els.statNewOrders.textContent = newInPeriod;
+  els.statVerify.textContent = needVerifyInPeriod;
+  els.statRevenue.textContent = formatRupiah(revenueInPeriod);
+  els.statLowstock.textContent = lowStockProducts.length;
+  els.todayDate.textContent = label;
+
+  // Perlu aksi segera — SELALU dari semua pesanan (bukan hanya periode terpilih),
+  // karena ini daftar tugas operasional yang tetap perlu ditangani berapa pun umur pesanannya.
+  const orders = state.orders;
+  const needVerifyGlobal = orders.filter((o) => o.status === "perlu_verifikasi").length;
+  const actions = [];
+  const needShippingQuote = orders.filter((o) => o.schemaVersion === 2 && o.shippingState !== 'confirmed' && o.status !== 'dibatalkan').length;
+  if (needShippingQuote > 0) actions.push({ text: `${needShippingQuote} pesanan menunggu konfirmasi ongkir`, goto: () => { location.href = 'admin-website.html#orders'; } });
+  if (needVerifyGlobal > 0) actions.push({ text: `${needVerifyGlobal} pesanan menunggu verifikasi pembayaran`, goto: () => { state.orderTab = "perlu_verifikasi"; navigateTo("pesanan"); } });
+  const needShip = orders.filter((o) => o.status === "diproses").length;
+  if (needShip > 0) actions.push({ text: `${needShip} pesanan siap dikirim, resi belum diinput`, goto: () => { state.orderTab = "diproses"; navigateTo("pesanan"); } });
+  if (lowStockProducts.length > 0) actions.push({ text: `${lowStockProducts.length} produk stok tinggal ${Math.min(...lowStockProducts.map((p) => p.totalStock))}–5 unit`, goto: () => navigateTo("produk") });
+
+  els.actionList.innerHTML = "";
+  if (actions.length === 0) {
+    els.actionList.innerHTML = `<li class="action-empty"><span>Semua pesanan sudah ditangani. Kerja bagus.</span></li>`;
+  } else {
+    actions.forEach((a) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span>${a.text}</span>`;
+      const btn = document.createElement("button");
+      btn.className = "mini-btn";
+      btn.textContent = "Lihat";
+      btn.addEventListener("click", a.goto);
+      li.appendChild(btn);
+      els.actionList.appendChild(li);
+    });
+  }
+
+  // Pesanan terbaru (5) — tetap dari semua pesanan, bukan hanya periode terpilih.
+  const recent = [...orders].sort((a, b) => toJsDate(b.createdAt) - toJsDate(a.createdAt)).slice(0, 5);
+  renderOrderRows(els.tableRecentOrders.querySelector("tbody"), recent, false);
+
   renderSalesChart();
 }
-function renderSalesChart(){
-  const {end}=getDashboardDateRange(),count=state.dashPeriod==='30d'?30:7,entries=salesEntries(state.orders,state.transactions),days=Array.from({length:count},(_,i)=>new Date(+end-(count-i)*86400000));
-  const totals=days.map(d=>entries.filter(t=>isWithinRange(t.at,d,new Date(+d+86400000))).reduce((n,t)=>n+t.amount,0)),max=Math.max(...totals,1),width=320/count;
-  els.chartTitle.textContent=`Penerimaan penjualan — ${count} hari hingga ${jakartaDateLabel(new Date(+end-1))}`;
-  els.salesChart.innerHTML=totals.map((total,i)=>{const height=total/max*110;return `<rect x="${i*width+2}" y="${115-height}" width="${Math.max(1,width-4)}" height="${height}" rx="2" fill="#7C2D3B"><title>${jakartaDateLabel(days[i])}: ${formatRupiah(total)}</title></rect>${i%Math.ceil(count/7)===0?`<text x="${i*width+width/2}" y="135" font-size="8" text-anchor="middle" fill="#69645b">${jakartaDateLabel(days[i],{day:'numeric',month:'short'})}</text>`:''}`;}).join('');
-}
-let moduleTimer;
-function showOperational(module){
-  const allowed=['orders','couriers','slots','resellers','pricing','claims','settings','reconcile'];if(!allowed.includes(module.split('/')[0]))return;
-  const view={resellers:'reseller',couriers:'pengiriman',slots:'jadwal',claims:'retur',orders:'pesanan',reconcile:'keuangan',pricing:'pengaturan',settings:'pengaturan'}[module.split('/')[0]];
-  state.view='operasional';document.querySelectorAll('.view').forEach(v=>v.hidden=true);document.getElementById('view-operasional').hidden=false;
-  document.querySelectorAll('.nav-item[data-view]').forEach(b=>b.classList.toggle('is-active',b.dataset.view===view));
-  document.getElementById('breadcrumb-title').textContent=({reseller:'Reseller',pengiriman:'Pengiriman & Kurir',jadwal:'Jadwal Pengiriman',retur:'Retur & Komplain',pesanan:'Pesanan Website',keuangan:'Rekonsiliasi',pengaturan:'Pengaturan operasional'})[view];
-  clearTimeout(moduleTimer);document.getElementById('module-error').hidden=true;
-  const frame=document.getElementById('operational-frame');
-  const inspect=()=>{try{const content=frame.contentDocument?.getElementById('content');if(!content||/Memeriksa/.test(content.textContent)){document.getElementById('module-error').hidden=false;}}catch{document.getElementById('module-error').hidden=false;}};
-  frame.onload=()=>{try{if(!frame.contentDocument?.getElementById('content'))inspect();}catch{inspect();}};
-  frame.src='admin-website.html?embed=1#'+module;
-  moduleTimer=setTimeout(inspect,20000);
-  document.getElementById('module-retry').onclick=()=>showOperational(module);toggleDrawer(false);
-}
-function toggleDrawer(open){
-  const wasOpen=document.body.classList.contains('drawer-open');
-  document.body.classList.toggle('drawer-open',open);
-  document.querySelector('main.main').inert=open;
-  document.getElementById('drawer-backdrop').hidden=!open;
-  document.getElementById('open-menu').setAttribute('aria-expanded',String(open));
-  if(open)document.getElementById('close-menu').focus();
-  else if(wasOpen)document.getElementById('open-menu').focus();
-}
 
-function renderSearchResults(){
-  const query=document.getElementById('global-search').value.trim().toLowerCase();
-  const orders=query?state.orders.filter(o=>[o.invoiceNo,o.customerName].some(v=>String(v||'').toLowerCase().includes(query))):[];
-  const products=query?state.products.filter(p=>[p.name,p.sku,...(p.variants||[]).flatMap(v=>[v.sku,v.color,v.size])].some(v=>String(v||'').toLowerCase().includes(query))):[];
-  document.getElementById('search-summary').textContent=query?`${orders.length} pesanan · ${products.length} produk untuk “${document.getElementById('global-search').value.trim()}”`:'Masukkan nomor pesanan, nama pelanggan, nama produk, warna, atau SKU.';
-  document.getElementById('global-search-results').innerHTML=`<section class="panel"><h2>Pesanan</h2>${orders.slice(0,30).map(o=>`<button class="search-result" data-result-order="${escapeHtml(o.id)}"><strong>${escapeHtml(o.invoiceNo)}</strong><span>${escapeHtml(o.customerName)}</span></button>`).join('')||'<p>Tidak ada pesanan yang cocok.</p>'}</section><section class="panel"><h2>Produk</h2>${products.slice(0,30).map(p=>`<button class="search-result" data-result-product="${escapeHtml(p.id)}"><strong>${escapeHtml(p.name)}</strong><span>${escapeHtml(p.sku||'Lihat varian & stok')}</span></button>`).join('')||'<p>Tidak ada produk yang cocok.</p>'}</section>`;
-  document.querySelectorAll('[data-result-order]').forEach(b=>b.onclick=()=>openOrderModal(b.dataset.resultOrder));document.querySelectorAll('[data-result-product]').forEach(b=>b.onclick=()=>{navigateTo('produk');openProductModal(state.products.find(p=>p.id===b.dataset.resultProduct));});
-}
-function bindAdminDashboard(){
-  window.addEventListener('resize',()=>{if(window.innerWidth>900&&document.body.classList.contains('drawer-open'))toggleDrawer(false);});
-  document.getElementById('dash-create-order').onclick=openCreateOrderModal;
-  document.getElementById('dash-period-select').onchange=e=>{state.dashPeriod=e.target.value;els.dashCustomDate.hidden=state.dashPeriod!=='custom';if(!state.dashCustomDate){state.dashCustomDate=jakartaDay();els.dashCustomDate.value=state.dashCustomDate;}renderDashboard();};
-  document.querySelectorAll('[data-recent]').forEach(b=>b.onclick=()=>{state.recentTab=b.dataset.recent;renderDashboard();});
-  document.querySelectorAll('[data-follow]').forEach(b=>b.onclick=()=>followActivity(b.dataset.follow));document.querySelectorAll('[data-module]').forEach(b=>b.onclick=()=>showOperational(b.dataset.module));
-  document.getElementById('global-search-form').onsubmit=e=>{e.preventDefault();navigateTo('pencarian');};
-  document.getElementById('order-channel').onchange=e=>{state.orderChannel=e.target.value;renderOrdersView();};
-  document.getElementById('view-store').onclick=e=>{if(!safeStoreUrl(state.settings.storeUrl)){e.preventDefault();navigateTo('pengaturan');showToast('Isi Alamat Website Pembeli terlebih dahulu.');els.settingsForm.elements.storeUrl.focus();}};
-  document.getElementById('open-menu').onclick=()=>toggleDrawer(true);document.getElementById('close-menu').onclick=()=>toggleDrawer(false);document.getElementById('drawer-backdrop').onclick=()=>toggleDrawer(false);
-  document.getElementById('notifications-toggle').onclick=()=>{const panel=document.getElementById('notification-panel');panel.hidden=!panel.hidden;document.getElementById('notifications-toggle').setAttribute('aria-expanded',String(!panel.hidden));};
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){const wasOpen=document.body.classList.contains('drawer-open');toggleDrawer(false);document.getElementById('notification-panel').hidden=true;document.getElementById('notifications-toggle').setAttribute('aria-expanded','false');if(wasOpen)document.getElementById('open-menu').focus();}});
-}
+function renderSalesChart() {
+  let dayCount = 7;
+  let endDate = new Date();
+  if (state.dashPeriod === "30d") {
+    dayCount = 30;
+  } else if (state.dashPeriod === "custom" && state.dashCustomDate) {
+    const [y, m, d] = state.dashCustomDate.split("-").map(Number);
+    endDate = new Date(y, m - 1, d);
+  }
+  // "today" & "custom" tetap menampilkan tren 7 hari di sekitarnya — grafik 1 bar tidak informatif.
 
+  els.chartTitle.textContent = `Tren penjualan — ${dayCount} hari terakhir`;
+
+  const days = [...Array(dayCount)].map((_, i) => {
+    const d = new Date(endDate);
+    d.setDate(d.getDate() - (dayCount - 1 - i));
+    return d;
+  });
+  const totals = days.map((d) =>
+    state.orders
+      .filter((o) => o.status !== "dibatalkan")
+      .filter((o) => toJsDate(o.createdAt).toDateString() === d.toDateString())
+      .reduce((s, o) => s + o.total, 0)
+  );
+
+  const max = Math.max(...totals, 1);
+  const w = 320, h = 140, padBottom = 20;
+  const barGap = dayCount > 14 ? 2 : 10;
+  const barW = (w - barGap * (dayCount - 1)) / dayCount;
+  const labelEvery = dayCount <= 10 ? 1 : Math.ceil(dayCount / 8);
+
+  let svg = "";
+  totals.forEach((t, i) => {
+    const barH = (t / max) * (h - padBottom - 10);
+    const x = i * (barW + barGap);
+    const y = h - padBottom - barH;
+    svg += `<rect x="${x}" y="${y}" width="${Math.max(barW, 1)}" height="${barH}" rx="2" fill="#7C2D3B" opacity="${0.4 + (i / (dayCount - 1 || 1)) * 0.6}"></rect>`;
+    if (i % labelEvery === 0) {
+      const labelText = dayCount <= 10 ? days[i].toLocaleDateString("id-ID", { weekday: "short" }).slice(0, 2) : String(days[i].getDate());
+      svg += `<text x="${x + barW / 2}" y="${h - 4}" font-size="8.5" fill="#6E6754" text-anchor="middle" font-family="Inter, sans-serif">${labelText}</text>`;
+    }
+  });
+  els.salesChart.innerHTML = svg;
+}
 
 function renderOrderRows(tbody, orders, withAction) {
   tbody.innerHTML = "";
@@ -1296,8 +1130,7 @@ function renderOrdersView() {
   els.orderTabs.innerHTML = "";
   const tabs = [{ key: "semua", label: "Semua" }, ...STATUS_ORDER.map((s) => ({ key: s, label: STATUS_META[s].label }))];
   tabs.forEach((t) => {
-    const channelOrders=state.orders.filter(o=>state.orderChannel==='semua'||orderChannel(o)===state.orderChannel);
-    const count=t.key==='semua'?channelOrders.length:channelOrders.filter(o=>o.status===t.key).length;
+    const count = t.key === "semua" ? state.orders.length : state.orders.filter((o) => o.status === t.key).length;
     const btn = document.createElement("button");
     btn.className = "tab" + (state.orderTab === t.key ? " is-active" : "");
     btn.textContent = `${t.label} (${count})`;
@@ -1306,7 +1139,7 @@ function renderOrdersView() {
   });
 
   const q = state.orderSearch.trim().toLowerCase();
-  let filtered = state.orders.filter(o=>state.orderChannel==='semua'||orderChannel(o)===state.orderChannel);
+  let filtered = state.orders;
   if (state.orderTab !== "semua") filtered = filtered.filter((o) => o.status === state.orderTab);
   if (q) filtered = filtered.filter((o) => (o.invoiceNo || "").toLowerCase().includes(q) || (o.customerName || "").toLowerCase().includes(q));
 
@@ -3120,7 +2953,6 @@ function applySettingsToForm() {
   f["address"].value = s.address || "";
   f["phone"].value = s.phone || "";
   f["logoUrl"].value = s.logoUrl || "";
-  f["storeUrl"].value = s.storeUrl || "";
 }
 
 // ------------------------------------------------------------
@@ -3446,7 +3278,7 @@ function applyCalcPreset(multiplier) {
 // Order detail modal
 // ------------------------------------------------------------
 function openOrderModal(orderId) {
-  if (state.orders.find(o=>o.id===orderId)?.schemaVersion === 2) { showOperational('orders/'+encodeURIComponent(orderId)); return; }
+  if (state.orders.find(o=>o.id===orderId)?.schemaVersion === 2) { location.href='admin-website.html#orders/'+encodeURIComponent(orderId); return; }
   state.openOrderId = orderId;
   renderOrderModalBody(orderId);
   els.orderModal.hidden = false;
@@ -3947,12 +3779,6 @@ function updatePreview() {
 // 4. NAVIGATION & EVENTS
 // ============================================================
 function navigateTo(view) {
-  const module={reseller:'resellers',pengiriman:'couriers',jadwal:'slots',retur:'claims'}[view];
-  if(module){showOperational(module);return;}
-  const destination=document.getElementById('view-'+view);if(!destination)return;
-  clearTimeout(moduleTimer);document.getElementById('operational-frame').onload=null;
-  document.getElementById('operational-frame').src='about:blank';toggleDrawer(false);
-  document.getElementById('breadcrumb-title').textContent=view==='dashboard'?'Ringkasan toko':destination.querySelector('h1')?.textContent||'Admin';
   state.view = view;
   document.querySelectorAll(".view").forEach((v) => (v.hidden = true));
   document.getElementById("view-" + view).hidden = false;
@@ -3963,14 +3789,30 @@ function navigateTo(view) {
 }
 
 function bindEvents() {
-  bindAdminDashboard();
-  els.loginForm.addEventListener('submit',submitAdminLogin);
-  document.getElementById('login-retry').onclick=()=>{void retryAdminLogin().catch(error=>{authCheckPending=false;setLoginBusy();loginFailure(error);});};
-  els.btnLogout.addEventListener('click',async()=>{
-    if(!authInstance||!authFns)return;
-    els.btnLogout.disabled=true;
-    try{await authFns.signOut(authInstance);}catch(error){showToast(mapAuthErrorMessage(error.code));}
-    finally{els.btnLogout.disabled=false;}
+  els.loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showLoginError("");
+    const f = new FormData(els.loginForm);
+    const email = f.get("email").trim();
+    const password = f.get("password");
+
+    els.loginSubmitBtn.disabled = true;
+    els.loginSubmitBtn.textContent = "Memproses…";
+    try {
+      await authFns.signInWithEmailAndPassword(authInstance, email, password);
+      // onAuthStateChanged yang akan menangani transisi ke dashboard.
+    } catch (err) {
+      showLoginError(mapAuthErrorMessage(err.code));
+    } finally {
+      els.loginSubmitBtn.disabled = false;
+      els.loginSubmitBtn.textContent = "Masuk";
+    }
+  });
+
+  els.btnLogout.addEventListener("click", async () => {
+    if (!authInstance || !authFns) return;
+    await authFns.signOut(authInstance);
+    // onAuthStateChanged yang akan menampilkan kembali layar login.
   });
 
   document.querySelectorAll(".nav-item[data-view]:not(.is-disabled)").forEach((btn) => {
@@ -3980,6 +3822,24 @@ function bindEvents() {
     btn.addEventListener("click", () => navigateTo(btn.dataset.goto));
   });
 
+  // ---- Filter periode dashboard ----
+  els.periodFilter.querySelectorAll(".tab[data-period]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const period = btn.dataset.period;
+      state.dashPeriod = period;
+      els.periodFilter.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-active", t.dataset.period === period));
+      if (period === "custom") {
+        els.dashCustomDate.hidden = false;
+        if (!state.dashCustomDate) {
+          state.dashCustomDate = toDateInputValue(new Date());
+          els.dashCustomDate.value = state.dashCustomDate;
+        }
+      } else {
+        els.dashCustomDate.hidden = true;
+      }
+      renderDashboard();
+    });
+  });
   els.dashCustomDate.addEventListener("change", (e) => {
     state.dashCustomDate = e.target.value;
     renderDashboard();
@@ -3993,7 +3853,6 @@ function bindEvents() {
 
   els.createOrderForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (state.creatingOrder) return; // cegah submit ganda (dobel klik) — pengganti idempotency-key server yang sudah dihapus
     const f = new FormData(els.createOrderForm);
 
     const items = state.orderItemRows
@@ -4023,18 +3882,10 @@ function bindEvents() {
       statusHistory: [{ status, at: new Date().toISOString() }],
     };
 
-    const submitBtn = els.createOrderForm.querySelector('button[type="submit"]');
-    state.creatingOrder = true;
-    if (submitBtn) submitBtn.disabled = true;
-    try {
-      await addOrder(order);
-      closeModals();
-      navigateTo("pesanan");
-      showToast(`Pesanan ${order.invoiceNo} tersimpan.`);
-    } finally {
-      state.creatingOrder = false;
-      if (submitBtn) submitBtn.disabled = false;
-    }
+    await addOrder(order);
+    closeModals();
+    navigateTo("pesanan");
+    showToast(`Pesanan ${order.invoiceNo} tersimpan.`);
   });
   els.productSearch.addEventListener("input", (e) => { state.productSearch = e.target.value; renderProductsView(); });
 
@@ -4493,17 +4344,14 @@ function bindEvents() {
   els.settingsForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = new FormData(els.settingsForm);
-    const button=e.submitter;button.disabled=true;
-    try { await saveSettings({
+    await saveSettings({
       storeName: f.get("storeName").trim(),
       tagline: f.get("tagline").trim(),
       address: f.get("address").trim(),
       phone: f.get("phone").trim(),
       logoUrl: f.get("logoUrl").trim(),
-      storeUrl: f.get("storeUrl").trim(),
     });
     showToast("Pengaturan toko disimpan.");
-    }catch(error){showToast(error.message||'Pengaturan gagal disimpan.');}finally{button.disabled=false;}
   });
 }
 
@@ -4755,4 +4603,4 @@ async function init() {
 
 init();
 
-window.addEventListener('unhandledrejection',event=>{event.preventDefault();if(els.appRoot?.hidden){authSubmitPending=false;authCheckPending=false;showLoginScreen();setLoginBusy();loginFailure(event.reason);}else showToast('Operasi belum berhasil. Periksa koneksi dan coba lagi.');});
+window.addEventListener('unhandledrejection', event => { showToast(event.reason?.message || 'Penyimpanan gagal. Periksa koneksi lalu coba lagi.'); });

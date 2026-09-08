@@ -4,7 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin — Kubah Nabawi</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231B1F2A'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-family='Georgia' font-size='48' fill='%23DED2B8'%3EK%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -19,11 +18,9 @@
       <span class="brand-mark">K</span>
       <span class="auth-brand-name" id="auth-store-name">Kubah Nabawi Store Admin</span>
     </div>
-    <p class="auth-sub">Versi gratis · Masuk untuk mengelola toko · <a href="toko.html">Belanja sebagai pelanggan</a></p>
+    <p class="auth-sub">Masuk untuk mengelola toko · <a href="toko.html">Belanja sebagai pelanggan</a></p>
 
     <p class="auth-checking" id="auth-checking">Memeriksa sesi…</p>
-    <button id="bootstrap-retry" class="btn btn--outline" hidden onclick="location.reload()">Muat ulang halaman</button>
-    <script>setTimeout(()=>{const status=document.getElementById('auth-checking');if(status&&!status.hidden){status.textContent='Aplikasi belum berhasil dimuat. Periksa koneksi dan file app.js serta firebase-config.js, lalu muat ulang.';document.getElementById('bootstrap-retry').hidden=false;}},25000);</script>
 
     <form id="login-form" hidden>
       <label class="field">
@@ -34,9 +31,7 @@
         <span>Password</span>
         <input type="password" name="password" required autocomplete="current-password" />
       </label>
-      <p class="auth-error" id="login-error" role="alert" hidden></p>
-      <p id="login-status" class="auth-checking" role="status" hidden></p>
-      <button type="button" class="btn btn--outline" id="login-retry" hidden>Coba lagi</button>
+      <p class="auth-error" id="login-error" hidden></p>
       <button type="submit" class="btn btn--primary auth-submit" id="login-submit-btn">Masuk</button>
     </form>
   </div>
@@ -45,57 +40,146 @@
 <div class="app" id="app-root" hidden>
 
   <!-- ============ SIDEBAR ============ -->
-<button id="drawer-backdrop" class="drawer-backdrop" aria-label="Tutup menu" hidden></button>
-  <aside class="sidebar" id="admin-sidebar" aria-label="Menu admin">
-    <div class="brand"><span class="brand-mark" id="sidebar-monogram">K</span><img id="sidebar-logo" alt="Logo toko" hidden><span class="brand-name"><strong id="sidebar-store-name">KUBAH NABAWI</strong><small>Store Admin</small></span><button class="icon-button drawer-close" id="close-menu" aria-label="Tutup menu"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 5 14 14M19 5 5 19"/></svg></button></div>
-    <nav class="nav" aria-label="Navigasi utama"><button class="nav-item is-active" data-view="dashboard"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg><span>Dashboard</span></button><button class="nav-item" data-view="pesanan"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h2l3 13h10l3-10H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg><span>Pesanan Manual &amp; Riwayat</span><span class="nav-badge" id="nav-badge-pesanan" hidden>0</span></button><button class="nav-item" data-view="produk"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5zm-9 5v11l9 4 9-4V8M12 13v10M7 5.8l9 5"/></svg><span>Produk</span></button><button class="nav-item" data-view="pelanggan"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3H3zm13-17a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5v2h-3"/></svg><span>Pelanggan</span></button><button class="nav-item" data-view="reseller"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3H3zm13-17a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5v2h-3"/></svg><span>Reseller</span><span class="nav-badge" id="nav-badge-reseller" hidden>0</span></button><button class="nav-item" data-view="pengiriman"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h12v12H2zm12 5h5l3 4v3h-8"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/></svg><span>Pengiriman & Kurir</span></button><button class="nav-item" data-view="jadwal"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="17" rx="2"/><path d="M7 2v6m10-6v6M3 11h18m-14 4h2m3 0h2m3 0h1m-11 4h2m3 0h2"/></svg><span>Jadwal Pengiriman</span></button><button class="nav-item" data-view="retur"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m8 4-6 6 6 6M2 10h12a6 6 0 0 1 0 12h-3"/></svg><span>Retur & Komplain</span><span class="nav-badge" id="nav-badge-retur" hidden>0</span></button><button class="nav-item" data-view="kalkulator"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M7 6h10M7 10h2m4 0h4M7 14h2m4 0h1m3 0v4M7 18h2m4 0h1"/></svg><span>Kalkulator Harga</span></button><button class="nav-item" data-view="karyawan"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2z"/></svg><span>Karyawan</span></button><button class="nav-item" data-view="keuangan"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V12m5 9V7m5 14V3m5 18v-9"/></svg><span>Keuangan</span></button><button class="nav-item" data-view="pengaturan"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 3 1-2h4l1 2 3 2 2 1 2 4-2 2v3l1 2-3 4-3-1-3 1-2 1-4-2v-3l-2-2-2-1 1-5 3-1z"/><circle cx="12" cy="12" r="3"/></svg><span>Pengaturan</span></button></nav>
-    <div class="sidebar-foot"><div class="admin-identity"><span class="account-avatar" id="admin-initial">A</span><div class="account-text"><strong id="admin-display-name">Admin</strong><small id="admin-role">Administrator</small></div><button class="icon-button" id="btn-logout" aria-label="Keluar" title="Keluar"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3H3v18h7m3-9h9m-4-4 4 4-4 4"/></svg></button></div><div class="conn-badge" id="conn-badge"><span class="conn-dot"></span><span id="conn-label">Memeriksa koneksi…</span></div></div>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">K</span>
+      <span class="brand-name">Kubah Nabawi Store<br/>Admin</span>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item is-active" data-view="dashboard">
+        <span class="nav-dot"></span> Dashboard
+      </button>
+
+      <div class="nav-group">
+        <button class="nav-item" data-view="pesanan">
+          <span class="nav-dot"></span> Pesanan
+        </button>
+        <span class="nav-badge" id="nav-badge-pesanan">0</span>
+      </div>
+
+      <button class="nav-item" data-view="produk">
+        <span class="nav-dot"></span> Produk
+      </button>
+
+      <button class="nav-item" data-view="kalkulator">
+        <span class="nav-dot"></span> Kalkulator Pintar
+      </button>
+
+      <button class="nav-item" data-view="pelanggan">
+        <span class="nav-dot"></span> Pelanggan
+      </button>
+
+      <button class="nav-item" data-view="karyawan">
+        <span class="nav-dot"></span> Karyawan
+      </button>
+
+      <button class="nav-item" data-view="keuangan">
+        <span class="nav-dot"></span> Keuangan
+      </button>
+      <button class="nav-item" data-view="pengaturan">
+        <span class="nav-dot"></span> Pengaturan
+      </button>
+    <a class="nav-item" href="admin-website.html#orders">Pesanan Website</a><a class="nav-item" href="admin-website.html#couriers">Pengiriman & Kurir</a><a class="nav-item" href="admin-website.html#slots">Jadwal Pengiriman</a><a class="nav-item" href="admin-website.html#resellers">Pendaftaran Reseller</a><a class="nav-item" href="admin-website.html#pricing">Harga Grosir/Reseller</a><a class="nav-item" href="admin-website.html#claims">Retur & Komplain</a><a class="nav-item" href="admin-website.html#settings">Pengaturan E-commerce</a><a class="nav-item" href="admin-website.html#reconcile">Rekonsiliasi Pembayaran</a></nav>
+
+    <div class="sidebar-foot">
+      <button class="nav-item" id="btn-logout" style="margin-bottom:10px;">
+        <span class="nav-dot"></span> Keluar
+      </button>
+      <div class="conn-badge" id="conn-badge">
+        <span class="conn-dot"></span>
+        <span id="conn-label">Memeriksa koneksi…</span>
+      </div>
+    </div>
   </aside>
 
   <!-- ============ MAIN ============ -->
-  <main class="main"><p class="free-banner">Versi gratis · Pesanan manual dan konfirmasi dana oleh petugas. Checkout pelanggan dan unggah berkas belum tersedia.</p>
-<div class="admin-topbar"><div class="breadcrumb"><button id="open-menu" class="icon-button mobile-menu" aria-label="Buka menu" aria-controls="admin-sidebar" aria-expanded="false"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><span class="breadcrumb-home"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg></span><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg><span id="breadcrumb-title">Ringkasan toko</span></div><form id="global-search-form" class="global-search" role="search"><label class="sr-only" for="global-search">Cari pesanan atau produk</label><input id="global-search" type="search" placeholder="Cari pesanan atau produk" autocomplete="off"><button type="submit" class="icon-button search-submit" aria-label="Cari"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></button></form><div class="topbar-actions"><button class="icon-button notification-button" id="notifications-toggle" aria-label="Notifikasi" aria-expanded="false"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 8-3 8-3 10h18c0-2-3-2-3-10M10 22h4"/></svg><span id="notification-dot" hidden></span></button><a class="btn btn--outline" id="view-store" href="#pengaturan" target="_blank" rel="noopener noreferrer"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7m0-7L10 14m-2-9H3v16h16v-5"/></svg><span>Lihat Toko</span></a></div><section id="notification-panel" class="notification-panel" aria-label="Aktivitas toko" hidden><h2>Perlu perhatian</h2><div id="notification-items"></div></section></div>
+  <main class="main">
 
+    <!-- ---------- DASHBOARD ---------- -->
     <section class="view" id="view-dashboard">
-      <header class="view-head dash-head"><div><h1>Dashboard</h1><p class="view-sub">Pantau pesanan dan pengiriman toko Anda.</p></div><div class="dash-controls"><div class="period-filter" id="period-filter"><label class="date-control"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="17" rx="2"/><path d="M7 2v6m10-6v6M3 11h18m-14 4h2m3 0h2m3 0h1m-11 4h2m3 0h2"/></svg><select id="dash-period-select" aria-label="Periode dashboard"><option value="today">Hari Ini</option><option value="7d">7 Hari Terakhir</option><option value="30d">30 Hari Terakhir</option><option value="custom">Pilih Tanggal</option></select></label><input type="date" id="dash-custom-date" aria-label="Tanggal dashboard" hidden></div><button class="btn btn--primary" id="dash-create-order"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M4 12h16"/></svg>Buat Pesanan</button><p id="today-date" class="dashboard-date"></p></div></header>
+      <header class="view-head dash-head">
+        <div>
+          <h1>Ringkasan</h1>
+          <p class="view-sub" id="today-date"></p>
+        </div>
+        <div class="period-filter" id="period-filter">
+          <button class="tab is-active" type="button" data-period="today">Hari Ini</button>
+          <button class="tab" type="button" data-period="7d">7 Hari Terakhir</button>
+          <button class="tab" type="button" data-period="30d">30 Hari Terakhir</button>
+          <button class="tab" type="button" data-period="custom">Pilih Tanggal</button>
+          <input type="date" id="dash-custom-date" class="stock-input" hidden />
+        </div>
+      </header>
+
       <div class="stat-row">
-        <article class="stat"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V12m5 9V7m5 14V3m5 18v-9"/></svg><div><span class="stat-label" id="sales-period-label">Penjualan Hari Ini</span><strong class="stat-value" id="stat-revenue">Memuat…</strong></div></article>
-        <article class="stat"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h2l3 13h10l3-10H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg><div><span class="stat-label">Pesanan Baru</span><strong class="stat-value" id="stat-new-orders">Memuat…</strong></div></article>
-        <article class="stat"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h12v12H2zm12 5h5l3 4v3h-8"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/></svg><div><span class="stat-label">Siap Dikirim</span><strong class="stat-value" id="stat-ready">Memuat…</strong></div></article>
-        <article class="stat"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 4 16 4 16 0V5M4 11v6c0 4 16 4 16 0v-6"/></svg><div><span class="stat-label">Tunai Belum Disetor</span><strong class="stat-value" id="stat-cash">Memuat…</strong></div></article>
+        <div class="stat">
+          <span class="stat-value" id="stat-new-orders">0</span>
+          <span class="stat-label">Pesanan baru</span>
+        </div>
+        <div class="stat stat--amber">
+          <span class="stat-value" id="stat-verify">0</span>
+          <span class="stat-label">Perlu verifikasi</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="stat-revenue">Rp 0</span>
+          <span class="stat-label">Total penjualan</span>
+        </div>
+        <div class="stat stat--red">
+          <span class="stat-value" id="stat-lowstock">0</span>
+          <span class="stat-label">Stok menipis</span>
+        </div>
       </div>
-      <div class="dashboard-grid"><section class="panel recent-panel"><div class="panel-head-row"><h2>Pesanan Terbaru</h2><button class="link-btn" data-goto="pesanan">Lihat semua pesanan <svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button></div><div id="recent-tabs" class="recent-tabs" aria-label="Status pesanan terbaru"><button data-recent="semua" class="is-active">Semua</button><button data-recent="perlu_verifikasi">Perlu Verifikasi</button><button data-recent="diproses">Diproses</button><button data-recent="dikirim">Dikirim</button></div><div class="table-scroll"><table class="table" id="table-recent-orders"><thead><tr><th>Pesanan</th><th>Pelanggan</th><th>Pengiriman</th><th>Total</th><th>Status</th><th><span class="sr-only">Aksi</span></th></tr></thead><tbody></tbody></table></div></section>
-      <section class="panel schedule-panel"><div class="panel-head-row"><h2><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="17" rx="2"/><path d="M7 2v6m10-6v6M3 11h18m-14 4h2m3 0h2m3 0h1m-11 4h2m3 0h2"/></svg>Jadwal Kurir Toko</h2><button class="btn btn--outline" data-goto="jadwal">Atur Jadwal</button></div><p id="schedule-date"></p><div id="delivery-slots"></div></section>
-      <section class="panel follow-panel"><h2>Perlu Ditindaklanjuti</h2><div class="follow-grid"><button class="follow-card" data-follow="reseller"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3H3zm13-17a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5v2h-3"/></svg><span><strong id="follow-resellers">—</strong><small>pengajuan reseller</small></span><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></button><button class="follow-card" data-follow="retur"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 3h.01"/></svg><span><strong id="follow-claims">—</strong><small>komplain belum selesai</small></span><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></button><button class="follow-card" data-follow="payment"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H5v20h14V7l-5-5v5h5M8 12h8m-8 4h8"/></svg><span><strong id="stat-verify">—</strong><small>pembayaran perlu verifikasi</small></span><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></button></div></section>
-      <section class="panel shipping-panel"><div class="shipping-rule-head"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h12v12H2zm12 5h5l3 4v3h-8"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/></svg><div><h2>Aturan Gratis Ongkir</h2><div id="free-shipping-summary">Memuat pengaturan…</div></div></div><div class="shipping-rule-foot"><span>Khusus Kurir Toko</span><button class="btn btn--outline" data-module="settings">Ubah Pengaturan</button></div></section></div>
-      <details class="dashboard-extras"><summary>Ringkasan tambahan & definisi angka</summary><p id="dashboard-definition"></p><p>Stok menipis: <strong id="stat-lowstock">—</strong> produk</p><ul class="action-list" id="action-list"></ul><div class="panel"><h2 id="chart-title">Tren penerimaan penjualan</h2><svg id="sales-chart" class="chart" viewBox="0 0 320 140" preserveAspectRatio="none" role="img" aria-label="Tren penerimaan penjualan"></svg></div></details>
+
+      <div class="dash-grid">
+        <div class="panel panel--action">
+          <h2>Perlu aksi segera</h2>
+          <ul class="action-list" id="action-list"></ul>
+        </div>
+
+        <div class="panel">
+          <h2 id="chart-title">Tren penjualan — 7 hari</h2>
+          <svg id="sales-chart" class="chart" viewBox="0 0 320 140" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head-row">
+          <h2>Pesanan terbaru</h2>
+          <button class="link-btn" data-goto="pesanan">Lihat semua pesanan</button>
+        </div>
+        <table class="table" id="table-recent-orders">
+          <thead>
+            <tr><th>No. Invoice</th><th>Pelanggan</th><th>Total</th><th>Status</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </section>
-    <section class="view" id="view-operasional" hidden><p id="module-error" class="auth-error" role="alert" hidden>Modul operasional belum tersedia. Periksa pemasangan admin-website.html, admin-website.js, shop-client.js dan shop.css. Menu admin lain tetap dapat digunakan. <button type="button" id="module-retry" class="btn btn--outline">Coba muat modul lagi</button></p><iframe id="operational-frame" title="Modul operasional admin" src="about:blank"></iframe></section>
-    <section class="view" id="view-pencarian" hidden><header class="view-head"><h1>Hasil Pencarian</h1><p class="view-sub" id="search-summary"></p></header><div id="global-search-results"></div></section>
 
     <!-- ---------- PESANAN ---------- -->
     <section class="view" id="view-pesanan" hidden>
       <header class="view-head">
-        <h1>Pesanan Manual &amp; Riwayat</h1>
-        <p class="view-sub">Kelola semua kanal, termasuk pesanan manual dan riwayat lama.</p>
+        <h1>Pesanan</h1>
+        <p class="view-sub">Kelola status pesanan dari checkout sampai selesai</p>
       </header>
 
       <div class="tabs" id="order-tabs"></div>
 
       <div class="toolbar toolbar--between">
         <div style="display:flex;align-items:center;gap:12px;">
-          <label class="sr-only" for="order-channel">Kanal pesanan</label><select id="order-channel"><option value="semua">Semua kanal</option><option value="website">Website</option><option value="admin">Manual admin</option><option value="historis">Historis / kanal lain</option></select><input type="search" id="order-search" placeholder="Cari no. invoice atau nama pelanggan" />
+          <input type="search" id="order-search" placeholder="Cari no. invoice atau nama pelanggan" />
           <span class="toolbar-count" id="order-count"></span>
         </div>
         <button class="btn btn--primary" id="btn-add-order">+ Buat pesanan</button>
       </div>
 
-      <div class="table-scroll"><table class="table" id="table-orders">
+      <table class="table" id="table-orders">
         <thead>
           <tr><th>No. Invoice</th><th>Pelanggan</th><th>Total</th><th>Status</th><th>Aksi</th></tr>
         </thead>
         <tbody></tbody>
-      </table></div>
+      </table>
     </section>
 
     <!-- ---------- PRODUK ---------- -->
@@ -126,7 +210,7 @@
     <!-- ---------- KALKULATOR PINTAR ---------- -->
     <section class="view" id="view-kalkulator" hidden>
       <header class="view-head">
-        <h1>Kalkulator Harga</h1>
+        <h1>Kalkulator Pintar</h1>
         <p class="view-sub">Hitung harga jual & margin bersih Offline vs Online dari HPP</p>
       </header>
 
@@ -365,7 +449,7 @@
         </div>
       </div>
 
-      <div id="karyawan-tab-payroll" hidden><p class="free-banner">Versi gratis: setelah gaji dibayar, catat pengeluaran satu kali melalui menu Keuangan. Jurnal payroll belum otomatis.</p>
+      <div id="karyawan-tab-payroll" hidden>
         <header class="view-head" style="margin-bottom:20px;">
           <h1 style="font-size:20px;">Payroll / Gaji</h1>
           <p class="view-sub">Kelola penggajian karyawan per periode.</p>
@@ -471,7 +555,7 @@
     <!-- ---------- KEUANGAN ---------- -->
     <section class="view" id="view-keuangan" hidden>
       <header class="view-head">
-        <h1>Keuangan</h1><button class="btn btn--outline" data-module="reconcile">Rekonsiliasi Pembayaran & Setoran</button>
+        <h1>Keuangan</h1>
         <p class="view-sub">Pesanan berstatus selesai otomatis tercatat sebagai pemasukan</p>
       </header>
 
@@ -511,8 +595,8 @@
         <h1>Pengaturan</h1>
         <p class="view-sub">Profil toko ini dipakai otomatis sebagai kop nota/invoice</p>
       </header>
-      <div class="module-shortcuts"><button class="btn btn--outline" data-module="settings">Promo, gudang & pengiriman</button><button class="btn btn--outline" data-module="pricing">Harga Grosir / Reseller & produk peserta</button></div>
-      <div class="panel" style="max-width:700px;">
+
+      <div class="panel" style="max-width:560px;">
         <form id="settings-form">
           <div class="form-grid">
             <label class="field field--wide">
@@ -536,7 +620,6 @@
               <input type="url" name="logoUrl" placeholder="https://…/logo.png" />
             </label>
           </div>
-          <label class="field" style="margin-top:16px"><span>Alamat Website Pembeli</span><input type="url" name="storeUrl" placeholder="https://alamat-toko-Anda" aria-describedby="store-url-help"><small id="store-url-help">Alamat etalase terpisah. Hanya URL http/https, tanpa token atau password.</small></label>
           <div class="form-actions" style="justify-content:flex-start;">
             <button type="submit" class="btn btn--primary">Simpan pengaturan</button>
           </div>
@@ -612,13 +695,13 @@
                 <option value="nonaktif">Nonaktif</option>
               </select>
             </label>
-            <div class="field field--wide">
-              <span>Foto produk (opsional)</span>
-              <div class="photo-gallery" id="product-photo-gallery"></div><label class="field"><span>URL foto HTTPS (opsional)</span><input id="free-image-url" type="url" placeholder="https://alamat-foto"></label><button type="button" class="btn btn--outline" id="free-add-image">Tambahkan URL foto</button><label class="field"><span><input type="checkbox" id="free-publish-product"> Tampilkan di katalog gratis dengan harga offline per varian</span></label>
+            <label class="field field--wide">
+              <span>Foto Produk Utama *</span>
+              <div class="photo-gallery" id="product-photo-gallery"></div>
               <label class="btn btn--secondary photo-upload-btn" id="btn-upload-product-photo" for="product-photo-input">+ Upload Foto</label>
               <input type="file" id="product-photo-input" accept="image/jpeg,image/jpg,image/png,image/webp" multiple hidden />
-              <small class="field-hint">Foto opsional; versi gratis memakai URL HTTPS, tanpa upload. Maksimal 9 foto. Foto bertanda ★ dipakai sebagai thumbnail utama di daftar produk.</small>
-            </div>
+              <small class="field-hint">Bisa lebih dari 1 foto (maks. 9). Foto bertanda ★ dipakai sebagai thumbnail utama di daftar produk.</small>
+            </label>
           </div>
 
           <hr class="divider" />
@@ -1057,7 +1140,7 @@
           <select name="status" required>
             <option value="menunggu_pembayaran">Menunggu Pembayaran</option>
           </select>
-          <small>Pembayaran diverifikasi melalui menu Pesanan Manual &amp; Riwayat setelah pesanan tersimpan.</small>
+          <small>Pembayaran diverifikasi melalui menu Pesanan Website setelah pesanan tersimpan.</small>
         </label>
       </div>
 
@@ -1176,9 +1259,9 @@
 <div class="toast" id="toast" hidden></div>
 
 <script src="firebase-config.js"></script>
-<script async src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<script async src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script async src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>
