@@ -1,7 +1,7 @@
-import {commerce} from './manual-service.js';
-import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js';
-import {manualStore} from './manual-store.js';
-import {manualAccess} from './manual-access.js';
+import {commerce} from './manual-service.js?v=manual-20260908-2';
+import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=manual-20260908-2';
+import {manualStore} from './manual-store.js?v=manual-20260908-2';
+import {manualAccess} from './manual-access.js?v=manual-20260908-2';
 
 const iso=()=>new Date().toISOString();
 const adminActions=new Set(['adminData','savePayroll','saveConfig','saveProduct','saveSlot','saveCourier','reviewReseller','confirmShipping','verifyPayment','orderAction','reschedule','cancellationRefund','createManualOrder','legacyManualOrder','confirmRequest','rejectRequest','confirmClaimRequest','rejectClaimRequest','expireOrder']);
