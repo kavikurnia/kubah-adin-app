@@ -1,4 +1,4 @@
-import {api,connect,login,logout,upload,viewEvidence,money,date,esc,safeURL,$,label,formValues,message,busy} from './shop-client.js';
+import {api,connect,login,logout,upload,viewEvidence,money,date,esc,safeURL,$,label,formValues,message,busy} from './shop-client.js?v=manual-20260908-1';
 const read=(key,def)=>{try{return JSON.parse(localStorage.getItem(key))??def;}catch{return def;}};
 const S={products:[],settings:{},user:null,mode:read('kn-mode','eceran'),cart:read('kn-cart',[]),wish:read('kn-wish',[]),category:'',sort:'name',onlyStock:false,query:'',account:null,resellerPrices:[],quote:null,checkoutDraft:read('kn-checkout',null)};
 let pageVersion=0,detailProduct=null;
