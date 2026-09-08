@@ -1,3 +1,47 @@
+// BEGIN BUNDLED ADMIN CLIENT
+const {connect:connectShop,api:shopApi,ensureAdminAccess}=(()=>{
+const VERSION='10.12.2';
+const money=n=>n===null||n===undefined?'Menunggu konfirmasi':new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n);
+const date=n=>n?new Date(n?.toDate?n.toDate():n).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'medium',timeStyle:'short'})+' WIB':'—';
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeURL=v=>{try{const u=new URL(v);return u.protocol==='https:'?u.href:'';}catch{return '';}};
+const $=s=>document.querySelector(s);
+const label=s=>({belum_dibayar:'Belum dibayar',perlu_verifikasi:'Menunggu verifikasi',lunas:'Lunas',menunggu_pembayaran:'Menunggu pembayaran',diproses:'Diproses',dikirim:'Dikirim',selesai:'Selesai',dibatalkan:'Dibatalkan',menunggu:'Menunggu persetujuan',disetujui:'Disetujui',ditolak:'Ditolak',dinonaktifkan:'Dinonaktifkan',diterima_kurir:'Uang diterima kurir',disetor_kurir:'Uang disetor kurir',setoran_diverifikasi:'Setoran diverifikasi',refund_menunggu:'Menunggu refund',refund_selesai:'Refund selesai',perlu_rekonsiliasi:'Pembayaran perlu ditinjau admin'}[s]||s||'Belum mengajukan');
+let ready;
+function connect(){return ready??=(async()=>{
+  const [appSDK,auth,fs,fn,storage]=await Promise.all(['app','auth','firestore','functions','storage'].map(m=>import(`https://www.gstatic.com/firebasejs/${VERSION}/firebase-${m}.js`)));
+  const app=appSDK.getApps()[0]||appSDK.initializeApp(window.FIREBASE_CONFIG);
+  const a=auth.getAuth(app),db=fs.getFirestore(app),functions=fn.getFunctions(app,'asia-southeast2'),bucket=storage.getStorage(app);
+  if(window.KUBAH_EMULATOR&&!window.__kubahEmulators){
+    auth.connectAuthEmulator(a,'http://127.0.0.1:9099',{disableWarnings:true});fs.connectFirestoreEmulator(db,'127.0.0.1',8080);fn.connectFunctionsEmulator(functions,'127.0.0.1',5001);storage.connectStorageEmulator(bucket,'127.0.0.1',9199);window.__kubahEmulators=true;
+  }
+  return {app,auth,a,db,fs,functions,fn,storage,bucket};
+})();}
+async function api(action,data={}){const c=await connect();try{return (await c.fn.httpsCallable(c.functions,'shopApi')({action,...data})).data;}catch(e){throw new Error(e.message||'Koneksi gagal. Coba kembali.');}}
+async function ensureAdminAccess(user){
+  await api('adminAccess');
+  const token=await user.getIdTokenResult(true);
+  const c=await connect();
+  if(c.a.currentUser?.uid!==user.uid)throw Error('Sesi login berubah. Silakan masuk kembali.');
+  return token;
+}
+async function upload(orderId,file,onProgress=()=>{}){
+  const c=await connect();if(!c.a.currentUser)throw Error('Silakan masuk.');
+  if(!file||!['image/jpeg','image/png','image/webp','video/mp4'].includes(file.type)||file.size<=0||file.size>20*1024*1024)throw Error('Gunakan JPG, PNG, WEBP, atau MP4 maksimal 20 MB.');
+  const path=`evidence/${orderId}/${c.a.currentUser.uid}/${crypto.randomUUID()}`;
+  const task=c.storage.uploadBytesResumable(c.storage.ref(c.bucket,path),file,{contentType:file.type});
+  await new Promise((resolve,reject)=>task.on('state_changed',s=>onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,resolve));return path;
+}
+async function viewEvidence(path){const c=await connect();const blob=await c.storage.getBlob(c.storage.ref(c.bucket,path),20*1024*1024);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+async function login(email,password,register=false){const c=await connect();return register?c.auth.createUserWithEmailAndPassword(c.a,email,password):c.auth.signInWithEmailAndPassword(c.a,email,password);}
+async function logout(){const c=await connect();return c.auth.signOut(c.a);}
+function formValues(form){return Object.fromEntries(new FormData(form));}
+function message(text,error=false){const el=document.getElementById('notice');if(el){el.hidden=false;el.className=error?'notice error':'notice';el.textContent=text;}}
+async function busy(button,fn){const text=button?.textContent;if(button){button.disabled=true;button.textContent='Memproses…';}try{return await fn();}catch(e){message(e.message,true);return undefined;}finally{if(button){button.disabled=false;button.textContent=text;}}}
+
+return {connect,api,ensureAdminAccess};
+})();
+// END BUNDLED ADMIN CLIENT
 // ============================================================
 // Admin Dashboard — Prototipe Interaktif
 // ============================================================
@@ -68,6 +112,10 @@ function formatPeriodLabel(periodValue) {
   return new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 }
 
+function normalizePayrollStatus(status) {
+  return ({draft: "Draft", "menunggu pembayaran": "Menunggu Pembayaran", dibayar: "Dibayar"})[String(status || "").trim().toLowerCase()] || "Draft";
+}
+
 function payrollStatusBadgeClass(status) {
   switch (status) {
     case "Dibayar": return "tag--selesai";
@@ -78,11 +126,12 @@ function payrollStatusBadgeClass(status) {
 
 // Profil toko default — dipakai sebelum menu Pengaturan pernah diisi.
 const DEFAULT_SETTINGS = {
-  storeName: "Atelier Admin",
+  storeName: "Kubah Nabawi",
   tagline: "",
-  address: "Jl. Contoh Toko No. 1, Sidoarjo, Jawa Timur",
-  phone: "0812-0000-0000",
+  address: "",
+  phone: "",
   logoUrl: "",
+  storeUrl: "",
 };
 
 const state = {
@@ -93,6 +142,10 @@ const state = {
   transactions: [],
   settings: { ...DEFAULT_SETTINGS },
   orderTab: "semua",
+  orderChannel: "semua",
+  recentTab: "semua",
+  deliverySlots: [], resellers: [], claims: [], ecommerce: null, adminIdentity: null,
+  ready: {orders:false,transactions:false,slots:false,resellers:false,claims:false,ecommerce:false},
   orderSearch: "",
   productSearch: "",
   customerSearch: "",
@@ -213,56 +266,41 @@ async function uploadImageFile(file, pathPrefix, onProgress) {
 }
 
 async function initDataLayer() {
-  const cfg = window.FIREBASE_CONFIG || {};
-  const isPlaceholder = !cfg.apiKey || cfg.apiKey === "YOUR_API_KEY";
-
-  if (isPlaceholder) {
-    // Tidak ada project Firebase asli terhubung — tidak ada yang perlu dilindungi,
-    // jadi lewati layar login sepenuhnya dan langsung masuk ke mode demo.
-    state.mode = "demo";
-    setConnectionBadge("demo", "Mode demo (localStorage)");
-    els.btnLogout.hidden = true;
-    enterApp();
-    await loadDemoData();
-    return;
-  }
-
+  state.mode = "firebase";
   try {
-    const [{ initializeApp }, firestore, authModule] = await Promise.all([
-      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
-      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),
-      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),
-    ]);
-    const app = initializeApp(cfg);
-    fbApp = app;
-    const db = firestore.getFirestore(app);
-    fb = { db, ...firestore };
-    state.mode = "firebase";
-
-    authInstance = authModule.getAuth(app);
-    authFns = authModule;
-
-    authFns.onAuthStateChanged(authInstance, (user) => {
-      if (user) {
-        setConnectionBadge("connected", "Terhubung ke Firebase");
-        showLoginError("");
-        enterApp();
-        if (firestoreUnsubscribers.length === 0) subscribeFirestore();
-      } else {
-        firestoreUnsubscribers.forEach((unsub) => unsub());
-        firestoreUnsubscribers = [];
-        showLoginScreen();
-      }
+    const c = await connectShop();
+    fbApp = c.app; fb = { db: c.db, ...c.fs }; authInstance = c.a; authFns = c.auth;
+    storageInstance = c.bucket; storageFns = c.storage;
+    const verifyEmailButton=document.getElementById('verify-admin-email');
+    verifyEmailButton.onclick=async()=>{
+      verifyEmailButton.disabled=true;
+      try { await authFns.sendEmailVerification(authInstance.currentUser); showLoginError('Tautan verifikasi dikirim. Buka email tersebut, lalu muat ulang halaman admin.'); }
+      catch(err){showLoginError('Email verifikasi gagal dikirim. '+err.message);}
+      finally{verifyEmailButton.disabled=false;}
+    };
+    authFns.onAuthStateChanged(authInstance, async (user) => {
+      verifyEmailButton.hidden=true;
+      state.adminIdentity=null;state.deliverySlots=[];state.resellers=[];state.claims=[];state.ecommerce=null;
+      Object.keys(state.ready).forEach(k=>state.ready[k]=false);
+      document.getElementById('operational-frame').src='about:blank';toggleDrawer(false);
+      firestoreUnsubscribers.forEach(unsub => unsub()); firestoreUnsubscribers = [];
+      showLoginScreen();
+      for (const key of ['orders','products','customers','transactions','employees','positions','performanceReviews','payrolls']) state[key] = [];
+      if (!user) { renderAll(); return; }
+      try {
+        const token = await ensureAdminAccess(user);
+        if (token.claims.role !== 'admin') { showLoginError('Akun ini bukan admin. Masuk melalui toko.html untuk belanja.'); return; }
+        setConnectionBadge('connected', window.KUBAH_EMULATOR ? 'Emulator lokal — bukan produksi' : 'Terhubung ke Firebase');
+        state.adminIdentity={name:user.displayName||user.email||'Admin',email:user.email||'',superAdmin:token.claims.superAdmin===true};
+        showLoginError(''); enterApp(); renderAdminChrome(); subscribeFirestore();
+      } catch (err) { showLoginError(err.message||'Pemeriksaan akses gagal. Muat ulang untuk mencoba lagi.'); verifyEmailButton.hidden=user.emailVerified||authInstance.currentUser?.uid!==user.uid; }
     });
   } catch (err) {
-    console.warn("Gagal konek Firebase, memakai mode demo.", err);
-    state.mode = "demo";
-    setConnectionBadge("demo", "Mode demo (Firebase gagal konek)");
-    els.btnLogout.hidden = true;
-    enterApp();
-    await loadDemoData();
+    state.mode = 'offline'; showLoginScreen(); setConnectionBadge('error', 'Gagal terhubung');
+    showLoginError('Firebase tidak dapat terhubung. Tidak ada mode demo otomatis. Periksa koneksi lalu muat ulang.');
   }
 }
+
 
 /** Tampilkan dashboard, sembunyikan layar login. */
 function enterApp() {
@@ -314,16 +352,21 @@ function setConnectionBadge(kind, label) {
 }
 
 function subscribeFirestore() {
-  const { collection, doc, onSnapshot, setDoc, query, orderBy } = fb;
+  const { collection, doc, setDoc, query, orderBy } = fb;
+  const onSnapshot = (ref, next) => fb.onSnapshot(ref, next, err => {
+    setConnectionBadge('error', 'Sinkronisasi gagal');
+    showToast('Data gagal disinkronkan. Periksa koneksi dan izin akses.');
+  });
+
+  for(const [collectionName,stateKey,readyKey] of [['resellers','resellers','resellers'],['claims','claims','claims'],['deliverySlots','deliverySlots','slots']]){
+    firestoreUnsubscribers.push(fb.onSnapshot(collection(fb.db,collectionName),snap=>{state[stateKey]=snap.docs.map(d=>({...d.data(),id:d.id}));state.ready[readyKey]=true;renderAll();},()=>{state.ready[readyKey]=false;setConnectionBadge('error','Dukungan modul belum tersedia');renderAll();}));
+  }
+  firestoreUnsubscribers.push(fb.onSnapshot(doc(fb.db,'settings','ecommerce'),snap=>{state.ecommerce=snap.exists()?snap.data():null;state.ready.ecommerce=true;renderAll();},()=>{state.ready.ecommerce=false;renderAll();}));
 
   firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "orders"), orderBy("createdAt", "desc")), (snap) => {
+    state.ready.orders=true;
     state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    if (snap.empty) {
-      seedFirestore();
-    } else {
-      syncCustomersFromOrders();
-      syncIncomeFromOrders();
-    }
+    // Pesanan kosong adalah kondisi sah; jangan membuat data contoh atau jurnal dari browser.
     renderAll();
   }));
 
@@ -338,6 +381,7 @@ function subscribeFirestore() {
   }));
 
   firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "transactions"), orderBy("date", "desc")), (snap) => {
+    state.ready.transactions=true;
     state.transactions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAll();
   }));
@@ -346,7 +390,6 @@ function subscribeFirestore() {
     if (snap.exists()) {
       state.settings = snap.data();
     } else {
-      setDoc(doc(fb.db, "settings", "store"), DEFAULT_SETTINGS);
       state.settings = { ...DEFAULT_SETTINGS };
     }
     if (state.view === "pengaturan") applySettingsToForm();
@@ -375,16 +418,8 @@ function subscribeFirestore() {
   }));
 }
 
-async function seedFirestore() {
-  const { addDoc, collection, serverTimestamp } = fb;
-  const { orders, products } = buildSeedData();
-  for (const o of orders) {
-    await addDoc(collection(fb.db, "orders"), { ...o, createdAt: serverTimestamp() });
-  }
-  for (const p of products) {
-    await addDoc(collection(fb.db, "products"), { ...p, createdAt: serverTimestamp() });
-  }
-}
+async function seedFirestore() { throw new Error('Pengisian data contoh produksi dinonaktifkan.'); }
+
 
 async function loadDemoData() {
   let orders = JSON.parse(localStorage.getItem(LOCAL_KEY_ORDERS) || "null");
@@ -434,47 +469,27 @@ function saveDemoData() {
 
 /** Update satu order (status + field lain) — dipakai untuk semua aksi alur kerja. */
 async function updateOrder(orderId, patch, historyLabel) {
-  if (state.mode === "firebase") {
-    const { doc, updateDoc, serverTimestamp } = fb;
-    const order = state.orders.find((o) => o.id === orderId);
-    const history = [...(order.statusHistory || []), { status: historyLabel || patch.status, at: new Date().toISOString() }];
-    await updateDoc(doc(fb.db, "orders", orderId), { ...patch, statusHistory: history });
-  } else {
-    const order = state.orders.find((o) => o.id === orderId);
-    Object.assign(order, patch);
-    order.statusHistory = [...(order.statusHistory || []), { status: historyLabel || patch.status, at: new Date().toISOString() }];
-    saveDemoData();
-    await syncIncomeFromOrders();
-    renderAll();
+  const order = state.orders.find(o => o.id === orderId);
+  if (order?.schemaVersion === 2) {
+    window.location.href = 'admin-website.html#orders/' + encodeURIComponent(orderId); return;
   }
+  await shopApi('orderAction', { orderId, operation: 'legacy', ...patch });
 }
+
 
 /** Buat pesanan baru secara manual (dipakai form "Buat pesanan"). */
 async function addOrder(order) {
-  if (state.mode === "firebase") {
-    const { addDoc, collection, serverTimestamp } = fb;
-    await addDoc(collection(fb.db, "orders"), { ...order, createdAt: serverTimestamp() });
-  } else {
-    const newOrder = { ...order, id: "demo-order-manual-" + Date.now(), createdAt: new Date().toISOString() };
-    state.orders.unshift(newOrder);
-    saveDemoData();
-    await syncCustomersFromOrders();
-    await syncIncomeFromOrders();
-    renderAll();
-  }
+  state.manualOrderKey ||= crypto.randomUUID();
+  const result = await shopApi('legacyManualOrder', { ...order, key: state.manualOrderKey });
+  order.invoiceNo = result.invoiceNo; state.manualOrderKey = null;
 }
+
 
 /** Hapus pesanan — dipakai untuk membersihkan data contoh/dummy setelah ada pesanan asli. */
 async function deleteOrder(orderId) {
-  if (state.mode === "firebase") {
-    const { doc, deleteDoc } = fb;
-    await deleteDoc(doc(fb.db, "orders", orderId));
-  } else {
-    state.orders = state.orders.filter((o) => o.id !== orderId);
-    saveDemoData();
-    renderAll();
-  }
+  throw new Error('Pesanan tidak dihapus permanen. Batalkan dari detail agar stok dan riwayat tetap konsisten.');
 }
+
 
 /** No. invoice otomatis, lanjutan dari nomor terbesar yang sudah ada. */
 function generateInvoiceNo() {
@@ -487,41 +502,20 @@ function generateInvoiceNo() {
 }
 
 /** Tambah produk baru. */
-async function addProduct(product) {
-  if (state.mode === "firebase") {
-    const { addDoc, collection, serverTimestamp } = fb;
-    await addDoc(collection(fb.db, "products"), { ...product, createdAt: serverTimestamp() });
-  } else {
-    const newProduct = { ...product, id: "demo-product-" + Date.now(), createdAt: new Date().toISOString() };
-    state.products.unshift(newProduct);
-    saveDemoData();
-    renderAll();
-  }
-}
+async function addProduct(product) { return shopApi('saveProduct', {product}); }
+
 
 async function deleteProduct(productId) {
-  if (state.mode === "firebase") {
-    const { doc, deleteDoc } = fb;
-    await deleteDoc(doc(fb.db, "products", productId));
-  } else {
-    state.products = state.products.filter((p) => p.id !== productId);
-    saveDemoData();
-    renderAll();
-  }
+  const product = state.products.find(p => p.id === productId);
+  await shopApi('saveProduct', {productId, expectedRevision: product.revision || 0, product: {...product, status:'nonaktif'}});
 }
+
 
 /** Update produk yang sudah ada (dipakai oleh form Edit). */
 async function updateProduct(productId, patch) {
-  if (state.mode === "firebase") {
-    const { doc, updateDoc } = fb;
-    await updateDoc(doc(fb.db, "products", productId), patch);
-  } else {
-    const product = state.products.find((p) => p.id === productId);
-    Object.assign(product, patch);
-    saveDemoData();
-    renderAll();
-  }
+  return shopApi('saveProduct', {productId, expectedRevision: state.editingProductRevision || 0, product: patch});
 }
+
 
 /** Tambah pelanggan baru (manual ATAU otomatis dari sinkronisasi pesanan). */
 /**
@@ -600,6 +594,8 @@ async function addTransaction(tx) {
 
 /** Simpan profil toko (dipakai form Pengaturan). */
 async function saveSettings(patch) {
+  if(patch.storeUrl?.trim()&&!safeStoreUrl(patch.storeUrl))throw Error('Alamat Website Pembeli harus URL http/https tanpa kredensial atau token.');
+  if('storeUrl' in patch)patch.storeUrl=safeStoreUrl(patch.storeUrl);
   const merged = { ...DEFAULT_SETTINGS, ...(state.settings || {}), ...patch };
   if (state.mode === "firebase") {
     const { doc, setDoc } = fb;
@@ -732,6 +728,7 @@ function toDateInputValue(input) {
 
 /** Pastikan setiap nomor HP unik di daftar pesanan punya data pelanggan di koleksi customers. */
 async function syncCustomersFromOrders() {
+  if (state.mode !== "demo") return;
   const seenPhones = new Set();
   for (const o of state.orders) {
     const phone = (o.phone || "").trim();
@@ -750,6 +747,7 @@ async function syncCustomersFromOrders() {
 
 /** Pastikan setiap pesanan berstatus "selesai" punya satu baris pemasukan di koleksi transactions. */
 async function syncIncomeFromOrders() {
+  if (state.mode !== "demo") return;
   for (const o of state.orders) {
     if (o.status !== "selesai") continue;
     const alreadyExists = state.transactions.some((t) => t.orderId === o.id);
@@ -759,7 +757,7 @@ async function syncIncomeFromOrders() {
       const completedEntry = (o.statusHistory || []).find((h) => h.status === "selesai");
       await addTransaction({
         date: toDateInputValue(completedEntry ? completedEntry.at : o.createdAt),
-        description: `Pesanan ${o.invoiceNo} — ${o.customerName}`,
+        description: `Pesanan ${escapeHtml(o.invoiceNo)} — ${escapeHtml(o.customerName)}`,
         category: "Penjualan",
         type: "masuk",
         amount: o.total,
@@ -772,31 +770,12 @@ async function syncIncomeFromOrders() {
 }
 
 // ------------------------------------------------------------
-// Seed data — dipakai untuk mode demo maupun pengisian awal Firestore
+// Seed data lama dinonaktifkan; gunakan emulator untuk pengujian
 // ------------------------------------------------------------
 function buildSeedData() {
-  const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
-  const orders = [
-    { invoiceNo: "INV-1042", customerName: "Budi Santoso", phone: "0812-3456-7890", address: "Jl. Melati No. 12, Surabaya", items: [{ productName: "Kemeja Flanel", variant: "M / Hitam", qty: 1, price: 235000 }], shippingCost: 15000, total: 250000, status: "perlu_verifikasi", courier: "", trackingNumber: "", statusHistory: [{ status: "menunggu_pembayaran", at: daysAgo(0) }], createdAt: daysAgo(0) },
-    { invoiceNo: "INV-1041", customerName: "Sari Wulandari", phone: "0813-2222-1111", address: "Jl. Anggrek No. 5, Malang", items: [{ productName: "Blouse Katun", variant: "S / Putih", qty: 2, price: 90000 }], shippingCost: 12000, total: 192000, status: "diproses", courier: "", trackingNumber: "", statusHistory: [{ status: "menunggu_pembayaran", at: daysAgo(1) }, { status: "perlu_verifikasi", at: daysAgo(1) }, { status: "diproses", at: daysAgo(0) }], createdAt: daysAgo(1) },
-    { invoiceNo: "INV-1040", customerName: "Andi Prasetyo", phone: "0821-9999-0000", address: "Jl. Kenanga No. 8, Sidoarjo", items: [{ productName: "Celana Chino", variant: "32 / Krem", qty: 1, price: 175000 }, { productName: "Kaos Polos", variant: "L / Putih", qty: 2, price: 85000 }], shippingCost: 18000, total: 363000, status: "dikirim", courier: "JNE", trackingNumber: "JNE0293841923", statusHistory: [{ status: "menunggu_pembayaran", at: daysAgo(3) }, { status: "perlu_verifikasi", at: daysAgo(3) }, { status: "diproses", at: daysAgo(2) }, { status: "dikirim", at: daysAgo(1) }], createdAt: daysAgo(3) },
-    { invoiceNo: "INV-1039", customerName: "Rina Amelia", phone: "0856-1111-2222", address: "Jl. Dahlia No. 21, Gresik", items: [{ productName: "Dress Linen", variant: "M / Sage", qty: 1, price: 310000 }], shippingCost: 15000, total: 325000, status: "selesai", courier: "SiCepat", trackingNumber: "SCP1187234", statusHistory: [{ status: "menunggu_pembayaran", at: daysAgo(6) }, { status: "perlu_verifikasi", at: daysAgo(6) }, { status: "diproses", at: daysAgo(5) }, { status: "dikirim", at: daysAgo(4) }, { status: "selesai", at: daysAgo(2) }], createdAt: daysAgo(6) },
-    { invoiceNo: "INV-1038", customerName: "Fajar Nugroho", phone: "0877-3333-4444", address: "Jl. Mawar No. 3, Sidoarjo", items: [{ productName: "Jaket Denim", variant: "L / Biru", qty: 1, price: 420000 }], shippingCost: 20000, total: 440000, status: "menunggu_pembayaran", courier: "", trackingNumber: "", statusHistory: [{ status: "menunggu_pembayaran", at: daysAgo(0) }], createdAt: daysAgo(0) },
-    { invoiceNo: "INV-1037", customerName: "Dewi Lestari", phone: "0898-5555-6666", address: "Jl. Kamboja No. 9, Surabaya", items: [{ productName: "Blouse Katun", variant: "M / Dusty Pink", qty: 1, price: 95000 }], shippingCost: 12000, total: 107000, status: "dibatalkan", courier: "", trackingNumber: "", statusHistory: [{ status: "menunggu_pembayaran", at: daysAgo(4) }, { status: "dibatalkan", at: daysAgo(3) }], createdAt: daysAgo(4) },
-    { invoiceNo: "INV-1036", customerName: "Yoga Pratama", phone: "0819-7777-8888", address: "Jl. Teratai No. 14, Malang", items: [{ productName: "Kemeja Flanel", variant: "L / Merah", qty: 1, price: 235000 }], shippingCost: 15000, total: 250000, status: "selesai", courier: "JNE", trackingNumber: "JNE0281123456", statusHistory: [{ status: "menunggu_pembayaran", at: daysAgo(8) }, { status: "perlu_verifikasi", at: daysAgo(8) }, { status: "diproses", at: daysAgo(7) }, { status: "dikirim", at: daysAgo(6) }, { status: "selesai", at: daysAgo(4) }], createdAt: daysAgo(8) },
-    { invoiceNo: "INV-1035", customerName: "Putri Handayani", phone: "0838-4444-3333", address: "Jl. Cempaka No. 17, Sidoarjo", items: [{ productName: "Celana Chino", variant: "30 / Hitam", qty: 1, price: 175000 }], shippingCost: 15000, total: 190000, status: "perlu_verifikasi", courier: "", trackingNumber: "", statusHistory: [{ status: "menunggu_pembayaran", at: daysAgo(1) }], createdAt: daysAgo(1) },
-  ];
-
-  const products = [
-    { name: "Kemeja Flanel", category: "Atasan", description: "Kemeja flanel lengan panjang, bahan katun tebal.", hpp: 147000, priceOffline: 235000, priceOnline: 235000, weight: 300, sku: "KMJ-FLN", status: "aktif", photoUrl: "https://picsum.photos/seed/kmjfln/120", variants: [{ image: "", color: "Hitam", size: "M", sku: "KMJ-FLN-M-HTM", hpp: 147000, priceOffline: 235000, priceOnline: 235000, stock: 8 }, { image: "", color: "Hitam", size: "L", sku: "KMJ-FLN-L-HTM", hpp: 147000, priceOffline: 235000, priceOnline: 235000, stock: 3 }, { image: "", color: "Merah", size: "L", sku: "KMJ-FLN-L-MRH", hpp: 153000, priceOffline: 245000, priceOnline: 245000, stock: 2 }], totalStock: 13, createdAt: daysAgo(20) },
-    { name: "Blouse Katun", category: "Atasan", description: "Blouse katun ringan untuk sehari-hari.", hpp: 56000, priceOffline: 90000, priceOnline: 90000, weight: 150, sku: "BLS-KTN", status: "aktif", photoUrl: "https://picsum.photos/seed/blsktn/120", variants: [{ image: "", color: "Putih", size: "S", sku: "BLS-KTN-S-PTH", hpp: 56000, priceOffline: 90000, priceOnline: 90000, stock: 12 }, { image: "", color: "Dusty Pink", size: "M", sku: "BLS-KTN-M-DPK", hpp: 59000, priceOffline: 95000, priceOnline: 95000, stock: 4 }], totalStock: 16, createdAt: daysAgo(18) },
-    { name: "Celana Chino", category: "Bawahan", description: "Celana chino slim fit, bahan twill.", hpp: 109000, priceOffline: 175000, priceOnline: 175000, weight: 350, sku: "CLN-CHN", status: "aktif", photoUrl: "", variants: [{ image: "", color: "Hitam", size: "30", sku: "CLN-CHN-30-HTM", hpp: 109000, priceOffline: 175000, priceOnline: 175000, stock: 1 }, { image: "", color: "Krem", size: "32", sku: "CLN-CHN-32-KRM", hpp: 109000, priceOffline: 175000, priceOnline: 175000, stock: 6 }], totalStock: 7, createdAt: daysAgo(15) },
-    { name: "Dress Linen", category: "Dress", description: "Dress linen midi, cocok untuk acara santai.", hpp: 194000, priceOffline: 310000, priceOnline: 310000, weight: 280, sku: "DRS-LNN", status: "aktif", photoUrl: "https://picsum.photos/seed/drslnn/120", variants: [{ image: "", color: "Sage", size: "M", sku: "DRS-LNN-M-SAG", hpp: 194000, priceOffline: 310000, priceOnline: 310000, stock: 2 }], totalStock: 2, createdAt: daysAgo(10) },
-    { name: "Jaket Denim", category: "Outer", description: "Jaket denim washed, unisex.", hpp: 262000, priceOffline: 420000, priceOnline: 420000, weight: 500, sku: "JKT-DNM", status: "aktif", photoUrl: "", variants: [{ image: "", color: "Biru", size: "L", sku: "JKT-DNM-L-BIR", hpp: 262000, priceOffline: 420000, priceOnline: 420000, stock: 5 }], totalStock: 5, createdAt: daysAgo(9) },
-    { name: "Kaos Polos", category: "Atasan", description: "Kaos polos cotton combed 24s.", hpp: 53000, priceOffline: 85000, priceOnline: 85000, weight: 140, sku: "KOS-PLS", status: "draft", photoUrl: "", variants: [{ image: "", color: "Putih", size: "L", sku: "KOS-PLS-L-PTH", hpp: 53000, priceOffline: 85000, priceOnline: 85000, stock: 20 }], totalStock: 20, createdAt: daysAgo(5) },
-  ];
-
-  return { orders, products };
+  // Data contoh bernama/alamat tidak disertakan dalam paket distribusi.
+  // Pengujian lokal menggunakan seed-emulator.mjs secara eksplisit.
+  return { orders: [], products: [] };
 }
 
 // ============================================================
@@ -807,11 +786,11 @@ const formatDate = (iso) => {
   if (!iso) return "-";
   const d = iso?.toDate ? iso.toDate() : new Date(iso);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("id-ID", { timeZone:"Asia/Jakarta", day: "numeric", month: "short", year: "numeric" });
 };
 /** Konversi Firestore Timestamp atau string ISO menjadi objek Date JS. */
 const toJsDate = (input) => (input?.toDate ? input.toDate() : new Date(input));
-const isToday = (input) => toJsDate(input).toDateString() === new Date().toDateString();
+const isToday = (input) => jakartaDay(input) === jakartaDay();
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c]));
 }
@@ -865,6 +844,7 @@ function getProductBasePricing(p) {
 function normalizeVariantForEdit(v) {
   const pricing = normalizeVariantPricing(v);
   return {
+    id: v.id || crypto.randomUUID(),
     image: v.image || "",
     color: v.color !== undefined ? v.color : (v.name || ""),
     size: v.size || "",
@@ -887,7 +867,8 @@ function showToast(msg) {
 // 3. RENDER
 // ============================================================
 function renderAll() {
-  renderNavBadge();
+  renderNavBadge(); renderAdminChrome();
+  if (state.view === "pencarian") renderSearchResults();
   if (state.view === "dashboard") renderDashboard();
   if (state.view === "pesanan") renderOrdersView();
   if (state.view === "produk") renderProductsView();
@@ -897,136 +878,146 @@ function renderAll() {
   if (state.openOrderId) renderOrderModalBody(state.openOrderId);
 }
 
+const DASHBOARD_ZONE='Asia/Jakarta';
+function jakartaDay(input=new Date()) { const d=toJsDate(input);return Number.isNaN(+d)?'':new Date(+d+7*3600000).toISOString().slice(0,10); }
+function jakartaDateLabel(input,options={day:'numeric',month:'long',year:'numeric'}) {return toJsDate(input).toLocaleDateString('id-ID',{...options,timeZone:DASHBOARD_ZONE});}
+function safeStoreUrl(value) {
+  try {const u=new URL(String(value||'').trim());if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return '';for(const key of u.searchParams.keys())if(/^(token|access_token|id_token|password|auth)$/i.test(key))return '';return u.href;}catch{return '';}
+}
+function claimNeedsAction(c) {
+  if(['ditolak','selesai','ditutup'].includes(c.status))return false;
+  if(c.status==='refund')return c.refundPaid!==true;
+  if(c.status==='retur')return !c.returnInspected||c.refundAmount>0&&!c.refundPaid;
+  if(c.status==='penggantian')return !c.returnInspected||!c.fulfilled||c.refundAmount>0&&!c.refundPaid;
+  if(c.status==='kirim_kekurangan')return !c.fulfilled||c.refundAmount>0&&!c.refundPaid;
+  return true;
+}
+function readyToShip(o){return o.status==='diproses'&&o.shippingMethod!=='pickup'&&(o.schemaVersion!==2||(['Dikemas','Menunggu kurir','Siap dikirim'].includes(o.detailStatus)&&(o.paymentStatus==='lunas'||o.cashConfirmed&&String(o.paymentMethod).startsWith('cash_'))));}
+function outstandingCourierCash(orders){return orders.filter(o=>o.paymentMethod==='cash_store'&&['diterima_kurir','disetor_kurir'].includes(o.cashStatus)&&o.paidAmount>0).reduce((n,o)=>n+Number(o.paidAmount),0);}
+function orderChannel(o){return o.source==='website'?'website':o.source==='admin'?'admin':'historis';}
+function salesEntries(orders,transactions) {
+  const lookup=new Map();orders.forEach(o=>{lookup.set(o.id,o);if(o.invoiceNo)lookup.set(o.invoiceNo,o);});
+  const result=new Map();
+  const sorted=[...transactions].sort((a,b)=>Number(String(b.id).startsWith('income_'))-Number(String(a.id).startsWith('income_')));
+  for(const t of sorted){
+    if(t.type!=='masuk'||!(Number(t.amount)>0)||(!t.orderId&&t.category!=='Penjualan'))continue;
+    const o=lookup.get(t.orderId);if(o?.status==='dibatalkan')continue;
+    const key=t.orderId?'order:'+(o?.id||t.orderId):'manual:'+t.id;
+    if(!result.has(key))result.set(key,{amount:Number(t.amount),at:t.createdAt||t.date,orderId:t.orderId});
+  }
+  return [...result.values()];
+}
+function getDashboardDateRange(now=new Date()) {
+  const today=jakartaDay(now),selected=state.dashPeriod==='custom'&&/^\d{4}-\d{2}-\d{2}$/.test(state.dashCustomDate)?state.dashCustomDate:today;
+  const dayStart=new Date(selected+'T00:00:00+07:00'),end=new Date(+dayStart+86400000);
+  const count=state.dashPeriod==='7d'?7:state.dashPeriod==='30d'?30:1,start=new Date(+dayStart-(count-1)*86400000);
+  const label=count===1?jakartaDateLabel(start):`${jakartaDateLabel(start)} – ${jakartaDateLabel(new Date(+end-1))}`;
+  return {start,end,label};
+}
+function isWithinRange(input,start,end){const date=typeof input==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(input)?new Date(input+'T00:00:00+07:00'):toJsDate(input);return date>=start&&date<end;}
+function activityCounts(){return {reseller:state.resellers.filter(r=>r.status==='menunggu').length,claims:state.claims.filter(claimNeedsAction).length,payment:state.orders.filter(o=>o.status==='perlu_verifikasi').length};}
 function renderNavBadge() {
-  const count = state.orders.filter((o) => o.status === "perlu_verifikasi").length;
-  els.navBadgePesanan.textContent = count;
-  els.navBadgePesanan.style.display = count > 0 ? "inline-block" : "none";
-}
-
-/** Hitung rentang tanggal [start, end) dan label tampilan sesuai filter periode dashboard yang aktif. */
-function getDashboardDateRange() {
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endExclusive = new Date(startOfToday);
-  endExclusive.setDate(endExclusive.getDate() + 1);
-
-  if (state.dashPeriod === "7d") {
-    const start = new Date(startOfToday);
-    start.setDate(start.getDate() - 6);
-    return { start, end: endExclusive, label: `7 hari terakhir — ${formatDate(start)} s/d ${formatDate(now)}` };
+  const counts=activityCounts();
+  for(const [key,value,ready] of [['pesanan',state.orders.filter(o=>!['selesai','dibatalkan'].includes(o.status)).length,state.ready.orders],['reseller',counts.reseller,state.ready.resellers],['retur',counts.claims,state.ready.claims]]){
+    const badge=document.getElementById('nav-badge-'+key);badge.textContent=value;badge.hidden=!ready||!value;badge.style.removeProperty('display');
   }
-  if (state.dashPeriod === "30d") {
-    const start = new Date(startOfToday);
-    start.setDate(start.getDate() - 29);
-    return { start, end: endExclusive, label: `30 hari terakhir — ${formatDate(start)} s/d ${formatDate(now)}` };
-  }
-  if (state.dashPeriod === "custom" && state.dashCustomDate) {
-    const [y, m, d] = state.dashCustomDate.split("-").map(Number);
-    const start = new Date(y, m - 1, d);
-    const end = new Date(y, m - 1, d + 1);
-    return { start, end, label: formatDate(start) };
-  }
-  // default: hari ini
-  return { start: startOfToday, end: endExclusive, label: now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) };
 }
-
-function isWithinRange(dateInput, start, end) {
-  const d = toJsDate(dateInput);
-  return d >= start && d < end;
+function renderAdminChrome() {
+  const s=state.settings||{},u=state.adminIdentity;
+  document.getElementById('sidebar-store-name').textContent=s.storeName||'KUBAH NABAWI';
+  const logo=document.getElementById('sidebar-logo'),url=safeStoreUrl(s.logoUrl);if(url&&logo.getAttribute('src')!==url)logo.src=url;logo.hidden=!url;document.getElementById('sidebar-monogram').hidden=!!url;
+  logo.onerror=()=>{logo.hidden=true;document.getElementById('sidebar-monogram').hidden=false;};
+  document.getElementById('admin-display-name').textContent=u?.name||'Admin';document.getElementById('admin-display-name').title=u?.email||'';
+  document.getElementById('admin-initial').textContent=(u?.name||'A').trim().slice(0,1).toUpperCase();document.getElementById('admin-role').textContent=u?.superAdmin?'Super Admin':'Administrator';
+  const storeLink=document.getElementById('view-store'),storeUrl=safeStoreUrl(s.storeUrl);storeLink.href=storeUrl||'#pengaturan';storeLink.dataset.configured=storeUrl?'true':'false';
+  const counts=activityCounts(),rows=[['reseller',counts.reseller,'pengajuan reseller menunggu',state.ready.resellers],['retur',counts.claims,'komplain belum selesai',state.ready.claims],['payment',counts.payment,'pembayaran perlu verifikasi',state.ready.orders]];
+  document.getElementById('notification-dot').hidden=!rows.some(r=>r[3]&&r[1]>0);
+  const panel=document.getElementById('notification-items');panel.innerHTML=rows.filter(r=>r[3]&&r[1]>0).map(r=>`<button data-activity="${r[0]}"><strong>${r[1]}</strong> ${r[2]} <span aria-hidden="true">›</span></button>`).join('')||'<p>Tidak ada tindak lanjut pada data yang sudah tersinkron.</p>';
+  panel.querySelectorAll('[data-activity]').forEach(b=>b.onclick=()=>followActivity(b.dataset.activity));
 }
-
+function followActivity(target){document.getElementById('notification-panel').hidden=true;document.getElementById('notifications-toggle').setAttribute('aria-expanded','false');if(target==='payment'){state.orderTab='perlu_verifikasi';state.orderChannel='semua';document.getElementById('order-channel').value='semua';navigateTo('pesanan');}else navigateTo(target);}
 function renderDashboard() {
-  const { start, end, label } = getDashboardDateRange();
-  const periodOrders = state.orders.filter((o) => isWithinRange(o.createdAt, start, end));
-
-  const newInPeriod = periodOrders.length;
-  const needVerifyInPeriod = periodOrders.filter((o) => o.status === "perlu_verifikasi").length;
-  const revenueInPeriod = periodOrders.filter((o) => o.status !== "dibatalkan").reduce((s, o) => s + o.total, 0);
-  const lowStockProducts = state.products.filter((p) => p.totalStock <= 5 && p.status === "aktif");
-
-  els.statNewOrders.textContent = newInPeriod;
-  els.statVerify.textContent = needVerifyInPeriod;
-  els.statRevenue.textContent = formatRupiah(revenueInPeriod);
-  els.statLowstock.textContent = lowStockProducts.length;
-  els.todayDate.textContent = label;
-
-  // Perlu aksi segera — SELALU dari semua pesanan (bukan hanya periode terpilih),
-  // karena ini daftar tugas operasional yang tetap perlu ditangani berapa pun umur pesanannya.
-  const orders = state.orders;
-  const needVerifyGlobal = orders.filter((o) => o.status === "perlu_verifikasi").length;
-  const actions = [];
-  if (needVerifyGlobal > 0) actions.push({ text: `${needVerifyGlobal} pesanan menunggu verifikasi pembayaran`, goto: () => { state.orderTab = "perlu_verifikasi"; navigateTo("pesanan"); } });
-  const needShip = orders.filter((o) => o.status === "diproses").length;
-  if (needShip > 0) actions.push({ text: `${needShip} pesanan siap dikirim, resi belum diinput`, goto: () => { state.orderTab = "diproses"; navigateTo("pesanan"); } });
-  if (lowStockProducts.length > 0) actions.push({ text: `${lowStockProducts.length} produk stok tinggal ${Math.min(...lowStockProducts.map((p) => p.totalStock))}–5 unit`, goto: () => navigateTo("produk") });
-
-  els.actionList.innerHTML = "";
-  if (actions.length === 0) {
-    els.actionList.innerHTML = `<li class="action-empty"><span>Semua pesanan sudah ditangani. Kerja bagus.</span></li>`;
-  } else {
-    actions.forEach((a) => {
-      const li = document.createElement("li");
-      li.innerHTML = `<span>${a.text}</span>`;
-      const btn = document.createElement("button");
-      btn.className = "mini-btn";
-      btn.textContent = "Lihat";
-      btn.addEventListener("click", a.goto);
-      li.appendChild(btn);
-      els.actionList.appendChild(li);
-    });
-  }
-
-  // Pesanan terbaru (5) — tetap dari semua pesanan, bukan hanya periode terpilih.
-  const recent = [...orders].sort((a, b) => toJsDate(b.createdAt) - toJsDate(a.createdAt)).slice(0, 5);
-  renderOrderRows(els.tableRecentOrders.querySelector("tbody"), recent, false);
-
+  const {start,end,label}=getDashboardDateRange(),orders=state.orders,counts=activityCounts();
+  const money=salesEntries(orders,state.transactions).filter(t=>isWithinRange(t.at,start,end)).reduce((n,t)=>n+t.amount,0);
+  els.statRevenue.textContent=state.ready.orders&&state.ready.transactions?formatRupiah(money):'Belum tersedia';
+  document.getElementById('sales-period-label').textContent=state.dashPeriod==='today'?'Penjualan Hari Ini':'Penjualan Periode Ini';
+  els.statNewOrders.textContent=state.ready.orders?orders.filter(o=>isWithinRange(o.createdAt,start,end)).length:'—';
+  document.getElementById('stat-ready').textContent=state.ready.orders?orders.filter(readyToShip).length:'—';
+  const cashReady=state.ready.orders&&state.ready.ecommerce&&!!state.ecommerce;
+  const cash=outstandingCourierCash(orders);
+  document.getElementById('stat-cash').textContent=cashReady?formatRupiah(cash):'Belum tersedia';
+  document.getElementById('stat-cash').title=cashReady?'Dana diterima kurir dan belum diverifikasi setorannya, seluruh tanggal.':'Data penerimaan dan setoran kurir belum tersedia.';
+  els.statVerify.textContent=state.ready.orders?counts.payment:'—';els.statLowstock.textContent=state.products.filter(p=>p.status==='aktif'&&Number(p.totalStock)<=5).length;
+  document.getElementById('follow-resellers').textContent=state.ready.resellers?counts.reseller:'—';document.getElementById('follow-claims').textContent=state.ready.claims?counts.claims:'—';
+  els.todayDate.textContent=label+' · WIB';
+  document.querySelector('#dash-period-select option[value="today"]').textContent=jakartaDateLabel(new Date());
+  document.getElementById('dashboard-definition').textContent='Penjualan: penerimaan penjualan tercatat pada periode terpilih, sebelum refund; jurnal pesanan dihitung sekali dan pesanan batal dikecualikan. Pesanan Baru: dibuat dalam periode. Siap Dikirim: pesanan dikemas/menunggu kurir (pesanan lama: diproses), di seluruh tanggal. Tunai: dana yang telah diterima kurir dan belum diverifikasi setorannya, di seluruh tanggal.';
+  const recent=orders.filter(o=>isWithinRange(o.createdAt,start,end)&&(state.recentTab==='semua'||o.status===state.recentTab)).sort((a,b)=>toJsDate(b.createdAt)-toJsDate(a.createdAt)).slice(0,5);
+  const tbody=els.tableRecentOrders.querySelector('tbody');tbody.innerHTML=recent.map(o=>{
+    const shipping={store:'Kurir Toko',pickup:'Ambil di Gudang',regular:'Reguler',instant:'Instan',cargo:'Kargo'}[o.shippingMethod]||o.courier||'Belum diatur';
+    const badge=o.promoApplied===true&&o.shippingMethod==='store'&&o.shippingState==='confirmed'&&o.shippingCost===0?'<span class="promo-badge">Gratis ongkir</span>':'';
+    const status=o.detailStatus==='Menunggu kurir'?'Menunggu Kurir':o.shippingMethod==='pickup'&&o.status==='diproses'?'Siap Diambil':STATUS_META[o.status]?.label||o.status||'Belum tersedia';
+    return `<tr data-recent-order="${escapeHtml(o.id)}"><td><button class="invoice-link" data-order-detail="${escapeHtml(o.id)}" title="${escapeHtml(o.invoiceNo)}">${escapeHtml(o.invoiceNo||o.id)}</button></td><td>${escapeHtml(o.customerName)}${o.usesReseller?'<small class="reseller-label">Reseller</small>':''}</td><td>${escapeHtml(shipping)} ${badge}</td><td>${o.total==null?'Menunggu konfirmasi':formatRupiah(o.total)}</td><td><span class="tag tag--${escapeHtml(o.status)}">${escapeHtml(status)}</span></td><td><button class="row-more" data-order-detail="${escapeHtml(o.id)}" aria-label="Detail pesanan ${escapeHtml(o.invoiceNo||o.id)}">⋮</button></td></tr>`;
+  }).join('')||`<tr><td colspan="6" class="table-empty">${state.ready.orders?'Belum ada pesanan pada periode dan status ini.':'Data pesanan belum tersedia.'}</td></tr>`;
+  tbody.querySelectorAll('[data-recent-order]').forEach(row=>row.onclick=()=>openOrderModal(row.dataset.recentOrder));
+  document.querySelectorAll('[data-recent]').forEach(b=>{const active=b.dataset.recent===state.recentTab;b.classList.toggle('is-active',active);b.setAttribute('aria-pressed',String(active));});
+  document.getElementById('schedule-date').textContent=(state.dashPeriod==='today'?'Hari ini, ':'')+label;
+  const slots=state.deliverySlots.filter(s=>s.enabled&&isWithinRange(s.startAt,start,end)).sort((a,b)=>Date.parse(a.startAt)-Date.parse(b.startAt));
+  const time=v=>new Date(v).toLocaleTimeString('id-ID',{timeZone:DASHBOARD_ZONE,hour:'2-digit',minute:'2-digit'}).replace(':','.');
+  document.getElementById('delivery-slots').innerHTML=state.ready.slots?(slots.map((slot,i)=>{const used=Number(slot.used)||0,cap=Number(slot.capacity)||0;return `<article class="slot-card"><div><strong>${state.dashPeriod==='7d'||state.dashPeriod==='30d'?escapeHtml(jakartaDateLabel(slot.startAt,{day:'numeric',month:'short'}))+' · ':''}${time(slot.startAt)} – ${time(slot.endAt)}</strong><small>${used}/${cap} pengiriman</small></div><progress class="slot-progress tone-${i%3}" value="${Math.min(used,cap)}" max="${Math.max(cap,1)}" aria-label="Kuota ${time(slot.startAt)}: ${used} dari ${cap}"></progress></article>`;}).join('')||'<div class="dashboard-empty"><p>Belum ada jadwal aktif pada periode ini.</p><button class="btn btn--outline" id="add-empty-slot">Tambah Jadwal</button></div>'):'<p class="dashboard-empty">Jadwal belum tersedia. Periksa koneksi dan izin Firebase.</p>';
+  document.getElementById('add-empty-slot')?.addEventListener('click',()=>navigateTo('jadwal'));
+  const c=state.ecommerce,free=c?.freeShipping;
+  document.getElementById('free-shipping-summary').innerHTML=state.ready.ecommerce&&free?`${free.enabled===false?'<p class="promo-disabled">Promo nonaktif</p>':''}<p>Minimal ${Number(free.minPcs)===20?'1 kodi (20 pcs)':escapeHtml(free.minPcs)+' pcs'}</p><p>Maksimal ${escapeHtml(free.maxKm)} km dari gudang</p><small>${c.routeProvider==='google'?'Jarak diverifikasi backend Google Routes.':'Jarak rute memerlukan verifikasi admin.'}</small>`:'<p>Konfigurasi promo belum tersedia.</p>';
+  const pending=orders.filter(o=>o.schemaVersion===2&&o.shippingState!=='confirmed'&&o.status!=='dibatalkan').length;
+  els.actionList.innerHTML=pending?`<li>${pending} pesanan masih menunggu konfirmasi ongkir.</li>`:'<li>Tidak ada ongkir yang menunggu konfirmasi pada data tersinkron.</li>';
   renderSalesChart();
 }
-
-function renderSalesChart() {
-  let dayCount = 7;
-  let endDate = new Date();
-  if (state.dashPeriod === "30d") {
-    dayCount = 30;
-  } else if (state.dashPeriod === "custom" && state.dashCustomDate) {
-    const [y, m, d] = state.dashCustomDate.split("-").map(Number);
-    endDate = new Date(y, m - 1, d);
-  }
-  // "today" & "custom" tetap menampilkan tren 7 hari di sekitarnya — grafik 1 bar tidak informatif.
-
-  els.chartTitle.textContent = `Tren penjualan — ${dayCount} hari terakhir`;
-
-  const days = [...Array(dayCount)].map((_, i) => {
-    const d = new Date(endDate);
-    d.setDate(d.getDate() - (dayCount - 1 - i));
-    return d;
-  });
-  const totals = days.map((d) =>
-    state.orders
-      .filter((o) => o.status !== "dibatalkan")
-      .filter((o) => toJsDate(o.createdAt).toDateString() === d.toDateString())
-      .reduce((s, o) => s + o.total, 0)
-  );
-
-  const max = Math.max(...totals, 1);
-  const w = 320, h = 140, padBottom = 20;
-  const barGap = dayCount > 14 ? 2 : 10;
-  const barW = (w - barGap * (dayCount - 1)) / dayCount;
-  const labelEvery = dayCount <= 10 ? 1 : Math.ceil(dayCount / 8);
-
-  let svg = "";
-  totals.forEach((t, i) => {
-    const barH = (t / max) * (h - padBottom - 10);
-    const x = i * (barW + barGap);
-    const y = h - padBottom - barH;
-    svg += `<rect x="${x}" y="${y}" width="${Math.max(barW, 1)}" height="${barH}" rx="2" fill="#7C2D3B" opacity="${0.4 + (i / (dayCount - 1 || 1)) * 0.6}"></rect>`;
-    if (i % labelEvery === 0) {
-      const labelText = dayCount <= 10 ? days[i].toLocaleDateString("id-ID", { weekday: "short" }).slice(0, 2) : String(days[i].getDate());
-      svg += `<text x="${x + barW / 2}" y="${h - 4}" font-size="8.5" fill="#6E6754" text-anchor="middle" font-family="Inter, sans-serif">${labelText}</text>`;
-    }
-  });
-  els.salesChart.innerHTML = svg;
+function renderSalesChart(){
+  const {end}=getDashboardDateRange(),count=state.dashPeriod==='30d'?30:7,entries=salesEntries(state.orders,state.transactions),days=Array.from({length:count},(_,i)=>new Date(+end-(count-i)*86400000));
+  const totals=days.map(d=>entries.filter(t=>isWithinRange(t.at,d,new Date(+d+86400000))).reduce((n,t)=>n+t.amount,0)),max=Math.max(...totals,1),width=320/count;
+  els.chartTitle.textContent=`Penerimaan penjualan — ${count} hari hingga ${jakartaDateLabel(new Date(+end-1))}`;
+  els.salesChart.innerHTML=totals.map((total,i)=>{const height=total/max*110;return `<rect x="${i*width+2}" y="${115-height}" width="${Math.max(1,width-4)}" height="${height}" rx="2" fill="#7C2D3B"><title>${jakartaDateLabel(days[i])}: ${formatRupiah(total)}</title></rect>${i%Math.ceil(count/7)===0?`<text x="${i*width+width/2}" y="135" font-size="8" text-anchor="middle" fill="#69645b">${jakartaDateLabel(days[i],{day:'numeric',month:'short'})}</text>`:''}`;}).join('');
 }
+function showOperational(module){
+  const allowed=['orders','couriers','slots','resellers','pricing','claims','settings','reconcile'];if(!allowed.includes(module.split('/')[0]))return;
+  const view={resellers:'reseller',couriers:'pengiriman',slots:'jadwal',claims:'retur',orders:'pesanan',reconcile:'keuangan',pricing:'pengaturan',settings:'pengaturan'}[module.split('/')[0]];
+  state.view='operasional';document.querySelectorAll('.view').forEach(v=>v.hidden=true);document.getElementById('view-operasional').hidden=false;
+  document.querySelectorAll('.nav-item[data-view]').forEach(b=>b.classList.toggle('is-active',b.dataset.view===view));
+  document.getElementById('breadcrumb-title').textContent=({reseller:'Reseller',pengiriman:'Pengiriman & Kurir',jadwal:'Jadwal Pengiriman',retur:'Retur & Komplain',pesanan:'Pesanan Website',keuangan:'Rekonsiliasi',pengaturan:'Pengaturan operasional'})[view];
+  document.getElementById('operational-frame').src='admin-website.html?embed=1#'+module;toggleDrawer(false);
+}
+function toggleDrawer(open){
+  const wasOpen=document.body.classList.contains('drawer-open');
+  document.body.classList.toggle('drawer-open',open);
+  document.querySelector('main.main').inert=open;
+  document.getElementById('drawer-backdrop').hidden=!open;
+  document.getElementById('open-menu').setAttribute('aria-expanded',String(open));
+  if(open)document.getElementById('close-menu').focus();
+  else if(wasOpen)document.getElementById('open-menu').focus();
+}
+
+function renderSearchResults(){
+  const query=document.getElementById('global-search').value.trim().toLowerCase();
+  const orders=query?state.orders.filter(o=>[o.invoiceNo,o.customerName].some(v=>String(v||'').toLowerCase().includes(query))):[];
+  const products=query?state.products.filter(p=>[p.name,p.sku,...(p.variants||[]).flatMap(v=>[v.sku,v.color,v.size])].some(v=>String(v||'').toLowerCase().includes(query))):[];
+  document.getElementById('search-summary').textContent=query?`${orders.length} pesanan · ${products.length} produk untuk “${document.getElementById('global-search').value.trim()}”`:'Masukkan nomor pesanan, nama pelanggan, nama produk, warna, atau SKU.';
+  document.getElementById('global-search-results').innerHTML=`<section class="panel"><h2>Pesanan</h2>${orders.slice(0,30).map(o=>`<button class="search-result" data-result-order="${escapeHtml(o.id)}"><strong>${escapeHtml(o.invoiceNo)}</strong><span>${escapeHtml(o.customerName)}</span></button>`).join('')||'<p>Tidak ada pesanan yang cocok.</p>'}</section><section class="panel"><h2>Produk</h2>${products.slice(0,30).map(p=>`<button class="search-result" data-result-product="${escapeHtml(p.id)}"><strong>${escapeHtml(p.name)}</strong><span>${escapeHtml(p.sku||'Lihat varian & stok')}</span></button>`).join('')||'<p>Tidak ada produk yang cocok.</p>'}</section>`;
+  document.querySelectorAll('[data-result-order]').forEach(b=>b.onclick=()=>openOrderModal(b.dataset.resultOrder));document.querySelectorAll('[data-result-product]').forEach(b=>b.onclick=()=>{navigateTo('produk');openProductModal(state.products.find(p=>p.id===b.dataset.resultProduct));});
+}
+function bindAdminDashboard(){
+  window.addEventListener('resize',()=>{if(window.innerWidth>900&&document.body.classList.contains('drawer-open'))toggleDrawer(false);});
+  document.getElementById('dash-create-order').onclick=openCreateOrderModal;
+  document.getElementById('dash-period-select').onchange=e=>{state.dashPeriod=e.target.value;els.dashCustomDate.hidden=state.dashPeriod!=='custom';if(!state.dashCustomDate){state.dashCustomDate=jakartaDay();els.dashCustomDate.value=state.dashCustomDate;}renderDashboard();};
+  document.querySelectorAll('[data-recent]').forEach(b=>b.onclick=()=>{state.recentTab=b.dataset.recent;renderDashboard();});
+  document.querySelectorAll('[data-follow]').forEach(b=>b.onclick=()=>followActivity(b.dataset.follow));document.querySelectorAll('[data-module]').forEach(b=>b.onclick=()=>showOperational(b.dataset.module));
+  document.getElementById('global-search-form').onsubmit=e=>{e.preventDefault();navigateTo('pencarian');};
+  document.getElementById('order-channel').onchange=e=>{state.orderChannel=e.target.value;renderOrdersView();};
+  document.getElementById('view-store').onclick=e=>{if(!safeStoreUrl(state.settings.storeUrl)){e.preventDefault();navigateTo('pengaturan');showToast('Isi Alamat Website Pembeli terlebih dahulu.');els.settingsForm.elements.storeUrl.focus();}};
+  document.getElementById('open-menu').onclick=()=>toggleDrawer(true);document.getElementById('close-menu').onclick=()=>toggleDrawer(false);document.getElementById('drawer-backdrop').onclick=()=>toggleDrawer(false);
+  document.getElementById('notifications-toggle').onclick=()=>{const panel=document.getElementById('notification-panel');panel.hidden=!panel.hidden;document.getElementById('notifications-toggle').setAttribute('aria-expanded',String(!panel.hidden));};
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){const wasOpen=document.body.classList.contains('drawer-open');toggleDrawer(false);document.getElementById('notification-panel').hidden=true;document.getElementById('notifications-toggle').setAttribute('aria-expanded','false');if(wasOpen)document.getElementById('open-menu').focus();}});
+}
+
 
 function renderOrderRows(tbody, orders, withAction) {
   tbody.innerHTML = "";
@@ -1038,10 +1029,10 @@ function renderOrderRows(tbody, orders, withAction) {
     const tr = document.createElement("tr");
     tr.className = "is-clickable";
     tr.innerHTML = `
-      <td>${o.invoiceNo}</td>
-      <td>${o.customerName}</td>
-      <td>${formatRupiah(o.total)}</td>
-      <td><span class="tag tag--${o.status}">${STATUS_META[o.status].label}</span></td>
+      <td>${escapeHtml(o.invoiceNo)}</td>
+      <td>${escapeHtml(o.customerName)}</td>
+      <td>${(o.total == null ? "Menunggu konfirmasi" : formatRupiah(o.total))}</td>
+      <td><span class="tag tag--${escapeHtml(o.status)}">${(STATUS_META[o.status]?.label || "Status tidak dikenal")}</span></td>
       ${withAction ? `<td></td>` : ""}
     `;
     tr.addEventListener("click", (e) => {
@@ -1061,16 +1052,16 @@ function renderOrderRows(tbody, orders, withAction) {
       printBtn.addEventListener("click", () => printInvoice(o));
       const delBtn = document.createElement("button");
       delBtn.className = "mini-btn mini-btn--outline";
-      delBtn.textContent = "Hapus";
+      delBtn.textContent = "Nonaktifkan";
       delBtn.addEventListener("click", async () => {
-        if (confirm(`Hapus pesanan ${o.invoiceNo}? Tindakan ini tidak bisa dibatalkan.`)) {
+        if (confirm(`Hapus pesanan ${escapeHtml(o.invoiceNo)}? Tindakan ini tidak bisa dibatalkan.`)) {
           await deleteOrder(o.id);
-          showToast(`${o.invoiceNo} dihapus.`);
+          showToast(`${escapeHtml(o.invoiceNo)} dihapus.`);
         }
       });
       actionTd.appendChild(btn);
       actionTd.appendChild(printBtn);
-      actionTd.appendChild(delBtn);
+      // Pesanan tetap tersimpan untuk audit.
     }
     tbody.appendChild(tr);
   });
@@ -1180,8 +1171,8 @@ function buildInvoiceHtml(o) {
 
     <div class="totals">
       <div class="totals-row"><span>Subtotal</span><span>${formatRupiah(subtotal)}</span></div>
-      <div class="totals-row"><span>Ongkos kirim</span><span>${formatRupiah(o.shippingCost)}</span></div>
-      <div class="totals-row grand"><span>Total</span><span>${formatRupiah(o.total)}</span></div>
+      <div class="totals-row"><span>Ongkos kirim</span><span>${(o.shippingCost == null ? "Menunggu konfirmasi" : formatRupiah(o.shippingCost))}</span></div>
+      <div class="totals-row grand"><span>Total</span><span>${(o.total == null ? "Menunggu konfirmasi" : formatRupiah(o.total))}</span></div>
     </div>
 
     <p class="footer-note">Terima kasih atas pesanan Anda. Nota ini dicetak otomatis oleh sistem admin.</p>
@@ -1217,7 +1208,8 @@ function renderOrdersView() {
   els.orderTabs.innerHTML = "";
   const tabs = [{ key: "semua", label: "Semua" }, ...STATUS_ORDER.map((s) => ({ key: s, label: STATUS_META[s].label }))];
   tabs.forEach((t) => {
-    const count = t.key === "semua" ? state.orders.length : state.orders.filter((o) => o.status === t.key).length;
+    const channelOrders=state.orders.filter(o=>state.orderChannel==='semua'||orderChannel(o)===state.orderChannel);
+    const count=t.key==='semua'?channelOrders.length:channelOrders.filter(o=>o.status===t.key).length;
     const btn = document.createElement("button");
     btn.className = "tab" + (state.orderTab === t.key ? " is-active" : "");
     btn.textContent = `${t.label} (${count})`;
@@ -1226,7 +1218,7 @@ function renderOrdersView() {
   });
 
   const q = state.orderSearch.trim().toLowerCase();
-  let filtered = state.orders;
+  let filtered = state.orders.filter(o=>state.orderChannel==='semua'||orderChannel(o)===state.orderChannel);
   if (state.orderTab !== "semua") filtered = filtered.filter((o) => o.status === state.orderTab);
   if (q) filtered = filtered.filter((o) => (o.invoiceNo || "").toLowerCase().includes(q) || (o.customerName || "").toLowerCase().includes(q));
 
@@ -1300,7 +1292,7 @@ function renderProductsView() {
       delBtn.className = "btn btn--danger";
       delBtn.style.padding = "5px 10px";
       delBtn.style.fontSize = "12px";
-      delBtn.textContent = "Hapus";
+      delBtn.textContent = "Nonaktifkan";
       delBtn.addEventListener("click", async () => {
         if (confirm(`Hapus produk "${p.name}"?`)) {
           await deleteProduct(p.id);
@@ -1324,7 +1316,7 @@ function renderProductsView() {
                 return `
                   <div class="variant-expand-item">
                     <div class="variant-expand-thumb">
-                      ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" alt="" onerror="this.parentElement.innerHTML='${escapeHtml(variantLabel(v)).charAt(0)}'" />` : escapeHtml(variantLabel(v)).charAt(0) || "?"}
+                      ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" alt="" onerror="this.style.display='none'" />` : escapeHtml(variantLabel(v)).charAt(0) || "?"}
                     </div>
                     <div class="variant-expand-info">
                       <strong>${escapeHtml(variantLabel(v))}</strong>
@@ -1395,7 +1387,7 @@ function renderPelangganView() {
       delBtn.className = "btn btn--danger";
       delBtn.style.padding = "5px 10px";
       delBtn.style.fontSize = "12px";
-      delBtn.textContent = "Hapus";
+      delBtn.textContent = "Nonaktifkan";
       delBtn.addEventListener("click", async () => {
         if (confirm(`Yakin ingin menghapus data pelanggan "${c.name}"?`)) {
           await deleteCustomer(c.id);
@@ -1443,7 +1435,7 @@ function openCustomerModal(customer) {
       const rows = orders
         .slice()
         .sort((a, b) => new Date(b.createdAt?.toDate?.() || b.createdAt) - new Date(a.createdAt?.toDate?.() || a.createdAt))
-        .map((o) => `<li><span>${escapeHtml(o.invoiceNo)} — <span class="tag tag--${o.status}">${STATUS_META[o.status].label}</span></span><span>${formatRupiah(o.total)}</span></li>`)
+        .map((o) => `<li><span>${escapeHtml(o.invoiceNo)} — <span class="tag tag--${escapeHtml(o.status)}">${(STATUS_META[o.status]?.label || "Status tidak dikenal")}</span></span><span>${(o.total == null ? "Menunggu konfirmasi" : formatRupiah(o.total))}</span></li>`)
         .join("");
       els.customerOrderHistory.innerHTML = `<h3 style="font-size:12px;color:var(--text-muted);margin:18px 0 8px;">Riwayat pesanan</h3><ul class="od-items">${rows}</ul>`;
     }
@@ -2443,7 +2435,7 @@ function renderEmployeeDecisionForm(employee, decision) {
 // Payroll / Gaji
 // ------------------------------------------------------------
 function renderPayrollView() {
-  let filtered = state.payrolls.slice();
+  let filtered = state.payrolls.map((p) => ({ ...p, status: normalizePayrollStatus(p.status) }));
   if (state.payrollFilterPeriod) filtered = filtered.filter((p) => p.period === state.payrollFilterPeriod);
   if (state.payrollFilterStatus) filtered = filtered.filter((p) => p.status === state.payrollFilterStatus);
   filtered.sort((a, b) => (b.period || "").localeCompare(a.period || "") || (a.employeeName || "").localeCompare(b.employeeName || ""));
@@ -2451,7 +2443,8 @@ function renderPayrollView() {
   const tbody = els.tablePayrolls.querySelector("tbody");
   tbody.innerHTML = "";
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="table-empty">Belum ada data payroll.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="table-empty"><p>${state.payrolls.length ? "Tidak ada payroll sesuai filter." : "Belum ada data payroll."}</p><button type="button" class="btn btn--primary">${state.payrolls.length ? "+ Buat Payroll" : "+ Buat Payroll Pertama"}</button></td></tr>`;
+    tbody.querySelector("button").addEventListener("click", () => openPayrollModal());
     return;
   }
   filtered.forEach((p) => {
@@ -2469,9 +2462,15 @@ function renderPayrollView() {
     const actionTd = tr.querySelector("td:last-child");
     const editBtn = document.createElement("button");
     editBtn.className = "mini-btn";
-    editBtn.textContent = "Detail/Edit";
+    editBtn.textContent = "Edit";
     editBtn.addEventListener("click", () => openPayrollModal(p));
-    actionTd.appendChild(editBtn);
+    actionTd.className = "payroll-actions";
+    if (p.status !== "Dibayar") actionTd.appendChild(editBtn);
+    const detailBtn = document.createElement("button");
+    detailBtn.className = "mini-btn";
+    detailBtn.textContent = p.status === "Dibayar" ? "Lihat" : "Lihat Detail";
+    detailBtn.addEventListener("click", () => openPayrollModal(p, true));
+    actionTd.appendChild(detailBtn);
 
     if (p.status === "Dibayar") {
       const slipBtn = document.createElement("button");
@@ -2551,10 +2550,14 @@ function handlePayrollEmployeeChange() {
 
 function resetPayrollForm() {
   els.payrollForm.reset();
+  els.payrollForm.querySelectorAll("input, select, button").forEach((el) => { el.disabled = false; });
+  els.payrollBaseSalaryDisplay.disabled = true;
+  els.payrollSubmitBtn.hidden = false;
   state.editingPayrollId = null;
   state.payrollDeductionRows = [];
   els.payrollModalTitle.textContent = "Buat payroll";
-  els.payrollSubmitBtn.textContent = "Proses Payroll";
+  els.payrollSubmitBtn.textContent = "Simpan Payroll";
+  els.payrollPeriod.value = getCurrentPeriodValue();
   els.payrollEmployeeSelect.disabled = false;
   populatePayrollEmployeeSelect();
   renderDeductionRows();
@@ -2562,7 +2565,7 @@ function resetPayrollForm() {
 }
 
 /** Buka modal payroll. Tanpa argumen = buat baru. Dengan argumen = edit, form terisi otomatis. */
-function openPayrollModal(payroll) {
+function openPayrollModal(payroll, readOnly = false) {
   resetPayrollForm();
   if (payroll) {
     state.editingPayrollId = payroll.id;
@@ -2579,11 +2582,17 @@ function openPayrollModal(payroll) {
     els.payrollIncentive.value = payroll.incentive || 0;
     state.payrollDeductionRows = (payroll.deductions || []).map((d) => ({ ...d }));
     renderDeductionRows();
-    els.payrollStatus.value = payroll.status || "Draft";
+    els.payrollStatus.value = normalizePayrollStatus(payroll.status);
     els.payrollPaymentDate.value = payroll.paymentDate || "";
     els.payrollPaymentMethod.value = payroll.paymentMethod || "Transfer";
   }
   updatePayrollTotals();
+  if (readOnly) {
+    els.payrollModalTitle.textContent = `Detail payroll — ${payroll.employeeName}`;
+    els.payrollForm.querySelectorAll("input, select, button:not([data-close-modal])").forEach((el) => { el.disabled = true; });
+    els.payrollSubmitBtn.hidden = true;
+  }
+  els.payrollPaymentDate.required = !readOnly && els.payrollStatus.value === "Dibayar";
   els.payrollModal.hidden = false;
 }
 
@@ -2756,17 +2765,21 @@ function buildPayslipHtml(payroll) {
 }
 
 function openSlipModal(payroll) {
+  if (!payroll || normalizePayrollStatus(payroll.status) !== "Dibayar") return;
   const employee = state.employees.find((e) => e.id === payroll.employeeId);
   state.viewingSlipPayroll = payroll;
   state.viewingSlipEmployee = employee || null;
   els.slipSheet.innerHTML = buildPayslipHtml(payroll);
-  els.btnSlipShareEmployee.hidden = !(employee && employee.phone);
+  const hasPhone = !!normalizeWhatsAppNumber(employee?.phone);
+  els.btnSlipShareEmployee.hidden = !hasPhone;
+  els.slipShareHint.textContent = hasPhone ? "WhatsApp membuka pesan siap kirim. Lampirkan PDF/PNG yang telah diunduh." : "Nomor WhatsApp karyawan belum tersedia.";
   els.slipModal.hidden = false;
 }
 
 /** "0812..." atau "+62812..." -> "62812..." untuk link wa.me. Nomor asli di Data Karyawan tidak diubah. */
 function normalizeWhatsAppNumber(phone) {
-  let digits = (phone || "").replace(/\D/g, "");
+  let digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
   if (digits.startsWith("0")) digits = "62" + digits.slice(1);
   else if (!digits.startsWith("62")) digits = "62" + digits;
   return digits;
@@ -2832,39 +2845,12 @@ function generatePayslipPngBlob() {
  * Share slip gaji. Tanpa targetPhone = tombol "Share WhatsApp" generik (native share / wa.me tanpa nomor).
  * Dengan targetPhone = tombol "Kirim ke WhatsApp Karyawan" (buka chat spesifik nomor tsb).
  */
-async function sharePayslip(payroll, employee, targetPhone) {
+function sharePayslip(payroll, employee, targetPhone) {
+  if (!payroll || normalizePayrollStatus(payroll.status) !== "Dibayar") return;
   const message = buildPayslipWhatsAppMessage(payroll, employee);
-
-  if (targetPhone) {
-    const waNumber = normalizeWhatsAppNumber(targetPhone);
-    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`, "_blank");
-    showToast("Chat WhatsApp dibuka — lampirkan slip yang sudah diunduh secara manual di sana (link wa.me tidak bisa melampirkan file otomatis).");
-    return;
-  }
-
-  try {
-    const blob = await generatePayslipPngBlob();
-    if (blob) {
-      const file = new File([blob], `${payslipFileNameBase(payroll)}.png`, { type: "image/png" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], text: message, title: "Slip Gaji" });
-        return;
-      }
-    }
-  } catch (err) {
-    console.warn("Native share dengan file gagal/dibatalkan, coba fallback.", err);
-  }
-
-  if (navigator.share) {
-    try {
-      await navigator.share({ text: message, title: "Slip Gaji" });
-      return;
-    } catch (err) {
-      return; // dibatalkan pengguna — tidak perlu fallback lagi
-    }
-  }
-
-  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+  const number = targetPhone ? normalizeWhatsAppNumber(targetPhone) : "";
+  window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  showToast("WhatsApp dibuka. Lampirkan PDF/PNG yang telah diunduh sebelum mengirim.");
 }
 
 // ------------------------------------------------------------
@@ -3016,6 +3002,7 @@ const payrollFinanceSyncInFlight = new Set();
 
 /** Setiap payroll berstatus Dibayar dipastikan punya 1 transaksi pengeluaran di Keuangan (dicek via payrollId, anti-duplikat). */
 async function syncFinanceFromPayrolls() {
+  if (state.mode !== "demo") return;
   for (const p of state.payrolls) {
     if (p.status !== "Dibayar") continue;
     const alreadyExists = state.transactions.some((t) => t.payrollId === p.id);
@@ -3045,6 +3032,7 @@ function applySettingsToForm() {
   f["address"].value = s.address || "";
   f["phone"].value = s.phone || "";
   f["logoUrl"].value = s.logoUrl || "";
+  f["storeUrl"].value = s.storeUrl || "";
 }
 
 // ------------------------------------------------------------
@@ -3117,30 +3105,10 @@ function groupImportRows(rows) {
 
 /** Simpan produk hasil import. Firebase: writeBatch berkelompok (maks. 400/batch, aman di bawah limit 500 Firestore). */
 async function saveImportedProducts(products, onProgress) {
-  if (state.mode === "firebase") {
-    const { writeBatch, collection, doc, serverTimestamp } = fb;
-    const chunkSize = 400;
-    let done = 0;
-    for (let i = 0; i < products.length; i += chunkSize) {
-      const chunk = products.slice(i, i + chunkSize);
-      const batch = writeBatch(fb.db);
-      chunk.forEach((p) => {
-        const ref = doc(collection(fb.db, "products"));
-        batch.set(ref, { ...p, createdAt: serverTimestamp() });
-      });
-      await batch.commit();
-      done += chunk.length;
-      onProgress({ done, total: products.length });
-    }
-  } else {
-    products.forEach((p, i) => {
-      state.products.unshift({ ...p, id: `demo-product-import-${Date.now()}-${i}`, createdAt: new Date().toISOString() });
-    });
-    saveDemoData();
-    renderAll();
-    onProgress({ done: products.length, total: products.length });
-  }
+  let done = 0;
+  for (const product of products) { await addProduct(product); done++; onProgress({done,total:products.length}); }
 }
+
 
 function openImportModal() {
   els.importLog.innerHTML = "";
@@ -3230,7 +3198,7 @@ async function handleImportExcel(file) {
 // Buat pesanan manual
 // ------------------------------------------------------------
 function addOrderItemRow() {
-  state.orderItemRows.push({ productId: "", productName: "", variantIndex: "", variantName: "", variantSku: "", price: 0, qty: 1 });
+  state.orderItemRows.push({ productId: "", productName: "", variantId: "", variantName: "", variantSku: "", price: 0, qty: 1 });
   renderOrderItemRowsTable();
 }
 
@@ -3251,7 +3219,7 @@ function renderOrderItemRowsTable() {
 
     const productOptions = state.products.map((p) => `<option value="${p.id}" ${row.productId === p.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
     const variantOptions = selectedProduct
-      ? (selectedProduct.variants || []).map((v, vi) => `<option value="${vi}" ${Number(row.variantIndex) === vi ? "selected" : ""}>${escapeHtml(variantLabel(v))} (stok ${v.stock ?? 0})</option>`).join("")
+      ? (selectedProduct.variants || []).filter(v => v.id).map((v) => `<option value="${escapeHtml(v.id)}" ${row.variantId === v.id ? "selected" : ""}>${escapeHtml(variantLabel(v))} (stok ${v.stock ?? 0})</option>`).join("")
       : "";
 
     tr.innerHTML = `
@@ -3277,7 +3245,7 @@ function renderOrderItemRowsTable() {
       const product = state.products.find((p) => p.id === e.target.value);
       row.productId = e.target.value;
       row.productName = product ? product.name : "";
-      row.variantIndex = "";
+      row.variantId = "";
       row.variantName = "";
       row.variantSku = "";
       row.price = 0;
@@ -3288,8 +3256,8 @@ function renderOrderItemRowsTable() {
 
     tr.querySelector('[data-field="variant"]').addEventListener("change", (e) => {
       const product = state.products.find((p) => p.id === row.productId);
-      const variant = product?.variants?.[Number(e.target.value)];
-      row.variantIndex = e.target.value;
+      const variant = product?.variants?.find(v => v.id === e.target.value);
+      row.variantId = e.target.value;
       row.variantName = variant ? variantLabel(variant) : "";
       row.variantSku = variant ? variant.sku : "";
       row.price = variant ? Number(variant.priceOffline ?? variant.priceOnline ?? variant.price ?? product.priceOffline ?? product.price ?? 0) : 0;
@@ -3318,6 +3286,7 @@ function updateCreateOrderTotals() {
 
 function resetCreateOrderForm() {
   els.createOrderForm.reset();
+  state.manualOrderKey = null;
   state.orderItemRows = [];
   renderOrderItemRowsTable();
   updateCreateOrderTotals();
@@ -3389,6 +3358,7 @@ function applyCalcPreset(multiplier) {
 // Order detail modal
 // ------------------------------------------------------------
 function openOrderModal(orderId) {
+  if (state.orders.find(o=>o.id===orderId)?.schemaVersion === 2) { showOperational('orders/'+encodeURIComponent(orderId)); return; }
   state.openOrderId = orderId;
   renderOrderModalBody(orderId);
   els.orderModal.hidden = false;
@@ -3420,14 +3390,14 @@ function closeModals() {
 function renderOrderModalBody(orderId) {
   const o = state.orders.find((x) => x.id === orderId);
   if (!o) return;
-  const itemsHtml = o.items.map((it) => `<li><span>${it.productName} — ${it.variant} × ${it.qty}</span><span>${formatRupiah(it.price * it.qty)}</span></li>`).join("");
+  const itemsHtml = o.items.map((it) => `<li><span>${escapeHtml(it.productName)} — ${escapeHtml(it.variant)} × ${it.qty}</span><span>${formatRupiah(it.price * it.qty)}</span></li>`).join("");
 
   let actionHtml = "";
   if (o.status === "perlu_verifikasi") {
     actionHtml = `
       <div class="od-action-block">
         <h3>Verifikasi pembayaran</h3>
-        <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;">Cocokkan nominal transfer (${formatRupiah(o.total)}) dan nama pengirim dengan mutasi rekening toko sebelum menyetujui.</p>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;">Cocokkan nominal transfer (${(o.total == null ? "Menunggu konfirmasi" : formatRupiah(o.total))}) dan nama pengirim dengan mutasi rekening toko sebelum menyetujui.</p>
         <div class="od-action-row">
           <button class="btn btn--primary" data-act="verify-ok">Verifikasi valid</button>
           <button class="btn btn--ghost" data-act="verify-reject">Tolak, minta ulang</button>
@@ -3478,27 +3448,27 @@ function renderOrderModalBody(orderId) {
     ? `<div class="od-block" style="margin-bottom:16px;"><h3>Metode pengiriman</h3><p>${escapeHtml(o.courier)}${o.trackingNumber ? " — " + escapeHtml(o.trackingNumber) : o.courier === "Diambil di Tempat" ? " (tanpa resi)" : ""}</p></div>`
     : "";
 
-  const historyHtml = (o.statusHistory || []).map((h) => `<li>${STATUS_META[h.status]?.label || h.status} — ${formatDate(h.at)}</li>`).join("");
+  const historyHtml = (o.statusHistory || []).map((h) => `<li>${escapeHtml(STATUS_META[h.status]?.label || h.status)} — ${formatDate(h.at)}</li>`).join("");
 
   els.orderModalBody.innerHTML = `
     <div class="od-head">
       <div>
-        <h2>${o.invoiceNo}</h2>
-        <span class="tag tag--${o.status}">${STATUS_META[o.status].label}</span>
+        <h2>${escapeHtml(o.invoiceNo)}</h2>
+        <span class="tag tag--${escapeHtml(o.status)}">${(STATUS_META[o.status]?.label || "Status tidak dikenal")}</span>
       </div>
     </div>
     <div class="od-cols">
       <div class="od-block">
         <h3>Pelanggan</h3>
-        <p><strong>${o.customerName}</strong></p>
-        <p>${o.phone}</p>
-        <p>${o.address}</p>
+        <p><strong>${escapeHtml(o.customerName)}</strong></p>
+        <p>${escapeHtml(o.phone)}</p>
+        <p>${escapeHtml(o.address)}</p>
       </div>
       <div class="od-block">
         <h3>Item pesanan</h3>
         <ul class="od-items">${itemsHtml}</ul>
-        <div class="od-total-row"><span>Ongkir</span><span>${formatRupiah(o.shippingCost)}</span></div>
-        <div class="od-total-row"><span>Total</span><span>${formatRupiah(o.total)}</span></div>
+        <div class="od-total-row"><span>Ongkir</span><span>${(o.shippingCost == null ? "Menunggu konfirmasi" : formatRupiah(o.shippingCost))}</span></div>
+        <div class="od-total-row"><span>Total</span><span>${(o.total == null ? "Menunggu konfirmasi" : formatRupiah(o.total))}</span></div>
       </div>
     </div>
     ${shippingInfoHtml}
@@ -3694,6 +3664,7 @@ function openProductModal(product) {
   resetProductForm();
   if (product) {
     state.editingProductId = product.id;
+    state.editingProductRevision = product.revision || 0;
     els.productModalTitle.textContent = `Edit produk — ${product.name}`;
     els.productSubmitBtn.textContent = "Simpan perubahan";
 
@@ -3724,7 +3695,7 @@ function slug(str) {
 
 /** Tambah satu baris varian kosong (atau terisi, jika dipanggil dengan data awal). */
 function addVariantRow(initial) {
-  state.variantRows.push({ image: "", color: "", size: "", hpp: null, priceOffline: null, priceOnline: null, stock: 0, sku: "", ...initial });
+  state.variantRows.push({ id: crypto.randomUUID(), image: "", color: "", size: "", hpp: null, priceOffline: null, priceOnline: null, stock: 0, sku: "", ...initial });
   renderVariantRowsTable();
 }
 
@@ -3888,6 +3859,11 @@ function updatePreview() {
 // 4. NAVIGATION & EVENTS
 // ============================================================
 function navigateTo(view) {
+  const module={reseller:'resellers',pengiriman:'couriers',jadwal:'slots',retur:'claims'}[view];
+  if(module){showOperational(module);return;}
+  const destination=document.getElementById('view-'+view);if(!destination)return;
+  document.getElementById('operational-frame').src='about:blank';toggleDrawer(false);
+  document.getElementById('breadcrumb-title').textContent=view==='dashboard'?'Ringkasan toko':destination.querySelector('h1')?.textContent||'Admin';
   state.view = view;
   document.querySelectorAll(".view").forEach((v) => (v.hidden = true));
   document.getElementById("view-" + view).hidden = false;
@@ -3898,6 +3874,7 @@ function navigateTo(view) {
 }
 
 function bindEvents() {
+  bindAdminDashboard();
   els.loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     showLoginError("");
@@ -3931,24 +3908,6 @@ function bindEvents() {
     btn.addEventListener("click", () => navigateTo(btn.dataset.goto));
   });
 
-  // ---- Filter periode dashboard ----
-  els.periodFilter.querySelectorAll(".tab[data-period]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const period = btn.dataset.period;
-      state.dashPeriod = period;
-      els.periodFilter.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-active", t.dataset.period === period));
-      if (period === "custom") {
-        els.dashCustomDate.hidden = false;
-        if (!state.dashCustomDate) {
-          state.dashCustomDate = toDateInputValue(new Date());
-          els.dashCustomDate.value = state.dashCustomDate;
-        }
-      } else {
-        els.dashCustomDate.hidden = true;
-      }
-      renderDashboard();
-    });
-  });
   els.dashCustomDate.addEventListener("change", (e) => {
     state.dashCustomDate = e.target.value;
     renderDashboard();
@@ -3965,8 +3924,8 @@ function bindEvents() {
     const f = new FormData(els.createOrderForm);
 
     const items = state.orderItemRows
-      .filter((r) => r.productId && r.variantIndex !== "")
-      .map((r) => ({ productName: r.productName, variant: r.variantName, qty: r.qty, price: r.price }));
+      .filter((r) => r.productId && r.variantId)
+      .map((r) => ({ productId:r.productId, variantId:r.variantId, productName: r.productName, variant: r.variantName, qty: r.qty, price: r.price }));
 
     if (items.length === 0) {
       showToast("Tambahkan minimal 1 item dengan produk & varian yang valid.");
@@ -4060,6 +4019,7 @@ function bindEvents() {
     const variants = state.variantRows
       .filter((r) => r.color.trim() !== "" || r.size.trim() !== "")
       .map((r) => ({
+        id: r.id || crypto.randomUUID(),
         image: r.image.trim(),
         color: r.color.trim(),
         size: r.size.trim(),
@@ -4314,6 +4274,7 @@ function bindEvents() {
   els.btnAddPayroll.addEventListener("click", () => openPayrollModal());
   els.btnMassPayroll.addEventListener("click", () => openMassPayrollModal());
 
+  els.payrollStatus.addEventListener("change", () => { els.payrollPaymentDate.required = els.payrollStatus.value === "Dibayar"; });
   els.payrollEmployeeSelect.addEventListener("change", handlePayrollEmployeeChange);
   els.payrollAllowance.addEventListener("input", updatePayrollTotals);
   els.payrollBonus.addEventListener("input", updatePayrollTotals);
@@ -4357,6 +4318,12 @@ function bindEvents() {
       paymentMethod: els.payrollPaymentMethod.value,
     };
 
+    els.payrollSubmitBtn.disabled = true;
+    try {
+    state.payrollFilterPeriod = "";
+    state.payrollFilterStatus = "";
+    els.payrollFilterPeriod.value = "";
+    els.payrollFilterStatus.value = "";
     if (state.editingPayrollId) {
       await updatePayroll(state.editingPayrollId, payroll);
       closeModals();
@@ -4367,6 +4334,12 @@ function bindEvents() {
       closeModals();
       navigateTo("karyawan");
       showToast(`Payroll ${employee.name} untuk ${formatPeriodLabel(period)} tersimpan.`);
+    }
+    } catch (err) {
+      console.error("Gagal menyimpan payroll", err);
+      showToast("Payroll gagal disimpan. Periksa koneksi dan izin akses, lalu coba lagi.");
+    } finally {
+      els.payrollSubmitBtn.disabled = false;
     }
   });
 
@@ -4439,14 +4412,17 @@ function bindEvents() {
   els.settingsForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = new FormData(els.settingsForm);
-    await saveSettings({
+    const button=e.submitter;button.disabled=true;
+    try { await saveSettings({
       storeName: f.get("storeName").trim(),
       tagline: f.get("tagline").trim(),
       address: f.get("address").trim(),
       phone: f.get("phone").trim(),
       logoUrl: f.get("logoUrl").trim(),
+      storeUrl: f.get("storeUrl").trim(),
     });
     showToast("Pengaturan toko disimpan.");
+    }catch(error){showToast(error.message||'Pengaturan gagal disimpan.');}finally{button.disabled=false;}
   });
 }
 
@@ -4636,6 +4612,7 @@ function cacheEls() {
 
   els.slipModal = document.getElementById("slip-modal");
   els.slipSheet = document.getElementById("slip-sheet");
+  els.slipShareHint = document.getElementById("slip-share-hint");
   els.btnSlipPdf = document.getElementById("btn-slip-pdf");
   els.btnSlipPng = document.getElementById("btn-slip-png");
   els.btnSlipShare = document.getElementById("btn-slip-share");
@@ -4696,3 +4673,5 @@ async function init() {
 }
 
 init();
+
+window.addEventListener('unhandledrejection', event => { showToast(event.reason?.message || 'Penyimpanan gagal. Periksa koneksi lalu coba lagi.'); });
