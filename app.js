@@ -3799,6 +3799,7 @@ function renderVariantRowsTable() {
           </label>
         </div>
         <div class="variant-card-fields">
+          <label class="field"><span>URL foto varian (HTTPS, opsional)</span><input type="url" data-variant-url value="${escapeHtml(row.image || '')}" placeholder="https://..." /></label>
           <label class="field"><span>Warna / Nama Varian</span><input type="text" data-field="color" value="${escapeHtml(row.color)}" placeholder="mis. Hitam" /></label>
           <label class="field"><span>Ukuran</span><input type="text" data-field="size" value="${escapeHtml(row.size)}" placeholder="mis. M" /></label>
           <label class="field"><span>SKU Varian</span><input type="text" data-field="sku" value="${escapeHtml(row.sku)}" placeholder="SKU" /></label>
@@ -3825,6 +3826,13 @@ function renderVariantRowsTable() {
       }
     };
     syncPreview();
+
+    card.querySelector('[data-variant-url]').addEventListener('input',e=>{
+      const value=e.target.value.trim();let url='';
+      try{if(value){const parsed=new URL(value);if(parsed.protocol!=='https:'||parsed.username||parsed.password)throw Error();url=parsed.href;}e.target.setCustomValidity('');}
+      catch{e.target.setCustomValidity('Gunakan URL foto publik HTTPS tanpa kredensial.');return;}
+      row.image=url;syncPreview();updatePreview();
+    });
 
     card.querySelector('input[type="file"]').addEventListener("change", async (e) => {
       const file = e.target.files[0];
