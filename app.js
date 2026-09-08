@@ -530,15 +530,16 @@ async function updateOrder(orderId, patch, historyLabel) {
   if (order?.schemaVersion === 2) {
     window.location.href = 'admin-website.html#orders/' + encodeURIComponent(orderId); return;
   }
-  await shopApi('orderAction', { orderId, operation: 'legacy', ...patch });
+  const { doc, updateDoc } = fb;
+  const history = [...(order?.statusHistory || []), { status: historyLabel || patch.status, at: new Date().toISOString() }];
+  await updateDoc(doc(fb.db, "orders", orderId), { ...patch, statusHistory: history });
 }
 
 
 /** Buat pesanan baru secara manual (dipakai form "Buat pesanan"). */
 async function addOrder(order) {
-  state.manualOrderKey ||= crypto.randomUUID();
-  const result = await shopApi('legacyManualOrder', { ...order, key: state.manualOrderKey });
-  order.invoiceNo = result.invoiceNo; state.manualOrderKey = null;
+  const { addDoc, collection, serverTimestamp } = fb;
+  await addDoc(collection(fb.db, "orders"), { ...order, createdAt: serverTimestamp() });
 }
 
 
@@ -559,18 +560,22 @@ function generateInvoiceNo() {
 }
 
 /** Tambah produk baru. */
-async function addProduct(product) { return shopApi('saveProduct', {product}); }
+async function addProduct(product) {
+  const { addDoc, collection, serverTimestamp } = fb;
+  await addDoc(collection(fb.db, "products"), { ...product, createdAt: serverTimestamp() });
+}
 
 
 async function deleteProduct(productId) {
-  const product = state.products.find(p => p.id === productId);
-  await shopApi('saveProduct', {productId, expectedRevision: product.revision || 0, product: {...product, status:'nonaktif'}});
+  const { doc, updateDoc } = fb;
+  await updateDoc(doc(fb.db, "products", productId), { status: 'nonaktif' });
 }
 
 
 /** Update produk yang sudah ada (dipakai oleh form Edit). */
 async function updateProduct(productId, patch) {
-  return shopApi('saveProduct', {productId, expectedRevision: state.editingProductRevision || 0, product: patch});
+  const { doc, updateDoc } = fb;
+  await updateDoc(doc(fb.db, "products", productId), patch);
 }
 
 
@@ -3969,6 +3974,7 @@ function bindEvents() {
 
   els.createOrderForm.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (state.creatingOrder) return; // cegah submit ganda (dobel klik) — pengganti idempotency-key server yang sudah dihapus
     const f = new FormData(els.createOrderForm);
 
     const items = state.orderItemRows
@@ -3998,10 +4004,18 @@ function bindEvents() {
       statusHistory: [{ status, at: new Date().toISOString() }],
     };
 
-    await addOrder(order);
-    closeModals();
-    navigateTo("pesanan");
-    showToast(`Pesanan ${order.invoiceNo} tersimpan.`);
+    const submitBtn = els.createOrderForm.querySelector('button[type="submit"]');
+    state.creatingOrder = true;
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      await addOrder(order);
+      closeModals();
+      navigateTo("pesanan");
+      showToast(`Pesanan ${order.invoiceNo} tersimpan.`);
+    } finally {
+      state.creatingOrder = false;
+      if (submitBtn) submitBtn.disabled = false;
+    }
   });
   els.productSearch.addEventListener("input", (e) => { state.productSearch = e.target.value; renderProductsView(); });
 
