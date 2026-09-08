@@ -1,4 +1,4 @@
-import {sha256} from './sha256.js';
+import {sha256} from './sha256.js?v=manual-20260908-2';
 const randomUUID=()=>crypto.randomUUID();
 export class Fault extends Error { constructor(message, code='failed-precondition') {super(message);this.code=code;} }
 export function check(ok, message, code) {if(!ok) throw new Fault(message,code);}
@@ -19,6 +19,7 @@ export const DEFAULTS = {
   vouchers:[], slots:[], routeProvider:'manual', gatewayProvider:'midtrans'
 };
 export function config(raw={}) {
+  raw=raw??{};
   return {...DEFAULTS,...raw,routeProvider:'manual',warehouse:{...DEFAULTS.warehouse,...raw.warehouse},shipping:{...DEFAULTS.shipping,...raw.shipping},freeShipping:{...DEFAULTS.freeShipping,...raw.freeShipping,minPcs:20,maxKm:25},storeDelivery:{...DEFAULTS.storeDelivery,...raw.storeDelivery},payments:{...DEFAULTS.payments,...raw.payments,gateway:false}};
 }
 export function validateConfig(raw) {
