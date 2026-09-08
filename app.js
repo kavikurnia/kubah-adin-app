@@ -1,158 +1,5 @@
 // BEGIN BUNDLED ADMIN CLIENT
 const {connect:connectShop,api:shopApi,ensureAdminAccess,withDeadline}=(()=>{
-const {freeAccess,freeApi,FREE_NOTICE}=(()=>{
-// Validasi produk dipertahankan dari domain backend; tanpa kredensial atau Node API.
-const randomUUID=()=>crypto.randomUUID();
-function safeURL(v){try{const u=new URL(v);return u.protocol==='https:'?u.href:'';}catch{return '';}}
-class Fault extends Error { constructor(message, code='failed-precondition') {super(message);this.code=code;} }
-function check(ok, message, code) {if(!ok) throw new Fault(message,code);}
-function str(v, max=500, required=false) {check(typeof v==='string' && v.length<=max && (!required || v.trim()),'Teks tidak valid.','invalid-argument');return v.trim();}
-function num(v,min=0,max=1000000000) {check(Number.isSafeInteger(v)&&v>=min&&v<=max,'Angka tidak valid.','invalid-argument');return v;}
-function id(v) {check(typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v),'ID tidak valid.','invalid-argument');return v;}
-function normalizeProduct(raw, old={}) {
-  check(Array.isArray(raw.variants)&&raw.variants.length>0&&raw.variants.length<=100,'Isi 1–100 varian.');
-  const p={...old,...raw,name:str(raw.name,250,true),category:str(raw.category||'',100),description:str(raw.description||'',10000)};
-  check(['aktif','nonaktif','draft'].includes(p.status),'Status produk tidak valid.');
-  const previous=new Map((old.variants||[]).map(v=>[v.id,v]));
-  p.variants=raw.variants.map(v=>{
-    const prev=previous.get(v.id)||{};
-    const out={...prev,...v,id:v.id?id(v.id):randomUUID(),stock:num(v.stock),reserved:prev.reserved||0};
-    for(const k of ['hpp','priceOffline','priceOnline']) if(out[k]!=null) num(out[k]);
-    for(const k of ['color','size','sku']) out[k]=str(out[k]||'',100);
-    out.image=safeURL(out.image);return out;
-  });
-  check(new Set(p.variants.map(v=>v.id)).size===p.variants.length,'ID varian duplikat.');
-  for(const v of old.variants||[])check(!v.reserved||p.variants.some(x=>x.id===v.id),'Varian masih dicadangkan oleh pesanan.');
-  p.website=validatePricing({...old.website,...raw.website});
-  p.weight=num(p.weight||0,0,1000000);p.sku=str(p.sku||'',100);
-  p.images=(raw.images||old.images||[]).slice(0,9).map((i,order)=>({url:safeURL(i.url),order,isPrimary:i.isPrimary===true})).filter(i=>i.url);
-  p.photoUrl=safeURL(raw.photoUrl||old.photoUrl);p.totalStock=p.variants.reduce((s,v)=>s+v.stock,0);p.revision=(old.revision||0)+1;
-  delete p.id;delete p.expectedRevision;return p;
-}
-function validatePricing(raw={}) {
-  const w={enabled:false,retail:0,packPcs:1,promo:false,combine:'product',group:'',tiers:[],reseller:{price:0,minPcs:20},...raw};
-  num(w.retail);num(w.packPcs,1,10000);check(['all','product','variant'].includes(w.combine),'Gabungan grosir tidak valid.');
-  str(w.group,80);check(Array.isArray(w.tiers)&&w.tiers.length<=10,'Tingkat grosir tidak valid.');
-  w.tiers=w.tiers.map(t=>({minPcs:num(t.minPcs,1,1000000),price:num(t.price,1)})).sort((a,b)=>a.minPcs-b.minPcs);
-  w.reseller={price:num(w.reseller?.price||0),minPcs:num(w.reseller?.minPcs||20,1,1000000)};
-  if(w.enabled)check(w.retail>0,'Harga website harus diatur secara eksplisit.');return w;
-}
-// Explicit allowlist: never spread an internal product/variant into a public document.
-function publicProduct(p,productId) {
-  const w=validatePricing(p.website);if(p.status!=='aktif'||!w.enabled)return null;
-  return {id:productId,name:p.name,category:p.category||'',description:p.description||'',specifications:String(p.specifications||''),sku:p.sku||'',weight:p.weight||0,
-    images:(p.images?.length?p.images:[{url:p.photoUrl}]).filter(i=>safeURL(i.url)).map(i=>({url:safeURL(i.url),isPrimary:!!i.isPrimary})),
-    price:w.retail,packPcs:w.packPcs,promo:!!w.promo,tiers:w.tiers,combine:w.combine,
-    variants:p.variants.map(v=>({id:v.id,color:v.color||v.name||'',size:v.size||'',sku:v.sku||'',image:safeURL(v.image),stock:v.stock}))};
-}
-
-
-const FREE_NOTICE='Versi gratis: administrasi dan pesanan manual. Checkout pelanggan, pembayaran otomatis, unggah berkas, dan layanan kurir otomatis belum tersedia.';
-const denied=message=>Object.assign(new Error(message),{code:'free/permission-denied'});
-function resolveFreeAccess(token,record){
-  const permitted=record===null?token.claims?.role==='admin':record.active===true&&record.role==='admin';
-  if(!permitted)throw denied('Akun belum mendapat izin admin atau izinnya dicabut. Pemilik perlu mengisi adminUsers/UID di Firestore.');
-  // Metadata tampilan berasal dari dokumen yang hanya bisa diubah pemilik melalui Console.
-  // Ini tidak membuat atau mengubah custom claim Firebase Authentication.
-  return {claims:{role:'admin',superAdmin:record===null?token.claims?.superAdmin===true:record.superAdmin===true},accessSource:record===null?'custom-claim':'firestore-owner-list'};
-}
-async function freeAccess(c,user){
-  const token=await user.getIdTokenResult(true);
-  const record=await c.fs.getDocFromServer(c.fs.doc(c.db,'adminUsers',user.uid));
-  if(c.a.currentUser?.uid!==user.uid)throw denied('Sesi berubah. Masuk kembali.');
-  return resolveFreeAccess(token,record.exists()?record.data():null);
-}
-function freePublicProduct(p,pid){
-  if(p.status!=='aktif'||p.freePublished!==true)return null;
-  return {id:pid,name:p.name,category:p.category||'',description:p.description||'',
-    images:(p.images||[]).map(i=>({url:i.url,isPrimary:i.isPrimary===true})),
-    variants:p.variants.map(v=>({id:v.id,color:v.color,size:v.size,stock:v.stock,price:num(v.priceOffline??p.priceOffline??0)}))};
-}
-function freeStore(c){
-  const ref=path=>c.fs.doc(c.db,path);
-  return {run:fn=>c.fs.runTransaction(c.db,async native=>fn({
-    get:async path=>{const s=await native.get(ref(path));return s.exists()?s.data():null;},
-    set:(path,data)=>native.set(ref(path),data),update:(path,data)=>native.update(ref(path),data),delete:path=>native.delete(ref(path))
-  }))};
-}
-function freeService(store,uid){
-  const stamp=()=>new Date().toISOString();
-  const publish=(tx,pid,p)=>{tx.set('products/'+pid,p);const pub=freePublicProduct(p,pid);if(pub)tx.set('freeCatalog/'+pid,pub);else tx.delete('freeCatalog/'+pid);};
-  const writeStock=(tx,products)=>{for(const [pid,p] of products){p.totalStock=p.variants.reduce((n,v)=>n+v.stock,0);p.revision=(p.revision||0)+1;publish(tx,pid,p);}};
-  async function productsFor(tx,items){const products=new Map();for(const pid of new Set(items.map(i=>i.productId))){const p=await tx.get('products/'+id(pid));check(p,'Produk tidak ditemukan.');products.set(pid,p);}return products;}
-  async function saveProduct(d){
-    const pid=d.productId?id(d.productId):crypto.randomUUID();
-    return store.run(async tx=>{
-      const old=await tx.get('products/'+pid);
-      check(!d.productId||old,'Produk tidak ditemukan.');
-      check(!old||(old.revision||0)===d.expectedRevision,'Produk atau stok berubah. Tutup formulir dan buka lagi sebelum menyimpan.');
-      const p=normalizeProduct(d.product,old||{});p.createdAt=old?.createdAt||stamp();p.updatedAt=stamp();
-      p.freePublished=d.product.freePublished===undefined?old?.freePublished===true:d.product.freePublished===true;
-      publish(tx,pid,p);return {id:pid};
-    });
-  }
-  async function manualOrder(d){
-    const combined=new Map();check(Array.isArray(d.items)&&d.items.length>0&&d.items.length<=60,'Isi barang pesanan.');
-    for(const i of d.items){const key=id(i.productId)+'/'+id(i.variantId);const prev=combined.get(key);combined.set(key,{productId:i.productId,variantId:i.variantId,qty:num((prev?.qty||0)+num(i.qty,1,10000),1,10000)});}
-    const items=[...combined.values()].sort((a,b)=>(a.productId+'/'+a.variantId).localeCompare(b.productId+'/'+b.variantId));
-    check(new Set(items.map(i=>i.productId)).size<=10,'Versi gratis mendukung maksimal 10 produk berbeda per pesanan manual.');
-    const input={items,customerName:str(d.customerName,150,true),phone:str(d.phone||'',30),address:str(d.address||'',1000),shippingCost:num(d.shippingCost||0)};
-    const fingerprint=JSON.stringify(input),key=id(d.key);
-    const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([uid,key])));
-    const oid='GR-'+Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('').slice(0,32);
-    return store.run(async tx=>{
-      const prior=await tx.get('orders/'+oid);
-      if(prior){check(prior.requestHash===fingerprint,'Permintaan sebelumnya berbeda. Buat pesanan baru.');return {id:oid,invoiceNo:prior.invoiceNo};}
-      const products=await productsFor(tx,items);
-      const lines=items.map(i=>{const p=products.get(i.productId),v=p.variants.find(v=>v.id===i.variantId);check(p.status==='aktif'&&v&&v.stock>=i.qty,'Stok atau varian tidak tersedia.');const price=num(v.priceOffline??p.priceOffline??0,1);return {...i,productName:p.name,variant:[v.color,v.size].filter(Boolean).join(' / '),price,lineTotal:price*i.qty};});
-      const subtotal=num(lines.reduce((n,i)=>n+i.lineTotal,0)),total=num(subtotal+input.shippingCost,1);
-      for(const i of lines){const v=products.get(i.productId).variants.find(v=>v.id===i.variantId);v.stock-=i.qty;v.reserved=(v.reserved||0)+i.qty;}
-      const createdAt=stamp(),o={...input,items:lines,invoiceNo:oid,requestHash:fingerprint,freeAdmin:true,schemaVersion:1,source:'admin',createdBy:uid,createdAt,subtotal,total,
-        status:'menunggu_pembayaran',paymentStatus:'belum_dibayar',paidAmount:0,reservationState:'reserved',courier:'',trackingNumber:'',
-        statusHistory:[{status:'menunggu_pembayaran',at:createdAt,by:uid,note:'Pesanan manual; stok dicadangkan. Konfirmasi dana oleh petugas, pembatalan manual.'}]};
-      writeStock(tx,products);tx.set('orders/'+oid,o);return {id:oid,invoiceNo:oid};
-    });
-  }
-  async function orderAction(d){
-    const oid=id(d.orderId);
-    return store.run(async tx=>{
-      const o=await tx.get('orders/'+oid);check(o?.freeAdmin===true,'Pesanan lama dipertahankan untuk dibaca. Perubahan alur pesanan lama memerlukan backend lengkap.');
-      if(o.status===d.status)return {id:oid};
-      const allowed={menunggu_pembayaran:['diproses','dibatalkan'],diproses:['dikirim','selesai'],dikirim:['selesai']};
-      check(allowed[o.status]?.includes(d.status),'Perubahan status tidak diizinkan. Pesanan lunas tidak dibatalkan melalui versi percobaan; lakukan rekonsiliasi refund.');
-      const products=['dibatalkan','dikirim','selesai'].includes(d.status)&&o.reservationState==='reserved'?await productsFor(tx,o.items):new Map();
-      const ledgerPath='transactions/free_income_'+oid,existingIncome=d.status==='diproses'?await tx.get(ledgerPath):null;
-      const patch={status:d.status,statusHistory:[...o.statusHistory,{status:d.status,at:stamp(),by:uid,note:''}]};
-      if(d.status==='diproses'){
-        const reference=str(d.reference,200,true);check(num(d.amount,1)===o.total,'Nominal harus sama dengan total pesanan.');
-        patch.paymentStatus='lunas';patch.paidAmount=o.total;patch.statusHistory.at(-1).note='Petugas mengonfirmasi dana: '+reference;
-        if(!existingIncome)tx.set(ledgerPath,{type:'masuk',amount:o.total,date:stamp().slice(0,10),createdAt:stamp(),category:'Penjualan',description:'Pembayaran manual '+o.invoiceNo,orderId:o.invoiceNo,verifiedBy:uid,reference,managed:true,freeAdmin:true});
-      }
-      if(d.status==='dikirim'||d.status==='selesai'){
-        check(o.paidAmount===o.total,'Konfirmasi dana sebelum pengiriman.');
-        if(o.status==='diproses'){patch.courier=str(d.courier,100,true);patch.trackingNumber=str(d.trackingNumber||'',200);check(patch.courier==='Kurir Toko'||patch.courier==='Diambil di Tempat'||patch.trackingNumber,'Isi nomor resi.');if(d.status==='selesai')check(patch.courier==='Diambil di Tempat','Tandai dikirim dahulu.');}
-      }
-      if(products.size){for(const i of o.items){const v=products.get(i.productId).variants.find(v=>v.id===i.variantId);check(v&&(v.reserved||0)>=i.qty,'Reservasi stok perlu diperiksa.');v.reserved-=i.qty;if(d.status==='dibatalkan')v.stock+=i.qty;}writeStock(tx,products);patch.reservationState=d.status==='dibatalkan'?'released':'consumed';}
-      if(d.status==='dibatalkan')patch.paymentStatus='dibatalkan';
-      tx.update('orders/'+oid,patch);return {id:oid};
-    });
-  }
-  return {saveProduct,manualOrder,orderAction};
-}
-async function freeApi(c,action,data){
-  const user=c.a.currentUser;if(!user)throw denied('Masuk dengan akun admin terlebih dahulu.');
-  await freeAccess(c,user);
-  const service=freeService(freeStore(c),user.uid);
-  try{
-    if(action==='saveProduct')return await service.saveProduct(data);
-    if(action==='legacyManualOrder')return await service.manualOrder(data);
-    if(action==='orderAction')return await service.orderAction(data);
-    throw Object.assign(new Error(FREE_NOTICE),{code:'free/unavailable'});
-  }catch(error){if(error.code&&!error.code.includes('/'))error.code='free/'+error.code;throw error;}
-}
-
-return {freeAccess,freeApi,FREE_NOTICE};
-})();
 const VERSION='10.12.2';
 const money=n=>n===null||n===undefined?'Menunggu konfirmasi':new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n);
 const date=n=>n?new Date(n?.toDate?n.toDate():n).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'medium',timeStyle:'short'})+' WIB':'—';
@@ -165,21 +12,37 @@ function withDeadline(promise,ms=15000,code='functions/deadline-exceeded'){
 }
 let ready;
 function connect(){return ready??=(async()=>{
-  const [appSDK,auth,fs]=await withDeadline(Promise.all(['app','auth','firestore'].map(m=>import(`https://www.gstatic.com/firebasejs/${VERSION}/firebase-${m}.js`))),15000,'auth/network-request-failed');
+  const [appSDK,auth,fs,fn,storage]=await withDeadline(Promise.all(['app','auth','firestore','functions','storage'].map(m=>import(`https://www.gstatic.com/firebasejs/${VERSION}/firebase-${m}.js`))),15000,'auth/network-request-failed');
   if(!window.FIREBASE_CONFIG?.apiKey||!window.FIREBASE_CONFIG?.projectId)throw Object.assign(new Error('Konfigurasi Firebase belum lengkap.'),{code:'auth/invalid-api-key'});
   const local=['localhost','127.0.0.1','[::1]'].includes(location.hostname);
   if(!local&&(window.KUBAH_EMULATOR||window.FIREBASE_CONFIG.projectId.startsWith('demo-')))throw Object.assign(new Error('Konfigurasi emulator tidak boleh dipakai pada website live.'),{code:'auth/emulator-config-on-live'});
   const app=appSDK.getApps()[0]||appSDK.initializeApp(window.FIREBASE_CONFIG);
-  const a=auth.getAuth(app),db=fs.getFirestore(app);
+  const a=auth.getAuth(app),db=fs.getFirestore(app),functions=fn.getFunctions(app,window.KUBAH_FUNCTIONS_REGION||'asia-southeast2'),bucket=storage.getStorage(app);
   if(window.KUBAH_EMULATOR&&!window.__kubahEmulators){
-    auth.connectAuthEmulator(a,'http://127.0.0.1:9101',{disableWarnings:true});fs.connectFirestoreEmulator(db,'127.0.0.1',8082);window.__kubahEmulators=true;
+    auth.connectAuthEmulator(a,'http://127.0.0.1:9099',{disableWarnings:true});fs.connectFirestoreEmulator(db,'127.0.0.1',8080);fn.connectFunctionsEmulator(functions,'127.0.0.1',5001);storage.connectStorageEmulator(bucket,'127.0.0.1',9199);window.__kubahEmulators=true;
   }
-  return {app,auth,a,db,fs};
+  return {app,auth,a,db,fs,functions,fn,storage,bucket};
 })().catch(error=>{ready=undefined;throw error;});}
-async function api(action,data={}){return withDeadline(freeApi(await connect(),action,data),20000,'free/unavailable');}
-async function ensureAdminAccess(user){return withDeadline(freeAccess(await connect(),user),15000,'free/unavailable');}
-async function upload(){throw Object.assign(new Error('Unggah berkas tidak tersedia pada versi gratis. Gunakan URL HTTPS untuk foto produk.'),{code:'free/unavailable'});}
-async function viewEvidence(){throw Object.assign(new Error('Bukti lama tersimpan pada layanan versi lengkap. Versi gratis tidak mengunduh bukti pembayaran.'),{code:'free/unavailable'});}
+async function api(action,data={}){
+  const c=await connect();
+  // Pertahankan code dari SDK; browser tidak dapat membedakan 404/CORS saat respons diblokir.
+  return (await c.fn.httpsCallable(c.functions,'shopApi',{timeout:action==='adminAccess'?15000:60000})({action,...data})).data;
+}
+async function ensureAdminAccess(user){
+  await api('adminAccess');
+  const token=await withDeadline(user.getIdTokenResult(true),15000,'auth/network-request-failed');
+  const c=await connect();
+  if(c.a.currentUser?.uid!==user.uid)throw Error('Sesi login berubah. Silakan masuk kembali.');
+  return token;
+}
+async function upload(orderId,file,onProgress=()=>{}){
+  const c=await connect();if(!c.a.currentUser)throw Error('Silakan masuk.');
+  if(!file||!['image/jpeg','image/png','image/webp','video/mp4'].includes(file.type)||file.size<=0||file.size>20*1024*1024)throw Error('Gunakan JPG, PNG, WEBP, atau MP4 maksimal 20 MB.');
+  const path=`evidence/${orderId}/${c.a.currentUser.uid}/${crypto.randomUUID()}`;
+  const task=c.storage.uploadBytesResumable(c.storage.ref(c.bucket,path),file,{contentType:file.type});
+  await new Promise((resolve,reject)=>task.on('state_changed',s=>onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,resolve));return path;
+}
+async function viewEvidence(path){const c=await connect();const blob=await c.storage.getBlob(c.storage.ref(c.bucket,path),20*1024*1024);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 async function login(email,password,register=false){const c=await connect();return register?c.auth.createUserWithEmailAndPassword(c.a,email,password):c.auth.signInWithEmailAndPassword(c.a,email,password);}
 async function logout(){const c=await connect();return c.auth.signOut(c.a);}
 function formValues(form){return Object.fromEntries(new FormData(form));}
@@ -378,8 +241,6 @@ function validateImageFile(file) {
  * onProgress(percent) dipanggil berkala selama upload berlangsung.
  */
 async function uploadImageFile(file, pathPrefix, onProgress) {
-  throw new Error('Unggah berkas belum tersedia pada versi gratis. Gunakan URL HTTPS foto produk.');
-
   validateImageFile(file);
   if (state.mode !== "firebase") {
     throw new Error("Upload foto hanya tersedia saat aplikasi terhubung ke Firebase (tidak tersedia di mode demo).");
@@ -426,13 +287,10 @@ function loginFailure(error,phase='auth'){
   const code=typeof error?.code==='string'&&/^[a-z-]+\/[a-z-]+$/.test(error.code)?error.code:'';
   let text;
   if(phase==='auth'||code.startsWith('auth/'))text=mapAuthErrorMessage(code);
-  else if(code==='free/permission-denied')text='Email dan password diterima, tetapi izin admin belum ada atau telah dicabut. Pemilik perlu menambahkan adminUsers/UID pada Firestore sesuai PANDUAN-GRATIS.md.';
-  else if(error?.code==='permission-denied')text='Aturan Firestore versi gratis belum terpasang atau izin baca adminUsers ditolak. Ikuti PANDUAN-GRATIS.md.';
-  else if(code.startsWith('free/'))text='Pemeriksaan izin atau penyimpanan belum selesai. Periksa koneksi Firestore dan coba lagi.';
   else if(code==='functions/permission-denied')text='Email dan password diterima, tetapi akses admin ditolak. Pemilik Firebase perlu memeriksa peran admin pada UID akun ini dan apakah akun dinonaktifkan.';
   else if(code==='functions/unauthenticated')text='Sesi login tidak berlaku. Masuk kembali dengan akun Anda.';
   else if(code==='functions/failed-precondition')text='Pemeriksaan admin ditolak oleh konfigurasi backend. Pastikan versi backend terbaru sudah dipasang dan peran akun sudah ditetapkan.';
-  else text='Autentikasi akun berhasil, tetapi izin Firestore belum dapat diperiksa. Periksa koneksi serta pemasangan rules versi gratis, lalu coba lagi.';
+  else text='Autentikasi akun berhasil, tetapi backend admin belum dapat dihubungi. Periksa deployment shopApi, project, region, serta respons endpoint/IAM/CORS. Coba lagi setelah backend tersedia.';
   showLoginError(text+(code?' ['+code+']':''));document.getElementById('login-retry').hidden=false;
 }
 function clearAdminSession(){
@@ -445,26 +303,41 @@ function clearAdminSession(){
   for(const key of ['orders','products','customers','transactions','employees','positions','performanceReviews','payrolls'])state[key]=[];
   showLoginScreen();
 }
+
+// Allowlist email admin — SATU-SATUNYA gerbang keamanan sekarang bahwa role/claims-check
+// via Cloud Function dihapus. Akun mana pun yang login TAPI emailnya tidak ada di daftar
+// ini (termasuk akun yang didaftarkan sendiri lewat toko.html) akan ditolak & di-logout otomatis.
+const ADMIN_ALLOWED_EMAILS = ['kubahnabawiofficialshop@gmail.com'];
+
 async function checkAdminSession(user){
   clearTimeout(authInitialTimer);const version=++authCheckVersion;
   clearAdminSession();showLoginError('');document.getElementById('login-retry').hidden=true;
   authCheckPending=!!user;setLoginBusy();
   if(!user){renderAll();return;}
+
+  const userEmail=(user.email||'').toLowerCase().trim();
+  if(!ADMIN_ALLOWED_EMAILS.includes(userEmail)){
+    try{await authFns.signOut(authInstance);}catch{}
+    if(version===authCheckVersion){
+      showLoginScreen();
+      loginFailure(Object.assign(new Error('Akun ini tidak terdaftar sebagai admin toko.'),{code:'functions/permission-denied'}),'access');
+      authCheckPending=false;setLoginBusy();
+    }
+    alert('Akun ini tidak terdaftar sebagai admin toko.');
+    return;
+  }
+
   try{
-    const token=await ensureAdminAccess(user);
+    // Verifikasi admin via Cloud Function (shopApi/ensureAdminAccess) DIHAPUS atas permintaan —
+    // gerbangnya sekarang allowlist email di atas, bukan role/claims dari backend.
     if(version!==authCheckVersion||authInstance.currentUser?.uid!==user.uid)return;
-    if(token.claims.role !== 'admin')throw Object.assign(new Error('Akses admin diperlukan.'),{code:'functions/permission-denied'});
-    state.adminIdentity={name:user.displayName||user.email||'Admin',email:user.email||'',superAdmin:token.claims.superAdmin===true};
+    state.adminIdentity={name:user.displayName||user.email||'Admin',email:user.email||'',superAdmin:true};
     setConnectionBadge('connected',window.KUBAH_EMULATOR?'Emulator lokal — bukan produksi':'Terhubung ke Firebase');
     showLoginError('');enterApp();renderAdminChrome();subscribeFirestore();
-    firestoreUnsubscribers.push(fb.onSnapshot(fb.doc(fb.db,'adminUsers',user.uid),snap=>{
-      if(snap.metadata.fromCache)return;
-      const r=snap.exists()?snap.data():null;
-      if((r&&(r.active!==true||r.role!=='admin'))||(!r&&token.accessSource==='firestore-owner-list')){
-        ++authCheckVersion;clearAdminSession();loginFailure({code:'free/permission-denied'},'access');
-      }
-    },()=>{++authCheckVersion;clearAdminSession();loginFailure({code:'free/unavailable'},'access');}));
-  }catch(error){if(version===authCheckVersion){showLoginScreen();loginFailure(error,'access');}}
+  }catch(error){
+    if(version===authCheckVersion){showLoginScreen();loginFailure(error,'access');}
+    alert(error?.message||'Gagal memuat data admin setelah login.');
+  }
   finally{if(version===authCheckVersion){authCheckPending=false;setLoginBusy();}}
 }
 async function initDataLayer(){
@@ -476,7 +349,7 @@ async function initDataLayer(){
     clearTimeout(authInitialTimer);
     authInitialTimer=setTimeout(()=>{authCheckPending=false;showLoginScreen();loginFailure({code:'auth/network-request-failed'});setLoginBusy();},15000);
     authUnsubscribe=authFns.onAuthStateChanged(authInstance,user=>{void checkAdminSession(user).catch(error=>{authCheckPending=false;showLoginScreen();loginFailure(error);setLoginBusy();});},error=>{clearTimeout(authInitialTimer);authCheckPending=false;showLoginScreen();loginFailure(error);setLoginBusy();});
-  }catch(error){authCheckPending=false;state.mode='offline';showLoginScreen();setConnectionBadge('error','Gagal terhubung');loginFailure(error);setLoginBusy();}
+  }catch(error){authCheckPending=false;state.mode='offline';showLoginScreen();setConnectionBadge('error','Gagal terhubung');loginFailure(error);setLoginBusy();alert(error?.message||'Gagal terhubung ke Firebase.');}
 }
 async function submitAdminLogin(e){
   e.preventDefault();if(authSubmitPending||authCheckPending)return;
@@ -486,7 +359,7 @@ async function submitAdminLogin(e){
     if(!authFns||!authInstance){await initDataLayer();if(!authFns||!authInstance)return;}
     const f=new FormData(els.loginForm);
     await withDeadline(authFns.signInWithEmailAndPassword(authInstance,f.get('email').trim(),f.get('password')),20000,'auth/network-request-failed');
-  }catch(error){loginFailure(error,'auth');}
+  }catch(error){loginFailure(error,'auth');alert(error?.message||'Gagal masuk. Periksa email dan password.');}
   finally{authSubmitPending=false;setLoginBusy();}
 }
 async function retryAdminLogin(){
@@ -674,17 +547,18 @@ function saveDemoData() {
 async function updateOrder(orderId, patch, historyLabel) {
   const order = state.orders.find(o => o.id === orderId);
   if (order?.schemaVersion === 2) {
-    throw new Error('Pesanan versi lengkap dipertahankan untuk dibaca. Perubahan memerlukan backend lengkap.');
+    window.location.href = 'admin-website.html#orders/' + encodeURIComponent(orderId); return;
   }
-  await shopApi('orderAction', { orderId, operation: 'legacy', ...patch });
+  const { doc, updateDoc } = fb;
+  const history = [...(order?.statusHistory || []), { status: historyLabel || patch.status, at: new Date().toISOString() }];
+  await updateDoc(doc(fb.db, "orders", orderId), { ...patch, statusHistory: history });
 }
 
 
 /** Buat pesanan baru secara manual (dipakai form "Buat pesanan"). */
 async function addOrder(order) {
-  state.manualOrderKey ||= crypto.randomUUID();
-  const result = await shopApi('legacyManualOrder', { ...order, key: state.manualOrderKey });
-  order.invoiceNo = result.invoiceNo; state.manualOrderKey = null;
+  const { addDoc, collection, serverTimestamp } = fb;
+  await addDoc(collection(fb.db, "orders"), { ...order, createdAt: serverTimestamp() });
 }
 
 
@@ -705,18 +579,22 @@ function generateInvoiceNo() {
 }
 
 /** Tambah produk baru. */
-async function addProduct(product) { return shopApi('saveProduct', {product}); }
+async function addProduct(product) {
+  const { addDoc, collection, serverTimestamp } = fb;
+  await addDoc(collection(fb.db, "products"), { ...product, createdAt: serverTimestamp() });
+}
 
 
 async function deleteProduct(productId) {
-  const product = state.products.find(p => p.id === productId);
-  await shopApi('saveProduct', {productId, expectedRevision: product.revision || 0, product: {...product, status:'nonaktif'}});
+  const { doc, updateDoc } = fb;
+  await updateDoc(doc(fb.db, "products", productId), { status: 'nonaktif' });
 }
 
 
 /** Update produk yang sudah ada (dipakai oleh form Edit). */
 async function updateProduct(productId, patch) {
-  return shopApi('saveProduct', {productId, expectedRevision: state.editingProductRevision || 0, product: patch});
+  const { doc, updateDoc } = fb;
+  await updateDoc(doc(fb.db, "products", productId), patch);
 }
 
 
@@ -1132,7 +1010,7 @@ function renderAdminChrome() {
   logo.onerror=()=>{logo.hidden=true;document.getElementById('sidebar-monogram').hidden=false;};
   document.getElementById('admin-display-name').textContent=u?.name||'Admin';document.getElementById('admin-display-name').title=u?.email||'';
   document.getElementById('admin-initial').textContent=(u?.name||'A').trim().slice(0,1).toUpperCase();document.getElementById('admin-role').textContent=u?.superAdmin?'Super Admin':'Administrator';
-  const storeLink=document.getElementById('view-store'),storeUrl=safeStoreUrl(s.storeUrl);storeLink.href='toko.html';storeLink.dataset.configured='true';
+  const storeLink=document.getElementById('view-store'),storeUrl=safeStoreUrl(s.storeUrl);storeLink.href=storeUrl||'#pengaturan';storeLink.dataset.configured=storeUrl?'true':'false';
   const counts=activityCounts(),rows=[['reseller',counts.reseller,'pengajuan reseller menunggu',state.ready.resellers],['retur',counts.claims,'komplain belum selesai',state.ready.claims],['payment',counts.payment,'pembayaran perlu verifikasi',state.ready.orders]];
   document.getElementById('notification-dot').hidden=!rows.some(r=>r[3]&&r[1]>0);
   const panel=document.getElementById('notification-items');panel.innerHTML=rows.filter(r=>r[3]&&r[1]>0).map(r=>`<button data-activity="${r[0]}"><strong>${r[1]}</strong> ${r[2]} <span aria-hidden="true">›</span></button>`).join('')||'<p>Tidak ada tindak lanjut pada data yang sudah tersinkron.</p>';
@@ -1183,13 +1061,6 @@ function renderSalesChart(){
 }
 let moduleTimer;
 function showOperational(module){
-  document.querySelectorAll('.view').forEach(v=>v.hidden=true);state.view='operasional';
-  document.getElementById('view-operasional').hidden=false;document.getElementById('operational-frame').hidden=true;
-  const info=document.getElementById('module-error');info.hidden=false;
-  info.querySelector('button').hidden=true;info.childNodes[0].textContent='Fitur versi lengkap belum aktif. ';
-  let detail=document.getElementById('free-module-detail');if(!detail){detail=document.createElement('p');detail.id='free-module-detail';info.prepend(detail);}
-  detail.textContent='Versi gratis: modul ini belum aktif. Gunakan Produk, Pesanan Manual, Pelanggan, Karyawan, Kalkulator, Keuangan, dan Pengaturan Toko. Data lama tetap disimpan.';
-  toggleDrawer(false);return;
   const allowed=['orders','couriers','slots','resellers','pricing','claims','settings','reconcile'];if(!allowed.includes(module.split('/')[0]))return;
   const view={resellers:'reseller',couriers:'pengiriman',slots:'jadwal',claims:'retur',orders:'pesanan',reconcile:'keuangan',pricing:'pengaturan',settings:'pengaturan'}[module.split('/')[0]];
   state.view='operasional';document.querySelectorAll('.view').forEach(v=>v.hidden=true);document.getElementById('view-operasional').hidden=false;
@@ -3575,7 +3446,7 @@ function applyCalcPreset(multiplier) {
 // Order detail modal
 // ------------------------------------------------------------
 function openOrderModal(orderId) {
-
+  if (state.orders.find(o=>o.id===orderId)?.schemaVersion === 2) { showOperational('orders/'+encodeURIComponent(orderId)); return; }
   state.openOrderId = orderId;
   renderOrderModalBody(orderId);
   els.orderModal.hidden = false;
@@ -3610,8 +3481,6 @@ function renderOrderModalBody(orderId) {
   const itemsHtml = o.items.map((it) => `<li><span>${escapeHtml(it.productName)} — ${escapeHtml(it.variant)} × ${it.qty}</span><span>${formatRupiah(it.price * it.qty)}</span></li>`).join("");
 
   let actionHtml = "";
-  if(o.freeAdmin&&o.status==='menunggu_pembayaran') actionHtml=`<div class="od-action-block"><h3>Konfirmasi dana oleh petugas</h3><p>Cocokkan dana yang benar-benar diterima. Tidak ada pemeriksaan bank otomatis.</p><label class="field"><span>Nominal diterima</span><input id="free-payment-amount" type="number" min="1" value="${Number(o.total)}"></label><label class="field"><span>Referensi pembayaran / catatan penerimaan</span><input id="free-payment-reference" maxlength="200"></label><button class="btn btn--primary" data-act="free-paid">Catat pembayaran diterima</button></div>`;
-
   if (o.status === "perlu_verifikasi") {
     actionHtml = `
       <div class="od-action-block">
@@ -3641,7 +3510,7 @@ function renderOrderModalBody(orderId) {
         </div>
         <p id="od-courier-hint" class="field-hint" style="margin-top:8px;"></p>
       </div>`;
-  } else if (o.status === "menunggu_pembayaran" && !o.freeAdmin) {
+  } else if (o.status === "menunggu_pembayaran") {
     actionHtml = `
       <div class="od-action-block">
         <h3>Menunggu bukti transfer dari pelanggan</h3>
@@ -3659,7 +3528,7 @@ function renderOrderModalBody(orderId) {
         </div>
       </div>`;
   }
-  if ((o.freeAdmin?["menunggu_pembayaran"]:["menunggu_pembayaran", "perlu_verifikasi", "diproses"]).includes(o.status)) {
+  if (["menunggu_pembayaran", "perlu_verifikasi", "diproses"].includes(o.status)) {
     actionHtml += `<div class="od-action-row" style="margin-top:10px;"><button class="btn btn--ghost" data-act="cancel">Batalkan pesanan</button></div>`;
   }
 
@@ -3691,7 +3560,7 @@ function renderOrderModalBody(orderId) {
       </div>
     </div>
     ${shippingInfoHtml}
-    ${o.freeAdmin?actionHtml:'<p class="field-hint">Riwayat lama dipertahankan untuk dibaca; perubahan memerlukan versi lengkap.</p>'}
+    ${actionHtml}
     <div class="od-history">
       <strong>Riwayat status</strong>
       <ul>${historyHtml}</ul>
@@ -3699,7 +3568,7 @@ function renderOrderModalBody(orderId) {
   `;
 
   els.orderModalBody.querySelectorAll("[data-act]").forEach((btn) => {
-    btn.addEventListener("click", async () => {if(btn.disabled)return;btn.disabled=true;try{await handleOrderAction(o,btn.dataset.act);}catch(e){showToast(e.message);}finally{btn.disabled=false;}});
+    btn.addEventListener("click", () => handleOrderAction(o, btn.dataset.act));
   });
 
   const courierSelect = document.getElementById("od-courier");
@@ -3736,11 +3605,6 @@ function updateShippingFieldsForCourier(courier) {
 }
 
 async function handleOrderAction(order, act) {
-  if(act==='free-paid'){
-    await updateOrder(order.id,{status:'diproses',amount:Number(document.getElementById('free-payment-amount').value),reference:document.getElementById('free-payment-reference').value.trim()});
-    showToast('Dana dicatat dan jurnal penjualan tersimpan.');return;
-  }
-
   if (act === "verify-ok") {
     await updateOrder(order.id, { status: "diproses" });
     showToast(`Pembayaran ${order.invoiceNo} diverifikasi.`);
@@ -3876,7 +3740,6 @@ function resetProductForm() {
   state.previewSelectedIndex = null;
   state.previewPriceChannel = "offline";
   state.productImages = [];
-  document.getElementById("free-publish-product").checked=false;
   els.previewPriceToggle.querySelectorAll(".price-toggle-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.channel === "offline"));
   els.productModalTitle.textContent = "Tambah produk baru";
   els.productSubmitBtn.textContent = "Simpan produk";
@@ -3905,7 +3768,6 @@ function openProductModal(product) {
     f["sku"].value = product.sku || "";
     f["status"].value = product.status || "aktif";
 
-    document.getElementById("free-publish-product").checked=product.freePublished===true;
     state.productImages = getProductImages(product).map((img, i) => ({ ...img, tempId: "existing-" + i }));
     renderProductPhotoGallery();
 
@@ -4131,8 +3993,7 @@ function bindEvents() {
 
   els.createOrderForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const submit=els.createOrderForm.querySelector('button[type="submit"]');if(submit.disabled)return;submit.disabled=true;
-    try {
+    if (state.creatingOrder) return; // cegah submit ganda (dobel klik) — pengganti idempotency-key server yang sudah dihapus
     const f = new FormData(els.createOrderForm);
 
     const items = state.orderItemRows
@@ -4162,11 +4023,18 @@ function bindEvents() {
       statusHistory: [{ status, at: new Date().toISOString() }],
     };
 
-    await addOrder(order);
-    closeModals();
-    navigateTo("pesanan");
-    showToast(`Pesanan ${order.invoiceNo} tersimpan.`);
-    }catch(error){showToast(error.message||'Penyimpanan belum berhasil.');}finally{submit.disabled=false;}
+    const submitBtn = els.createOrderForm.querySelector('button[type="submit"]');
+    state.creatingOrder = true;
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      await addOrder(order);
+      closeModals();
+      navigateTo("pesanan");
+      showToast(`Pesanan ${order.invoiceNo} tersimpan.`);
+    } finally {
+      state.creatingOrder = false;
+      if (submitBtn) submitBtn.disabled = false;
+    }
   });
   els.productSearch.addEventListener("input", (e) => { state.productSearch = e.target.value; renderProductsView(); });
 
@@ -4213,15 +4081,13 @@ function bindEvents() {
 
   els.productForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const submit=els.productForm.querySelector('button[type="submit"]');if(submit.disabled)return;submit.disabled=true;
-    try {
     const f = new FormData(els.productForm);
 
     if (state.productImages.some((i) => i.uploading)) {
       showToast("Tunggu proses upload foto sampai selesai sebelum menyimpan.");
       return;
     }
-    if (!window.KUBAH_FREE && state.productImages.length === 0) {
+    if (state.productImages.length === 0) {
       showToast("Tambahkan minimal 1 foto produk utama.");
       return;
     }
@@ -4267,9 +4133,8 @@ function bindEvents() {
       weight: Number(f.get("weight")) || 0,
       sku: f.get("sku").trim() || slug(f.get("name")),
       status: f.get("status"),
-      freePublished:document.getElementById("free-publish-product").checked,
       images,
-      photoUrl: primaryImage?.url||"", // cermin foto utama, dipakai kode lama yang masih baca photoUrl tunggal
+      photoUrl: primaryImage.url, // cermin foto utama, dipakai kode lama yang masih baca photoUrl tunggal
       variants,
       totalStock,
     };
@@ -4285,7 +4150,6 @@ function bindEvents() {
       navigateTo("produk");
       showToast(`Produk "${product.name}" tersimpan.`);
     }
-    }catch(error){showToast(error.message||'Penyimpanan belum berhasil.');}finally{submit.disabled=false;}
   });
 
   // ---- Pelanggan ----
@@ -4885,12 +4749,10 @@ function cacheEls() {
 async function init() {
   cacheEls();
   bindEvents();
-  document.getElementById('free-add-image').onclick=()=>{const input=document.getElementById('free-image-url');let url;try{url=new URL(input.value);if(url.protocol!=='https:')throw Error();}catch{showToast('Gunakan URL foto HTTPS yang dapat diakses publik.');return;}if(state.productImages.length>=9){showToast('Maksimal 9 foto.');return;}state.productImages.push({tempId:crypto.randomUUID(),url:url.href,isPrimary:state.productImages.length===0,order:state.productImages.length});input.value='';renderProductPhotoGallery();updatePreview();};
-  document.querySelectorAll('input[type="file"][accept*="image"]').forEach(input=>{input.disabled=true;document.querySelectorAll(`label[for="${input.id}"]`).forEach(label=>{label.hidden=true;});});
   await initDataLayer();
   renderAll();
 }
 
 init();
 
-window.addEventListener('unhandledrejection',event=>{event.preventDefault();if(els.appRoot?.hidden){authSubmitPending=false;authCheckPending=false;showLoginScreen();setLoginBusy();loginFailure(event.reason);}else showToast(event.reason?.message||'Operasi belum berhasil. Periksa koneksi dan coba lagi.');});
+window.addEventListener('unhandledrejection',event=>{event.preventDefault();if(els.appRoot?.hidden){authSubmitPending=false;authCheckPending=false;showLoginScreen();setLoginBusy();loginFailure(event.reason);}else showToast('Operasi belum berhasil. Periksa koneksi dan coba lagi.');});
