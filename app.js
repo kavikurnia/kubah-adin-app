@@ -533,7 +533,7 @@ function saveDemoData() {
 async function updateOrder(orderId, patch, historyLabel) {
   const order = state.orders.find(o => o.id === orderId);
   if (order?.schemaVersion === 2) {
-    window.location.href = 'admin-website.html#orders/' + encodeURIComponent(orderId); return;
+    window.location.href = 'admin-website.html?v=manual-20260908-1#orders/' + encodeURIComponent(orderId); return;
   }
   await shopApi('orderAction', { orderId, operation: 'legacy', ...patch });
 }
@@ -1051,7 +1051,7 @@ function showOperational(module){
   const frame=document.getElementById('operational-frame');
   const inspect=()=>{try{const content=frame.contentDocument?.getElementById('content');if(!content||/Memeriksa/.test(content.textContent)){document.getElementById('module-error').hidden=false;}}catch{document.getElementById('module-error').hidden=false;}};
   frame.onload=()=>{try{if(!frame.contentDocument?.getElementById('content'))inspect();}catch{inspect();}};
-  frame.src='admin-website.html?embed=1#'+module;
+  frame.src='admin-website.html?v=manual-20260908-1&embed=1#'+module;
   moduleTimer=setTimeout(inspect,20000);
   document.getElementById('module-retry').onclick=()=>showOperational(module);toggleDrawer(false);
 }
