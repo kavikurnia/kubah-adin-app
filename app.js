@@ -444,7 +444,7 @@ function subscribeFirestore() {
 
   firestoreUnsubscribers.push(onSnapshot(query(collection(fb.db, "transactions"), orderBy("date", "desc")), (snap) => {
     state.ready.transactions=true;
-    state.transactions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    state.transactions = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
     renderAll();
   }));
 
@@ -512,7 +512,6 @@ async function loadDemoData() {
 
   // Bangun data pelanggan & pemasukan dari pesanan yang sudah ada (juga jalan tiap kali pesanan berubah).
   await syncCustomersFromOrders();
-  await syncIncomeFromOrders();
   await syncFinanceFromPayrolls();
   saveDemoData();
 }
@@ -641,8 +640,9 @@ async function deleteCustomer(customerId) {
   }
 }
 
-/** Catat satu transaksi kas (manual ATAU otomatis dari pesanan selesai). */
+/** Catat transaksi kas manual; jurnal pesanan wajib melalui verifikasi pembayaran atomik. */
 async function addTransaction(tx) {
+  if (tx.orderId || tx.managed) throw new Error("Pemasukan pesanan dicatat melalui verifikasi pembayaran, bukan pencatatan kas manual.");
   if (state.mode === "firebase") {
     const { addDoc, collection, serverTimestamp } = fb;
     await addDoc(collection(fb.db, "transactions"), { ...tx, createdAt: serverTimestamp() });
@@ -780,7 +780,6 @@ function findExistingPayroll(employeeId, period, excludeId) {
 // Sinkronisasi otomatis: Pesanan → Pelanggan & Pesanan → Keuangan
 // ------------------------------------------------------------
 const customerSyncInFlight = new Set(); // no. HP yang sedang dalam proses dibuatkan data pelanggan
-const incomeSyncInFlight = new Set(); // id pesanan yang sedang dalam proses dicatat sebagai pemasukan
 
 function toDateInputValue(input) {
   const d = input?.toDate ? input.toDate() : new Date(input || Date.now());
@@ -807,29 +806,7 @@ async function syncCustomersFromOrders() {
   }
 }
 
-/** Pastikan setiap pesanan berstatus "selesai" punya satu baris pemasukan di koleksi transactions. */
-async function syncIncomeFromOrders() {
-  if (state.mode !== "demo") return;
-  for (const o of state.orders) {
-    if (o.status !== "selesai") continue;
-    const alreadyExists = state.transactions.some((t) => t.orderId === o.id);
-    if (alreadyExists || incomeSyncInFlight.has(o.id)) continue;
-    incomeSyncInFlight.add(o.id);
-    try {
-      const completedEntry = (o.statusHistory || []).find((h) => h.status === "selesai");
-      await addTransaction({
-        date: toDateInputValue(completedEntry ? completedEntry.at : o.createdAt),
-        description: `Pesanan ${escapeHtml(o.invoiceNo)} — ${escapeHtml(o.customerName)}`,
-        category: "Penjualan",
-        type: "masuk",
-        amount: o.total,
-        orderId: o.id,
-      });
-    } finally {
-      incomeSyncInFlight.delete(o.id);
-    }
-  }
-}
+// Pemasukan hanya ditulis oleh transaksi verifikasi pembayaran; tidak disinkronkan ulang saat login/refresh.
 
 // ------------------------------------------------------------
 // Seed data lama dinonaktifkan; gunakan emulator untuk pengujian
@@ -1075,7 +1052,7 @@ function renderSearchResults(){
 }
 function bindAdminDashboard(){
   window.addEventListener('resize',()=>{if(window.innerWidth>900&&document.body.classList.contains('drawer-open'))toggleDrawer(false);});
-  document.getElementById('dash-create-order').onclick=openCreateOrderModal;
+
   document.getElementById('dash-period-select').onchange=e=>{state.dashPeriod=e.target.value;els.dashCustomDate.hidden=state.dashPeriod!=='custom';if(!state.dashCustomDate){state.dashCustomDate=jakartaDay();els.dashCustomDate.value=state.dashCustomDate;}renderDashboard();};
   document.querySelectorAll('[data-recent]').forEach(b=>b.onclick=()=>{state.recentTab=b.dataset.recent;renderDashboard();});
   document.querySelectorAll('[data-follow]').forEach(b=>b.onclick=()=>followActivity(b.dataset.follow));document.querySelectorAll('[data-module]').forEach(b=>b.onclick=()=>showOperational(b.dataset.module));
@@ -1515,6 +1492,43 @@ function openCustomerModal(customer) {
 // ------------------------------------------------------------
 // Keuangan
 // ------------------------------------------------------------
+function encodeFinanceBackupValue(value) {
+  if (value && typeof value.toDate === 'function' && Number.isInteger(value.seconds) && Number.isInteger(value.nanoseconds)) {
+    return {__firestoreType:'timestamp',seconds:value.seconds,nanoseconds:value.nanoseconds};
+  }
+  if (Array.isArray(value)) return value.map(encodeFinanceBackupValue);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,encodeFinanceBackupValue(item)]));
+  return value;
+}
+let financeBackupUrl = null;
+async function backupFinanceTransactions() {
+  const button=document.getElementById('btn-backup-finance');
+  const session=authInstance?.currentUser?.uid;
+  button.disabled=true;
+  try {
+    if(state.mode!=='firebase'||!session)throw new Error('Masuk ke Firebase sebelum mencadangkan transaksi.');
+    const c=await connectShop();await ensureAdminAccess(c.a.currentUser);
+    const capturedAt=new Date().toISOString();
+    const [snapshot,orders]=await Promise.all([
+      c.fs.getDocsFromServer(c.fs.query(c.fs.collection(c.db,'transactions'),c.fs.orderBy('date','desc'))),
+      c.fs.getDocsFromServer(c.fs.collection(c.db,'orders'))
+    ]);
+    if(c.a.currentUser?.uid!==session)throw new Error('Sesi berubah. Masuk kembali untuk mencadangkan.');
+    const documents=snapshot.docs.map(d=>({id:d.id,path:d.ref.path,data:encodeFinanceBackupValue(d.data())}));
+    const relatedOrders=orders.docs.filter(o=>documents.some(t=>t.data.orderId===o.id||t.data.orderId===o.data().invoiceNo)).map(o=>({id:o.id,invoiceNo:o.data().invoiceNo||'',status:o.data().status||'',total:o.data().total??null,customerName:o.data().customerName||''}));
+    const backup={format:'kubah-finance-backup-v1',projectId:c.app.options.projectId,capturedAt,documents,relatedOrders};
+    const json=JSON.stringify(backup,null,2);
+    if(financeBackupUrl)URL.revokeObjectURL(financeBackupUrl);
+    financeBackupUrl=URL.createObjectURL(new Blob([json],{type:'application/json'}));
+    const link=document.getElementById('finance-backup-download');link.href=financeBackupUrl;link.download='kubah-transaksi-'+capturedAt.replace(/[:.]/g,'-')+'.json';
+    document.getElementById('finance-backup-json').value=json;
+    document.getElementById('finance-backup-status').textContent=documents.length+' dokumen transaksi dibaca dari server. Cadangan menyimpan ID dan timestamp lengkap.';
+    document.getElementById('finance-backup-panel').hidden=false;
+  } catch(error) {showToast(error.message||'Cadangan gagal dibuat.');}
+  finally {button.disabled=false;}
+}
+
+
 function renderKeuanganView() {
   const income = state.transactions.filter((t) => t.type === "masuk").reduce((s, t) => s + Number(t.amount || 0), 0);
   const expense = state.transactions.filter((t) => t.type === "keluar").reduce((s, t) => s + Number(t.amount || 0), 0);
@@ -4449,6 +4463,7 @@ function bindEvents() {
   });
 
   // ---- Keuangan ----
+  document.getElementById("btn-backup-finance").addEventListener("click", backupFinanceTransactions);
   els.btnAddTransaction.addEventListener("click", () => {
     els.transactionForm.reset();
     els.transactionForm.elements["date"].value = toDateInputValue(new Date());
