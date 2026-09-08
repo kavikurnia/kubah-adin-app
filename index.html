@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin — Kubah Nabawi</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231B1F2A'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-family='Georgia' font-size='48' fill='%23DED2B8'%3EK%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -21,6 +22,8 @@
     <p class="auth-sub">Masuk untuk mengelola toko · <a href="toko.html">Belanja sebagai pelanggan</a></p>
 
     <p class="auth-checking" id="auth-checking">Memeriksa sesi…</p>
+    <button id="bootstrap-retry" class="btn btn--outline" hidden onclick="location.reload()">Muat ulang halaman</button>
+    <script>setTimeout(()=>{const status=document.getElementById('auth-checking');if(status&&!status.hidden){status.textContent='Aplikasi belum berhasil dimuat. Periksa koneksi dan file app.js serta firebase-config.js, lalu muat ulang.';document.getElementById('bootstrap-retry').hidden=false;}},25000);</script>
 
     <form id="login-form" hidden>
       <label class="field">
@@ -31,7 +34,9 @@
         <span>Password</span>
         <input type="password" name="password" required autocomplete="current-password" />
       </label>
-      <p class="auth-error" id="login-error" hidden></p>
+      <p class="auth-error" id="login-error" role="alert" hidden></p>
+      <p id="login-status" class="auth-checking" role="status" hidden></p>
+      <button type="button" class="btn btn--outline" id="login-retry" hidden>Coba lagi</button>
       <button type="submit" class="btn btn--primary auth-submit" id="login-submit-btn">Masuk</button>
     </form>
   </div>
@@ -65,7 +70,7 @@
       <section class="panel shipping-panel"><div class="shipping-rule-head"><svg class="ui-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h12v12H2zm12 5h5l3 4v3h-8"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/></svg><div><h2>Aturan Gratis Ongkir</h2><div id="free-shipping-summary">Memuat pengaturan…</div></div></div><div class="shipping-rule-foot"><span>Khusus Kurir Toko</span><button class="btn btn--outline" data-module="settings">Ubah Pengaturan</button></div></section></div>
       <details class="dashboard-extras"><summary>Ringkasan tambahan & definisi angka</summary><p id="dashboard-definition"></p><p>Stok menipis: <strong id="stat-lowstock">—</strong> produk</p><ul class="action-list" id="action-list"></ul><div class="panel"><h2 id="chart-title">Tren penerimaan penjualan</h2><svg id="sales-chart" class="chart" viewBox="0 0 320 140" preserveAspectRatio="none" role="img" aria-label="Tren penerimaan penjualan"></svg></div></details>
     </section>
-    <section class="view" id="view-operasional" hidden><iframe id="operational-frame" title="Modul operasional admin" src="about:blank"></iframe></section>
+    <section class="view" id="view-operasional" hidden><p id="module-error" class="auth-error" role="alert" hidden>Modul operasional belum tersedia. Periksa pemasangan admin-website.html, admin-website.js, shop-client.js dan shop.css. Menu admin lain tetap dapat digunakan. <button type="button" id="module-retry" class="btn btn--outline">Coba muat modul lagi</button></p><iframe id="operational-frame" title="Modul operasional admin" src="about:blank"></iframe></section>
     <section class="view" id="view-pencarian" hidden><header class="view-head"><h1>Hasil Pencarian</h1><p class="view-sub" id="search-summary"></p></header><div id="global-search-results"></div></section>
 
     <!-- ---------- PESANAN ---------- -->
@@ -1171,9 +1176,9 @@
 <div class="toast" id="toast" hidden></div>
 
 <script src="firebase-config.js"></script>
-<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script async src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script async src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script async src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

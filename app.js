@@ -1,5 +1,5 @@
 // BEGIN BUNDLED ADMIN CLIENT
-const {connect:connectShop,api:shopApi,ensureAdminAccess}=(()=>{
+const {connect:connectShop,api:shopApi,ensureAdminAccess,withDeadline}=(()=>{
 const VERSION='10.12.2';
 const money=n=>n===null||n===undefined?'Menunggu konfirmasi':new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n);
 const date=n=>n?new Date(n?.toDate?n.toDate():n).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'medium',timeStyle:'short'})+' WIB':'—';
@@ -7,20 +7,30 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const safeURL=v=>{try{const u=new URL(v);return u.protocol==='https:'?u.href:'';}catch{return '';}};
 const $=s=>document.querySelector(s);
 const label=s=>({belum_dibayar:'Belum dibayar',perlu_verifikasi:'Menunggu verifikasi',lunas:'Lunas',menunggu_pembayaran:'Menunggu pembayaran',diproses:'Diproses',dikirim:'Dikirim',selesai:'Selesai',dibatalkan:'Dibatalkan',menunggu:'Menunggu persetujuan',disetujui:'Disetujui',ditolak:'Ditolak',dinonaktifkan:'Dinonaktifkan',diterima_kurir:'Uang diterima kurir',disetor_kurir:'Uang disetor kurir',setoran_diverifikasi:'Setoran diverifikasi',refund_menunggu:'Menunggu refund',refund_selesai:'Refund selesai',perlu_rekonsiliasi:'Pembayaran perlu ditinjau admin'}[s]||s||'Belum mengajukan');
+function withDeadline(promise,ms=15000,code='functions/deadline-exceeded'){
+  let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error('Batas waktu koneksi terlampaui.'),{code})),ms);})]).finally(()=>clearTimeout(timer));
+}
 let ready;
 function connect(){return ready??=(async()=>{
-  const [appSDK,auth,fs,fn,storage]=await Promise.all(['app','auth','firestore','functions','storage'].map(m=>import(`https://www.gstatic.com/firebasejs/${VERSION}/firebase-${m}.js`)));
+  const [appSDK,auth,fs,fn,storage]=await withDeadline(Promise.all(['app','auth','firestore','functions','storage'].map(m=>import(`https://www.gstatic.com/firebasejs/${VERSION}/firebase-${m}.js`))),15000,'auth/network-request-failed');
+  if(!window.FIREBASE_CONFIG?.apiKey||!window.FIREBASE_CONFIG?.projectId)throw Object.assign(new Error('Konfigurasi Firebase belum lengkap.'),{code:'auth/invalid-api-key'});
+  const local=['localhost','127.0.0.1','[::1]'].includes(location.hostname);
+  if(!local&&(window.KUBAH_EMULATOR||window.FIREBASE_CONFIG.projectId.startsWith('demo-')))throw Object.assign(new Error('Konfigurasi emulator tidak boleh dipakai pada website live.'),{code:'auth/emulator-config-on-live'});
   const app=appSDK.getApps()[0]||appSDK.initializeApp(window.FIREBASE_CONFIG);
-  const a=auth.getAuth(app),db=fs.getFirestore(app),functions=fn.getFunctions(app,'asia-southeast2'),bucket=storage.getStorage(app);
+  const a=auth.getAuth(app),db=fs.getFirestore(app),functions=fn.getFunctions(app,window.KUBAH_FUNCTIONS_REGION||'asia-southeast2'),bucket=storage.getStorage(app);
   if(window.KUBAH_EMULATOR&&!window.__kubahEmulators){
     auth.connectAuthEmulator(a,'http://127.0.0.1:9099',{disableWarnings:true});fs.connectFirestoreEmulator(db,'127.0.0.1',8080);fn.connectFunctionsEmulator(functions,'127.0.0.1',5001);storage.connectStorageEmulator(bucket,'127.0.0.1',9199);window.__kubahEmulators=true;
   }
   return {app,auth,a,db,fs,functions,fn,storage,bucket};
-})();}
-async function api(action,data={}){const c=await connect();try{return (await c.fn.httpsCallable(c.functions,'shopApi')({action,...data})).data;}catch(e){throw new Error(e.message||'Koneksi gagal. Coba kembali.');}}
+})().catch(error=>{ready=undefined;throw error;});}
+async function api(action,data={}){
+  const c=await connect();
+  // Pertahankan code dari SDK; browser tidak dapat membedakan 404/CORS saat respons diblokir.
+  return (await c.fn.httpsCallable(c.functions,'shopApi',{timeout:action==='adminAccess'?15000:60000})({action,...data})).data;
+}
 async function ensureAdminAccess(user){
   await api('adminAccess');
-  const token=await user.getIdTokenResult(true);
+  const token=await withDeadline(user.getIdTokenResult(true),15000,'auth/network-request-failed');
   const c=await connect();
   if(c.a.currentUser?.uid!==user.uid)throw Error('Sesi login berubah. Silakan masuk kembali.');
   return token;
@@ -39,7 +49,7 @@ function formValues(form){return Object.fromEntries(new FormData(form));}
 function message(text,error=false){const el=document.getElementById('notice');if(el){el.hidden=false;el.className=error?'notice error':'notice';el.textContent=text;}}
 async function busy(button,fn){const text=button?.textContent;if(button){button.disabled=true;button.textContent='Memproses…';}try{return await fn();}catch(e){message(e.message,true);return undefined;}finally{if(button){button.disabled=false;button.textContent=text;}}}
 
-return {connect,api,ensureAdminAccess};
+return {connect,api,ensureAdminAccess,withDeadline};
 })();
 // END BUNDLED ADMIN CLIENT
 // ============================================================
@@ -265,34 +275,77 @@ async function uploadImageFile(file, pathPrefix, onProgress) {
   });
 }
 
-async function initDataLayer() {
-  state.mode = "firebase";
-  try {
-    const c = await connectShop();
-    fbApp = c.app; fb = { db: c.db, ...c.fs }; authInstance = c.a; authFns = c.auth;
-    storageInstance = c.bucket; storageFns = c.storage;
-    authFns.onAuthStateChanged(authInstance, async (user) => {
-      state.adminIdentity=null;state.deliverySlots=[];state.resellers=[];state.claims=[];state.ecommerce=null;
-      Object.keys(state.ready).forEach(k=>state.ready[k]=false);
-      document.getElementById('operational-frame').src='about:blank';toggleDrawer(false);
-      firestoreUnsubscribers.forEach(unsub => unsub()); firestoreUnsubscribers = [];
-      showLoginScreen();
-      for (const key of ['orders','products','customers','transactions','employees','positions','performanceReviews','payrolls']) state[key] = [];
-      if (!user) { renderAll(); return; }
-      try {
-        const token = await ensureAdminAccess(user);
-        if (token.claims.role !== 'admin') { showLoginError('Akun ini bukan admin. Masuk melalui toko.html untuk belanja.'); return; }
-        setConnectionBadge('connected', window.KUBAH_EMULATOR ? 'Emulator lokal — bukan produksi' : 'Terhubung ke Firebase');
-        state.adminIdentity={name:user.displayName||user.email||'Admin',email:user.email||'',superAdmin:token.claims.superAdmin===true};
-        showLoginError(''); enterApp(); renderAdminChrome(); subscribeFirestore();
-      } catch (err) { showLoginError(err.message||'Pemeriksaan akses gagal. Muat ulang untuk mencoba lagi.'); }
-    });
-  } catch (err) {
-    state.mode = 'offline'; showLoginScreen(); setConnectionBadge('error', 'Gagal terhubung');
-    showLoginError('Firebase tidak dapat terhubung. Tidak ada mode demo otomatis. Periksa koneksi lalu muat ulang.');
-  }
+let authSubmitPending=false,authCheckPending=false,authCheckVersion=0,authUnsubscribe=null,authInitialTimer=null;
+function setLoginBusy(){
+  const busy=authSubmitPending||authCheckPending;
+  els.loginSubmitBtn.disabled=busy;els.loginSubmitBtn.textContent=busy?'Memeriksa…':'Masuk';
+  document.getElementById('login-retry').disabled=busy;
+  document.getElementById('login-status').hidden=!busy;
+  document.getElementById('login-status').textContent=authSubmitPending?'Memeriksa email dan password…':'Memeriksa izin admin…';
 }
-
+function loginFailure(error,phase='auth'){
+  const code=typeof error?.code==='string'&&/^[a-z-]+\/[a-z-]+$/.test(error.code)?error.code:'';
+  let text;
+  if(phase==='auth'||code.startsWith('auth/'))text=mapAuthErrorMessage(code);
+  else if(code==='functions/permission-denied')text='Email dan password diterima, tetapi akses admin ditolak. Pemilik Firebase perlu memeriksa peran admin pada UID akun ini dan apakah akun dinonaktifkan.';
+  else if(code==='functions/unauthenticated')text='Sesi login tidak berlaku. Masuk kembali dengan akun Anda.';
+  else if(code==='functions/failed-precondition')text='Pemeriksaan admin ditolak oleh konfigurasi backend. Pastikan versi backend terbaru sudah dipasang dan peran akun sudah ditetapkan.';
+  else text='Autentikasi akun berhasil, tetapi backend admin belum dapat dihubungi. Periksa deployment shopApi, project, region, serta respons endpoint/IAM/CORS. Coba lagi setelah backend tersedia.';
+  showLoginError(text+(code?' ['+code+']':''));document.getElementById('login-retry').hidden=false;
+}
+function clearAdminSession(){
+  state.adminIdentity=null;state.deliverySlots=[];state.resellers=[];state.claims=[];state.ecommerce=null;
+  Object.keys(state.ready).forEach(k=>state.ready[k]=false);
+  clearTimeout(moduleTimer);document.getElementById('operational-frame').onload=null;
+  document.getElementById('operational-frame').src='about:blank';toggleDrawer(false);
+  firestoreUnsubscribers.forEach(unsub=>unsub());firestoreUnsubscribers=[];
+  document.querySelectorAll('.overlay').forEach(el=>el.hidden=true);state.openOrderId=null;
+  for(const key of ['orders','products','customers','transactions','employees','positions','performanceReviews','payrolls'])state[key]=[];
+  showLoginScreen();
+}
+async function checkAdminSession(user){
+  clearTimeout(authInitialTimer);const version=++authCheckVersion;
+  clearAdminSession();showLoginError('');document.getElementById('login-retry').hidden=true;
+  authCheckPending=!!user;setLoginBusy();
+  if(!user){renderAll();return;}
+  try{
+    const token=await ensureAdminAccess(user);
+    if(version!==authCheckVersion||authInstance.currentUser?.uid!==user.uid)return;
+    if(token.claims.role !== 'admin')throw Object.assign(new Error('Akses admin diperlukan.'),{code:'functions/permission-denied'});
+    state.adminIdentity={name:user.displayName||user.email||'Admin',email:user.email||'',superAdmin:token.claims.superAdmin===true};
+    setConnectionBadge('connected',window.KUBAH_EMULATOR?'Emulator lokal — bukan produksi':'Terhubung ke Firebase');
+    showLoginError('');enterApp();renderAdminChrome();subscribeFirestore();
+  }catch(error){if(version===authCheckVersion){showLoginScreen();loginFailure(error,'access');}}
+  finally{if(version===authCheckVersion){authCheckPending=false;setLoginBusy();}}
+}
+async function initDataLayer(){
+  state.mode='firebase';authUnsubscribe?.();authUnsubscribe=null;
+  authCheckPending=true;showLoginScreen();setLoginBusy();
+  try{
+    const c=await connectShop();
+    fbApp=c.app;fb={db:c.db,...c.fs};authInstance=c.a;authFns=c.auth;storageInstance=c.bucket;storageFns=c.storage;
+    clearTimeout(authInitialTimer);
+    authInitialTimer=setTimeout(()=>{authCheckPending=false;showLoginScreen();loginFailure({code:'auth/network-request-failed'});setLoginBusy();},15000);
+    authUnsubscribe=authFns.onAuthStateChanged(authInstance,user=>{void checkAdminSession(user).catch(error=>{authCheckPending=false;showLoginScreen();loginFailure(error);setLoginBusy();});},error=>{clearTimeout(authInitialTimer);authCheckPending=false;showLoginScreen();loginFailure(error);setLoginBusy();});
+  }catch(error){authCheckPending=false;state.mode='offline';showLoginScreen();setConnectionBadge('error','Gagal terhubung');loginFailure(error);setLoginBusy();}
+}
+async function submitAdminLogin(e){
+  e.preventDefault();if(authSubmitPending||authCheckPending)return;
+  showLoginError('');document.getElementById('login-retry').hidden=true;
+  authSubmitPending=true;setLoginBusy();
+  try{
+    if(!authFns||!authInstance){await initDataLayer();if(!authFns||!authInstance)return;}
+    const f=new FormData(els.loginForm);
+    await withDeadline(authFns.signInWithEmailAndPassword(authInstance,f.get('email').trim(),f.get('password')),20000,'auth/network-request-failed');
+  }catch(error){loginFailure(error,'auth');}
+  finally{authSubmitPending=false;setLoginBusy();}
+}
+async function retryAdminLogin(){
+  if(authSubmitPending||authCheckPending)return;
+  if(authInstance?.currentUser)await checkAdminSession(authInstance.currentUser);
+  else if(!authFns)await initDataLayer();
+  else {showLoginError('Silakan masukkan email dan password, lalu tekan Masuk.');document.getElementById('login-retry').hidden=true;}
+}
 
 /** Tampilkan dashboard, sembunyikan layar login. */
 function enterApp() {
@@ -305,6 +358,7 @@ function showLoginScreen() {
   els.appRoot.hidden = true;
   els.authScreen.hidden = false;
   els.authChecking.hidden = true;
+  document.getElementById('bootstrap-retry').hidden=true;
   els.loginForm.hidden = false;
 }
 
@@ -332,9 +386,17 @@ function mapAuthErrorMessage(code) {
     case "auth/too-many-requests":
       return "Terlalu banyak percobaan gagal. Coba lagi beberapa saat lagi.";
     case "auth/network-request-failed":
-      return "Gagal terhubung ke server. Periksa koneksi internet kamu.";
-    default:
-      return "Gagal masuk. Periksa kembali email dan password kamu.";
+      return "Gagal terhubung ke Firebase. Periksa koneksi internet. Tidak ada mode demo otomatis.";
+    case 'auth/operation-not-allowed': return 'Login Email/Password belum diaktifkan pada proyek Firebase ini.';
+    case 'auth/unauthorized-domain': return 'Domain website belum diizinkan di Firebase Authentication.';
+    case 'auth/invalid-api-key':
+    case 'auth/app-not-authorized':
+    case 'auth/configuration-not-found':
+    case 'auth/invalid-app-credential': return 'Konfigurasi Firebase atau izin API key belum sesuai. Periksa proyek dan pembatasan API key.';
+    case 'auth/emulator-config-on-live': return 'Konfigurasi emulator ditemukan di website live. Gunakan konfigurasi Firebase proyek yang benar.';
+    case 'auth/user-token-expired':
+    case 'auth/invalid-user-token': return 'Sesi akun kedaluwarsa. Masuk kembali.';
+    default: return 'Autentikasi belum berhasil. Periksa kode error yang ditampilkan; kegagalan ini belum tentu karena password.';
   }
 }
 
@@ -970,13 +1032,20 @@ function renderSalesChart(){
   els.chartTitle.textContent=`Penerimaan penjualan — ${count} hari hingga ${jakartaDateLabel(new Date(+end-1))}`;
   els.salesChart.innerHTML=totals.map((total,i)=>{const height=total/max*110;return `<rect x="${i*width+2}" y="${115-height}" width="${Math.max(1,width-4)}" height="${height}" rx="2" fill="#7C2D3B"><title>${jakartaDateLabel(days[i])}: ${formatRupiah(total)}</title></rect>${i%Math.ceil(count/7)===0?`<text x="${i*width+width/2}" y="135" font-size="8" text-anchor="middle" fill="#69645b">${jakartaDateLabel(days[i],{day:'numeric',month:'short'})}</text>`:''}`;}).join('');
 }
+let moduleTimer;
 function showOperational(module){
   const allowed=['orders','couriers','slots','resellers','pricing','claims','settings','reconcile'];if(!allowed.includes(module.split('/')[0]))return;
   const view={resellers:'reseller',couriers:'pengiriman',slots:'jadwal',claims:'retur',orders:'pesanan',reconcile:'keuangan',pricing:'pengaturan',settings:'pengaturan'}[module.split('/')[0]];
   state.view='operasional';document.querySelectorAll('.view').forEach(v=>v.hidden=true);document.getElementById('view-operasional').hidden=false;
   document.querySelectorAll('.nav-item[data-view]').forEach(b=>b.classList.toggle('is-active',b.dataset.view===view));
   document.getElementById('breadcrumb-title').textContent=({reseller:'Reseller',pengiriman:'Pengiriman & Kurir',jadwal:'Jadwal Pengiriman',retur:'Retur & Komplain',pesanan:'Pesanan Website',keuangan:'Rekonsiliasi',pengaturan:'Pengaturan operasional'})[view];
-  document.getElementById('operational-frame').src='admin-website.html?embed=1#'+module;toggleDrawer(false);
+  clearTimeout(moduleTimer);document.getElementById('module-error').hidden=true;
+  const frame=document.getElementById('operational-frame');
+  const inspect=()=>{try{const content=frame.contentDocument?.getElementById('content');if(!content||/Memeriksa/.test(content.textContent)){document.getElementById('module-error').hidden=false;}}catch{document.getElementById('module-error').hidden=false;}};
+  frame.onload=()=>{try{if(!frame.contentDocument?.getElementById('content'))inspect();}catch{inspect();}};
+  frame.src='admin-website.html?embed=1#'+module;
+  moduleTimer=setTimeout(inspect,20000);
+  document.getElementById('module-retry').onclick=()=>showOperational(module);toggleDrawer(false);
 }
 function toggleDrawer(open){
   const wasOpen=document.body.classList.contains('drawer-open');
@@ -3854,6 +3923,7 @@ function navigateTo(view) {
   const module={reseller:'resellers',pengiriman:'couriers',jadwal:'slots',retur:'claims'}[view];
   if(module){showOperational(module);return;}
   const destination=document.getElementById('view-'+view);if(!destination)return;
+  clearTimeout(moduleTimer);document.getElementById('operational-frame').onload=null;
   document.getElementById('operational-frame').src='about:blank';toggleDrawer(false);
   document.getElementById('breadcrumb-title').textContent=view==='dashboard'?'Ringkasan toko':destination.querySelector('h1')?.textContent||'Admin';
   state.view = view;
@@ -3867,30 +3937,13 @@ function navigateTo(view) {
 
 function bindEvents() {
   bindAdminDashboard();
-  els.loginForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    showLoginError("");
-    const f = new FormData(els.loginForm);
-    const email = f.get("email").trim();
-    const password = f.get("password");
-
-    els.loginSubmitBtn.disabled = true;
-    els.loginSubmitBtn.textContent = "Memproses…";
-    try {
-      await authFns.signInWithEmailAndPassword(authInstance, email, password);
-      // onAuthStateChanged yang akan menangani transisi ke dashboard.
-    } catch (err) {
-      showLoginError(mapAuthErrorMessage(err.code));
-    } finally {
-      els.loginSubmitBtn.disabled = false;
-      els.loginSubmitBtn.textContent = "Masuk";
-    }
-  });
-
-  els.btnLogout.addEventListener("click", async () => {
-    if (!authInstance || !authFns) return;
-    await authFns.signOut(authInstance);
-    // onAuthStateChanged yang akan menampilkan kembali layar login.
+  els.loginForm.addEventListener('submit',submitAdminLogin);
+  document.getElementById('login-retry').onclick=()=>{void retryAdminLogin().catch(error=>{authCheckPending=false;setLoginBusy();loginFailure(error);});};
+  els.btnLogout.addEventListener('click',async()=>{
+    if(!authInstance||!authFns)return;
+    els.btnLogout.disabled=true;
+    try{await authFns.signOut(authInstance);}catch(error){showToast(mapAuthErrorMessage(error.code));}
+    finally{els.btnLogout.disabled=false;}
   });
 
   document.querySelectorAll(".nav-item[data-view]:not(.is-disabled)").forEach((btn) => {
@@ -4666,4 +4719,4 @@ async function init() {
 
 init();
 
-window.addEventListener('unhandledrejection', event => { showToast(event.reason?.message || 'Penyimpanan gagal. Periksa koneksi lalu coba lagi.'); });
+window.addEventListener('unhandledrejection',event=>{event.preventDefault();if(els.appRoot?.hidden){authSubmitPending=false;authCheckPending=false;showLoginScreen();setLoginBusy();loginFailure(event.reason);}else showToast('Operasi belum berhasil. Periksa koneksi dan coba lagi.');});
