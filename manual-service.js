@@ -1,5 +1,5 @@
 const randomUUID=()=>crypto.randomUUID();
-import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js';
+import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=manual-20260908-2';
 
 // Store contract: get/list outside a transaction; tx.get(path), tx.set/update/delete inside.
 // Every transaction below completes reads before staging writes. Firestore retries conflicts.
