@@ -271,15 +271,7 @@ async function initDataLayer() {
     const c = await connectShop();
     fbApp = c.app; fb = { db: c.db, ...c.fs }; authInstance = c.a; authFns = c.auth;
     storageInstance = c.bucket; storageFns = c.storage;
-    const verifyEmailButton=document.getElementById('verify-admin-email');
-    verifyEmailButton.onclick=async()=>{
-      verifyEmailButton.disabled=true;
-      try { await authFns.sendEmailVerification(authInstance.currentUser); showLoginError('Tautan verifikasi dikirim. Buka email tersebut, lalu muat ulang halaman admin.'); }
-      catch(err){showLoginError('Email verifikasi gagal dikirim. '+err.message);}
-      finally{verifyEmailButton.disabled=false;}
-    };
     authFns.onAuthStateChanged(authInstance, async (user) => {
-      verifyEmailButton.hidden=true;
       state.adminIdentity=null;state.deliverySlots=[];state.resellers=[];state.claims=[];state.ecommerce=null;
       Object.keys(state.ready).forEach(k=>state.ready[k]=false);
       document.getElementById('operational-frame').src='about:blank';toggleDrawer(false);
@@ -293,7 +285,7 @@ async function initDataLayer() {
         setConnectionBadge('connected', window.KUBAH_EMULATOR ? 'Emulator lokal — bukan produksi' : 'Terhubung ke Firebase');
         state.adminIdentity={name:user.displayName||user.email||'Admin',email:user.email||'',superAdmin:token.claims.superAdmin===true};
         showLoginError(''); enterApp(); renderAdminChrome(); subscribeFirestore();
-      } catch (err) { showLoginError(err.message||'Pemeriksaan akses gagal. Muat ulang untuk mencoba lagi.'); verifyEmailButton.hidden=user.emailVerified||authInstance.currentUser?.uid!==user.uid; }
+      } catch (err) { showLoginError(err.message||'Pemeriksaan akses gagal. Muat ulang untuk mencoba lagi.'); }
     });
   } catch (err) {
     state.mode = 'offline'; showLoginScreen(); setConnectionBadge('error', 'Gagal terhubung');
