@@ -1383,3 +1383,9 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .shipping-nav summary{cursor:pointer;padding:14px 16px;color:#e3e5e8;font-size:14px;list-style-position:inside}.shipping-nav>div{padding-left:16px}.shipping-nav .nav-item{font-size:13px}.photo-upload-btn{display:none!important}
 
 .variant-photo-upload-btn{display:none!important}
+
+/* Perapian identitas dan filter dashboard setelah tombol pesanan dipindahkan. */
+.sidebar .brand{align-items:center;gap:12px}.sidebar .brand-name strong{display:block;line-height:1.25}.sidebar .brand-name small{margin-top:4px;line-height:1.4}
+#view-dashboard .dash-controls{display:grid;justify-items:end;gap:8px;max-width:none}#view-dashboard .dashboard-date{margin:0}
+.finance-actions{display:flex;flex-wrap:wrap;gap:10px}#finance-backup-json{width:100%;font:12px/1.5 monospace}#finance-backup-panel details{margin-top:12px}
+@media(max-width:1100px){#view-dashboard .dash-controls{justify-items:start}#view-dashboard .dashboard-date{text-align:left}}
