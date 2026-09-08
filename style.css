@@ -1379,3 +1379,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 @media(max-width:1100px){.view-head.dash-head{flex-wrap:wrap}}
 @media(max-width:540px){.stat-row--3col{grid-template-columns:1fr}}
 @media(max-width:540px){#view-dashboard .stat{gap:9px;padding:14px 10px}#view-dashboard .stat>.ui-icon{width:32px;height:32px;padding:7px}#view-dashboard .stat-value{font-size:23px}}
+
+.free-banner{margin:0;padding:12px 24px;background:#f5e8d2;color:#553c20;font-size:13px;border-bottom:1px solid #dcc8a4;}
+label[hidden]{display:none!important;}
+
+.photo-upload-btn{display:none!important;}

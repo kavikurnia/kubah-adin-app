@@ -16,3 +16,5 @@ if (window.KUBAH_EMULATOR) window.FIREBASE_CONFIG = {
 
 // Harus sama dengan region backend Functions yang telah di-deploy.
 window.KUBAH_FUNCTIONS_REGION = 'asia-southeast2';
+
+window.KUBAH_FREE=true;
