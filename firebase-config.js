@@ -13,3 +13,8 @@ if (window.KUBAH_EMULATOR) window.FIREBASE_CONFIG = {
   apiKey:'demo-api-key', projectId:'demo-kubah-nabawi', authDomain:'demo-kubah-nabawi.firebaseapp.com',
   storageBucket:'demo-kubah-nabawi.appspot.com', appId:'demo-app-id'
 };
+
+// Versi ini memakai Auth + Firestore; tidak memanggil Cloud Functions/Storage.
+
+window.KUBAH_NO_BLAZE=true;
+window.KUBAH_RELEASE='manual-20260908-1';
