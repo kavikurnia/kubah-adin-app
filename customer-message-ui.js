@@ -1,5 +1,5 @@
-import {$,esc,table,form,select,area,bindForm,message,date} from './planning-ui.js?v=checkout-cloud-20260909-r5';
-import {customerMessages,PROGRAMS,MESSAGE_STATUS,messageNumber} from './customer-message-service.js?v=informasi-katalog-20260909-r6';
+import {$,esc,table,form,select,area,bindForm,message,date} from './planning-ui.js?v=katalog-pembeli-20260909-r7';
+import {customerMessages,PROGRAMS,MESSAGE_STATUS,messageNumber} from './customer-message-service.js?v=katalog-pembeli-20260909-r7';
 export async function renderCustomerMessages(U){
   const rows=await U.store.list('customerMessages');if(!U.isCurrent())return;
   rows.sort((a,b)=>Number(b.createdAt?.toMillis?.()||Date.parse(b.createdAt)||0)-Number(a.createdAt?.toMillis?.()||Date.parse(a.createdAt)||0));

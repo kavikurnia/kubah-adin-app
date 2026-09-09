@@ -1,18 +1,29 @@
-import {commerce} from './manual-service.js?v=checkout-cloud-20260909-r5';
-import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=checkout-cloud-20260909-r5';
+import {commerce} from './manual-service.js?v=katalog-pembeli-20260909-r7';
+import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
 import {manualStore} from './manual-store.js?v=admin-supplier-20260909-r3';
 import {manualAccess} from './manual-access.js?v=admin-supplier-20260909-r3';
 
-import {catalogEstimate} from './catalog-domain.js?v=checkout-cloud-20260909-r5';
+import {catalogEstimate,quoteSignature} from './catalog-domain.js?v=katalog-pembeli-20260909-r7';
+import {claimInput} from './buyer-domain.js?v=katalog-pembeli-20260909-r7';
 const iso=()=>new Date().toISOString();
 const adminActions=new Set(['adminData','savePayroll','saveConfig','saveProduct','saveSlot','saveCourier','reviewReseller','confirmShipping','verifyPayment','orderAction','reschedule','cancellationRefund','createManualOrder','legacyManualOrder','confirmRequest','rejectRequest','confirmClaimRequest','rejectClaimRequest','expireOrder']);
-export function publicSettings(raw){const c=config(raw||{});return {enabled:c.enabled,whatsapp:c.whatsapp,categories:c.categories,promos:c.promos,warehouse:c.warehouse,shipping:c.shipping,payments:c.payments,banks:c.banks,freeShipping:c.freeShipping,returnPolicy:c.returnPolicy,returnDays:c.returnDays,operatingDays:c.operatingDays,holidays:c.holidays};}
+export function publicSettings(raw){const c=config(raw||{});return {enabled:c.enabled,whatsapp:c.whatsapp,categories:c.categories,promos:c.promos,warehouse:c.warehouse,shipping:c.shipping,payments:c.payments,banks:c.banks,freeShipping:c.freeShipping,returnPolicy:c.returnPolicy,returnDays:c.returnDays,returnPolicyConfirmed:c.returnPolicyConfirmed===true,operatingDays:c.operatingDays,holidays:c.holidays};}
 function payload(raw){const p={orderOrigin:raw.orderOrigin==='reseller'?'reseller':'website',items:cartInput(raw.items),address:address(raw.address),mode:raw.mode,shippingMethod:raw.shippingMethod,paymentMethod:raw.paymentMethod,slotId:raw.slotId||'',voucher:str(raw.voucher||'',40),note:str(raw.note||'',1000)};check(['eceran','grosir'].includes(p.mode),'Mode belanja tidak valid.');check(['store','instant','regular','cargo','pickup'].includes(p.shippingMethod),'Metode pengiriman tidak valid.');check(['transfer','cash_store','cash_pickup'].includes(p.paymentMethod),'Pembayaran otomatis belum aktif.');if(p.slotId)id(p.slotId);check(p.paymentMethod!=='cash_store'||p.shippingMethod==='store','Tunai kurir untuk kurir toko.');check(p.paymentMethod!=='cash_pickup'||p.shippingMethod==='pickup','Tunai ambil sendiri untuk pengambilan.');return p;}
 function requestView(r,products=[],rates=[]){const p=r.payload,a=p.address;let estimate;try{estimate=catalogEstimate(p.items,products,p.mode,{},rates);}catch{}return {id:r.id,requestPending:true,invoiceNo:r.id,requestNumber:r.id,shippingState:'pending_admin',estimateOnly:true,salesChannel:p.orderOrigin||'website',customerId:r.customerId,customerName:a.name,phone:a.phone,address:a.text,addressData:a,createdAt:r.createdAt?.toDate?.().toISOString()||r.createdAt,status:r.status==='ditolak'?'dibatalkan':'menunggu_konfirmasi_admin',detailStatus:r.status==='ditolak'?'Ditolak admin: '+r.reviewNote:'Menunggu konfirmasi admin — harga, stok, jadwal, dan ongkir belum disetujui',items:estimate?.items||p.items.map(i=>({...i,productName:'Produk '+i.productId,variant:i.variantId,price:null,pcs:i.qty,lineTotal:null})),subtotal:estimate?.subtotal??null,discount:0,pcs:estimate?.pcs??p.items.reduce((s,i)=>s+i.qty,0),shippingCost:null,total:null,totalAccepted:false,paymentStatus:'belum_dibayar',paymentMethod:p.paymentMethod,shippingMethod:p.shippingMethod,cashStatus:'belum_dibayar',paidAmount:0,statusHistory:[],claims:[]};}
-async function once(store,path,data){return store.run(async tx=>{const old=await tx.get(path);if(old){check(old.customerId===data.customerId&&old.requestHash===data.requestHash,'Kunci permintaan telah digunakan untuk rincian berbeda.');return {id:path.split('/').pop()};}tx.set(path,data);return {id:path.split('/').pop()};});}
+async function once(store,path,data,validate=async()=>{}){return store.run(async tx=>{const old=await tx.get(path);if(old){check(old.customerId===data.customerId&&old.requestHash===data.requestHash,'Kunci permintaan telah digunakan untuk rincian berbeda.');return {id:path.split('/').pop()};}await validate(tx);tx.set(path,data);return {id:path.split('/').pop()};});}
+async function checkoutReview(reader,p,uid){
+ const [settings,reseller]=await Promise.all([reader.get('publicSettings/store'),reader.get('resellers/'+uid)]);
+ check(settings?.enabled&&settings.shipping?.[p.shippingMethod]&&settings.payments?.[p.paymentMethod],'Toko atau metode belum aktif.');
+ check(p.orderOrigin!=='reseller'||reseller?.status==='disetujui','Asal pesanan reseller memerlukan persetujuan akun.');
+ const ids=[...new Set(p.items.map(i=>i.productId))],products=await Promise.all(ids.map(async id=>{const v=await reader.get('catalog/'+id);return v?{...v,id}:null;}));
+ const rates=reseller?.status==='disetujui'?(await Promise.all(ids.map(id=>reader.get('resellerPrices/'+id)))).filter(Boolean):[];
+ if(p.shippingMethod==='store'){check(p.slotId,'Pilih jadwal kurir toko yang tersedia.');validateSlot(await reader.get('deliverySlots/'+p.slotId),config(settings));}
+ const q=catalogEstimate(p.items,products.filter(Boolean),p.mode,settings,rates,true);
+ return {...q,pricingSignature:quoteSignature(q)};
+}
 export async function manualApi(c,action,d={}){
   const store=manualStore(c),user=c.a.currentUser;
-  const core=commerce(store);
+  const core=commerce(store,{verifyFile:async file=>{const {documentStorage}=await import('./document-storage.js?v=katalog-pembeli-20260909-r7');await documentStorage(c).read(file);}});
   if(action==='catalog'){return {products:await store.list('catalog'),settings:publicSettings(await store.get('publicSettings/store'))};}
   if(action==='reviews')return store.list('reviews',[['productId','==',id(d.productId)]]);
   check(user,'Silakan masuk.','unauthenticated');const uid=user.uid,ctx={uid,role:'buyer'};
@@ -44,15 +55,12 @@ export async function manualApi(c,action,d={}){
   if(action==='slots'){const cfg=config(await store.get('publicSettings/store')||{});return (await store.list('deliverySlots')).filter(s=>{try{validateSlot(s,cfg);return true;}catch{return false;}}).map(s=>({id:s.id,startAt:s.startAt,endAt:s.endAt,remaining:s.capacity-s.used}));}
   if(action==='profile'||action==='reseller')return core.dispatch(ctx,{...d,action});
   if(action==='quote'){
-    const p=payload(d),[products,settings]=await Promise.all([store.list('catalog'),store.get('publicSettings/store')]);check(settings?.enabled,'Toko belum menerima permintaan pesanan.');
-    const reseller=await store.get('resellers/'+uid),rates=reseller?.status==='disetujui'?await store.list('resellerPrices'):[];
-    const q=catalogEstimate(p.items,products,p.mode,settings,rates);
+    const p=payload(d),q=await checkoutReview(store,p,uid);
     return {...q,shippingCost:null,total:null,shippingState:'pending_admin',estimateOnly:true,address:p.address};
   }
   if(action==='createOrder'){
-    const p=payload(d),key=id(d.key),rid='REQ-'+hash([uid,key]).slice(0,40),settings=await store.get('publicSettings/store');
-    check(settings?.enabled&&settings.shipping?.[p.shippingMethod]&&settings.payments?.[p.paymentMethod],'Toko atau metode belum aktif.');
-    const result=await once(store,'orderRequests/'+rid,{customerId:uid,key,payload:p,requestHash:hash(p),status:'menunggu_konfirmasi_admin',createdAt:c.fs.serverTimestamp()});
+    const p=payload(d),key=id(d.key),rid='REQ-'+hash([uid,key]).slice(0,40);
+    const result=await once(store,'orderRequests/'+rid,{customerId:uid,key,payload:p,requestHash:hash(p),status:'menunggu_konfirmasi_admin',createdAt:c.fs.serverTimestamp()},async tx=>{const q=await checkoutReview(tx,p,uid);check(!d.pricingSignature||d.pricingSignature===q.pricingSignature,'Harga atau isi paket berubah. Hitung ulang rincian sebelum mengirim pesanan.');});
     return {...result,invoiceNo:rid,requestPending:true};
   }
   if(action==='myOrders'){
@@ -75,8 +83,7 @@ export async function manualApi(c,action,d={}){
     const reason=str(d.reason,500,true);return once(store,path,{customerId:uid,orderId,reason,requestHash:hash([orderId,reason]),type:'cancel',createdAt:c.fs.serverTimestamp()});
   }
   if(action==='claim'){
-    const p={orderId:id(d.orderId),items:cartInput(d.items),reason:str(d.reason,100,true),description:str(d.description,3000,true)},key=id(d.key),rid='CR-'+hash([uid,key]).slice(0,40);
-    const o=await store.get('orders/'+p.orderId);check(o?.customerId===uid&&['dikirim','selesai'].includes(o.status),'Komplain tersedia setelah dikirim.');
+    const o=await store.get('orders/'+id(d.orderId)),p=claimInput(d,o,uid),key=id(d.key),rid='CR-'+hash([uid,key]).slice(0,40);
     return once(store,'claimRequests/'+rid,{customerId:uid,key,payload:p,requestHash:hash(p),status:'menunggu',createdAt:c.fs.serverTimestamp()});
   }
   if(action==='claimAction'&&d.operation==='reply'){

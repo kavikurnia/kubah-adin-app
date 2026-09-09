@@ -1,4 +1,5 @@
 import {MAX_DOCUMENT_BYTES,need,filePath} from './reseller-service.js?v=admin-supplier-20260909-r3';
+import {buyerFilePath} from './buyer-domain.js?v=katalog-pembeli-20260909-r7';
 export async function blobHash(blob){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),x=>x.toString(16).padStart(2,'0')).join('');}
 export async function detectedMime(file){
  const b=new Uint8Array(await file.slice(0,12).arrayBuffer());
@@ -62,5 +63,7 @@ export function documentStorage(c,{config=globalThis.SUPABASE_DOCUMENTS,fetcher=
   onProgress(97,'Memeriksa hasil tersimpan');await read(file);onProgress(100,'Berkas tersimpan dan terverifikasi');return file;
  }
  async function checkAdminAccess(){const h=await headers(),r=await fetcher(config.url+'/rest/v1/rpc/kn_document_admin',{method:'POST',headers:{...h,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(15000)});need(r.ok&&await r.json()===true,'Akses admin Supabase belum terverifikasi. Periksa integrasi Firebase, claim, dan sinkronisasi izin.');return true;}
- return {read,upload,uploadSupplier,access,checkAdminAccess};
+ async function buyerAccess(orderId){const h=await headers(),r=await fetcher(`${config.url}/rest/v1/kn_doc_buyer_orders?order_id=eq.${encodeURIComponent(orderId)}&select=order_id,invoice_no,customer_uid,active`,{headers:h});need(r.ok,'Upload komplain belum tersedia. Admin perlu memasang aturan dokumen pembeli.');const rows=await r.json();need(rows.length===1&&rows[0].active,'Upload komplain pesanan ini belum diaktifkan admin. Pengajuan tanpa lampiran tetap dapat disimpan.');return rows[0];}
+ async function uploadBuyer(prepared,{uid,orderId,invoiceNo,onProgress=()=>{}}){const grant=await buyerAccess(orderId);need(grant.customer_uid===uid&&grant.invoice_no===invoiceNo,'Pemilik/invoice bukti tidak sesuai.');need(prepared.size<=MAX_DOCUMENT_BYTES,'Berkas maksimal 2 MB.');return put(prepared,{objectName:buyerFilePath(uid,orderId,prepared.sha256,prepared.mime),sha256:prepared.sha256,mime:prepared.mime,size:prepared.size},onProgress);}
+ return {read,upload,uploadSupplier,access,checkAdminAccess,buyerAccess,uploadBuyer};
 }

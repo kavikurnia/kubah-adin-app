@@ -1,6 +1,6 @@
-import {connect,withDeadline,esc,date,message,busy} from './shop-client.js?v=checkout-cloud-20260909-r5';
+import {connect,withDeadline,esc,date,message,busy} from './shop-client.js?v=katalog-pembeli-20260909-r7';
 import {manualStore} from './manual-store.js?v=admin-supplier-20260909-r3';
-import {PROGRAMS,customerMessages,messagePayload,messageNumber,MESSAGE_STATUS} from './customer-message-service.js?v=informasi-katalog-20260909-r6';
+import {PROGRAMS,customerMessages,messagePayload,messageNumber,MESSAGE_STATUS} from './customer-message-service.js?v=katalog-pembeli-20260909-r7';
 
 export const MAP_URL='https://maps.app.goo.gl/YEehCmwGr1Sjg6re6?g_st=ic';
 export const STORE_NAME='Kubah Nabawi Store';

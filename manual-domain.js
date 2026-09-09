@@ -82,7 +82,7 @@ export function validatePricing(raw={}) {
 // Explicit allowlist: never spread an internal product/variant into a public document.
 export function publicProduct(p,productId) {
   const w=validatePricing(p.website);if(p.status!=='aktif'||!w.enabled)return null;
-  return {id:productId,name:p.name,category:p.category||'',description:p.description||'',specifications:String(p.specifications||''),sku:p.sku||'',weight:p.weight||0,
+  return {id:productId,name:p.name,category:p.category||'',description:p.description||'',specifications:String(p.specifications||''),sku:p.sku||'',weight:p.weight||0,createdAt:p.createdAt?.toDate?.().toISOString()||(typeof p.createdAt==='string'?p.createdAt:null),material:String(p.material||p.bahan||''),size:String(p.size||''),thickness:String(p.thickness||''),conditions:String(p.conditions||''),
     images:(p.images?.length?p.images:[{url:p.photoUrl}]).filter(i=>safeURL(i.url)).map(i=>({url:safeURL(i.url),isPrimary:!!i.isPrimary})),
     saleUnit:p.saleUnit||'unit',subcategory:p.subcategory||'',collections:p.collections?.includes('paket-grosir')?['paket-grosir']:[],price:w.retail,packPcs:w.packPcs,promo:!!w.promo,tiers:w.tiers,combine:w.combine,group:w.group,
     variants:p.variants.map(v=>({id:v.id,color:v.color||v.name||'',size:v.size||'',sku:v.sku||'',image:safeURL(v.image),stock:v.stock,pricing:{retail:v.pricing?.retail||null,wholesale:v.pricing?.wholesale||null}}))};

@@ -1,9 +1,9 @@
-import {$,esc,money,date,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download,filtered} from './planning-ui.js?v=checkout-cloud-20260909-r5';
-import {supplierService,supplierDocumentId} from './supplier-service.js?v=checkout-cloud-20260909-r5';
-import {storageConfiguration,prepareDocument,documentStorage} from './document-storage.js?v=admin-supplier-20260909-r3';
-import {wibDay,dueState,csv} from './planning-domain.js?v=checkout-cloud-20260909-r5';
-import {check} from './manual-domain.js?v=checkout-cloud-20260909-r5';
-import {renderSupplierWorkflow} from './supplier-workflow-ui.js?v=checkout-cloud-20260909-r5';
+import {$,esc,money,date,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download,filtered} from './planning-ui.js?v=katalog-pembeli-20260909-r7';
+import {supplierService,supplierDocumentId} from './supplier-service.js?v=katalog-pembeli-20260909-r7';
+import {storageConfiguration,prepareDocument,documentStorage} from './document-storage.js?v=katalog-pembeli-20260909-r7';
+import {wibDay,dueState,csv} from './planning-domain.js?v=katalog-pembeli-20260909-r7';
+import {check} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
+import {renderSupplierWorkflow} from './supplier-workflow-ui.js?v=katalog-pembeli-20260909-r7';
 const TABS=[['ringkasan','Ringkasan'],['data','Data Supplier'],['penerimaan','Surat Jalan & Penerimaan'],['tagihan','Tagihan & Nota'],['pembayaran','Pembayaran'],['pencocokan','Pencocokan Dokumen'],['arsip','Arsip Dokumen'],['pengajuan','Pengajuan Kerja Sama']];
 const REPORT_LABELS={code:'Kode',name:'Nama Supplier',pic:'PIC',phone:'Telepon',email:'Email',address:'Alamat',category:'Kategori',paymentTerms:'Termin (hari)',active:'Aktif',productName:'Produk',sku:'SKU',receiptId:'ID surat jalan',documentNo:'No. dokumen',quality:'Kualitas',delivery:'Ketepatan kirim',completeness:'Kelengkapan jumlah',response:'Respons komplain',scoredCount:'Aspek dinilai',average:'Rata-rata',notes:'Catatan',actor:'Penilai',number:'No. dokumen',poRef:'Referensi PO',status:'Status',shortage:'Kurang (unit)',damaged:'Rusak (unit)',documentId:'ID dokumen',reference:'Referensi',amount:'Nominal (Rp)',verifiedPaid:'Terbayar (Rp)',credits:'Kredit (Rp)',remaining:'Sisa (Rp)',dueDate:'Jatuh tempo',allocations:'Alokasi tagihan',total:'Nilai barang layak (Rp)'};
 const EVENT_LABELS={stock_allocated:'Alokasi stok',po_saved:'PO disimpan',invoice_lines:'Rincian nota',document_match:'Pencocokan dokumen',application_review:'Tinjauan pengajuan',application_link:'Supplier dihubungkan',partnership_content:'Konten kerja sama',receipt_revision:'Revisi surat jalan',receipt_verified:'Barang diterima',receipt_correction:'Perbaikan surat jalan',invoice_revision:'Revisi nota',invoice_review:'Pemeriksaan nota',payment_revision:'Revisi pembayaran',payment_verified:'Pembayaran diverifikasi',payment_correction:'Perbaikan bukti pembayaran',payment_reversed:'Pengembalian dana',invoice_cancelled:'Nota dibatalkan',return_credit:'Kredit retur',evaluation:'Evaluasi',supplier:'Data Supplier'};

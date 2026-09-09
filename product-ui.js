@@ -1,7 +1,7 @@
-import {$,esc,money,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download} from './planning-ui.js?v=checkout-cloud-20260909-r5';
-import {CATEGORIES,IMPORT_COLUMNS,IMPORT_LABELS,importPreview,pricingInput,skuId,csv,unitPrice} from './planning-domain.js?v=checkout-cloud-20260909-r5';
-import {productService} from './product-service.js?v=checkout-cloud-20260909-r5';
-import {check,num} from './manual-domain.js?v=checkout-cloud-20260909-r5';
+import {$,esc,money,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download} from './planning-ui.js?v=katalog-pembeli-20260909-r7';
+import {CATEGORIES,IMPORT_COLUMNS,IMPORT_LABELS,importPreview,pricingInput,skuId,csv,unitPrice} from './planning-domain.js?v=katalog-pembeli-20260909-r7';
+import {productService} from './product-service.js?v=katalog-pembeli-20260909-r7';
+import {check,num} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
 let filter={query:'',category:'',status:''};
 const excel=(name,rows)=>{check(globalThis.XLSX,'Pustaka Excel belum termuat. Periksa koneksi lalu coba lagi, atau gunakan CSV.');const sheet=XLSX.utils.json_to_sheet(rows.map(r=>Object.fromEntries(IMPORT_COLUMNS.map((k,i)=>[IMPORT_LABELS[i],r[k]??'']))),{header:IMPORT_LABELS}),book=XLSX.utils.book_new();sheet['!cols']=IMPORT_COLUMNS.map(k=>({wch:['name','description','photos'].includes(k)?36:20}));XLSX.utils.book_append_sheet(book,sheet,'Produk');XLSX.writeFile(book,name);};
 export async function renderProducts(U){const products=await U.store.list('products');if(!U.isCurrent())return;const active=U.tab==='impor'?'impor':U.tab==='migrasi'?'migrasi':'daftar';

@@ -1,6 +1,7 @@
-import {unitPrice} from './planning-domain.js?v=checkout-cloud-20260909-r5';
+import {unitPrice} from './planning-domain.js?v=katalog-pembeli-20260909-r7';
+import {claimEvidence} from './buyer-domain.js?v=katalog-pembeli-20260909-r7';
 const randomUUID=()=>crypto.randomUUID();
-import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=checkout-cloud-20260909-r5';
+import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
 
 // Store contract: get/list outside a transaction; tx.get(path), tx.set/update/delete inside.
 // Every transaction below completes reads before staging writes. Firestore retries conflicts.
@@ -93,7 +94,7 @@ export function commerce(store,providers={}) {
     check(typeof d.path==='string'&&d.path.startsWith('evidence/'+d.orderId+'/'),'Lokasi bukti tidak valid.');
     return o;
   }
-  async function verifyEvidence(ctx,oid,paths){check(Array.isArray(paths)&&paths.length<=6,'Maksimal enam bukti.');for(const path of paths){check(typeof path==='string'&&path.startsWith(`evidence/${oid}/${ctx.uid}/`),'Bukti harus milik pengunggah.');check(providers.verifyFile,'Penyimpanan bukti belum tersedia.');await providers.verifyFile(path);}return paths;}
+  async function verifyEvidence(ctx,oid,paths){check(Array.isArray(paths)&&paths.length<=6,'Maksimal enam bukti.');for(const path of paths){if(typeof path==='object')claimEvidence([path],ctx.uid,oid);else check(typeof path==='string'&&path.startsWith(`evidence/${oid}/${ctx.uid}/`),'Bukti harus milik pengunggah.');check(providers.verifyFile,'Penyimpanan bukti belum tersedia.');await providers.verifyFile(path);}return paths;}
   async function proof(ctx,d){user(ctx);await verifyEvidence(ctx,id(d.orderId),[d.path]);return store.run(async tx=>{const path='orders/'+d.orderId,o=await tx.get(path);owner(ctx,o);canPay(o,time());check(o.paymentMethod==='transfer'&&o.paidAmount===0,'Pesanan tidak memerlukan bukti transfer.');tx.update(path,{proofPath:d.path,paymentStatus:'perlu_verifikasi',status:'perlu_verifikasi',statusHistory:history(o,'perlu_verifikasi',ctx,'Bukti diterima, dana belum diverifikasi.')});return {ok:true};});}
   function ledger(tx,key,o,amount,type,description,ctx){tx.set('transactions/'+key,{date:iso().slice(0,10),createdAt:iso(),type,amount,description,category:type==='masuk'?'Penjualan':'Refund',orderId:o.invoiceNo,verifiedBy:ctx.uid||'gateway',managed:true});}
   async function payment(ctx,d){admin(ctx);return store.run(async tx=>{
@@ -186,7 +187,7 @@ export function commerce(store,providers={}) {
     return store.run(async tx=>{const prev=await tx.get('claims/'+cid);if(prev){check(prev.customerId===ctx.uid&&prev.orderId===oid,'Kunci pengajuan berbeda.');return {id:cid};}
       const request=d.requestId?await tx.get('claimRequests/'+id(d.requestId)):null;if(d.requestId)check(request?.customerId===ctx.uid&&request.status==='menunggu','Pengajuan sudah diproses.');
       const o=await tx.get('orders/'+oid);owner(ctx,o);const c=config(await tx.get('settings/ecommerce'));
-      check(['dikirim','selesai'].includes(o.status),'Komplain tersedia setelah dikirim.');check(!o.deliveredAt||time()<=Date.parse(o.deliveredAt)+c.returnDays*86400000,'Batas pengajuan retur telah lewat.');
+      check(['dikirim','selesai'].includes(o.status),'Komplain tersedia setelah dikirim.');check(!c.returnPolicyConfirmed||!o.deliveredAt||time()<=Date.parse(o.deliveredAt)+c.returnDays*86400000,'Batas pengajuan retur telah lewat.');
       const lines=cartInput(d.items),counts={...(o.claimedQuantities||{})};let maxRefund=0;
       for(const x of lines){const i=o.items.find(i=>i.productId===x.productId&&i.variantId===x.variantId);check(i,'Barang bukan bagian pesanan.');const k=x.productId+'_'+x.variantId;check((counts[k]||0)+x.qty<=i.qty,'Jumlah komplain melebihi hak pesanan.');counts[k]=(counts[k]||0)+x.qty;maxRefund+=Math.floor(i.price*x.qty*(o.subtotal-o.discount)/o.subtotal);}
       const reasons=['Barang salah','Varian salah','Jumlah kurang','Barang rusak','Barang belum diterima','Lainnya'];check(reasons.includes(d.reason),'Alasan tidak valid.');
@@ -272,7 +273,7 @@ export function commerce(store,providers={}) {
       case 'acceptTotal':return acceptTotal(ctx,d);
       case 'proof':return proof(ctx,d);
       case 'claim':return claim(ctx,d);
-      case 'confirmClaimRequest':{admin(ctx);const r=await store.get('claimRequests/'+id(d.requestId));check(r,'Pengajuan tidak ditemukan.');if(r.status==='dikonfirmasi')return {id:r.claimId};return claim({uid:r.customerId,role:'admin',actorId:ctx.uid},{...r.payload,key:r.key,requestId:d.requestId,evidence:[]});}
+      case 'confirmClaimRequest':{admin(ctx);const r=await store.get('claimRequests/'+id(d.requestId));check(r,'Pengajuan tidak ditemukan.');if(r.status==='dikonfirmasi')return {id:r.claimId};return claim({uid:r.customerId,role:'admin',actorId:ctx.uid},{...r.payload,key:r.key,requestId:d.requestId,evidence:r.payload.evidence||[]});}
       case 'rejectClaimRequest':{admin(ctx);return store.run(async tx=>{const path='claimRequests/'+id(d.requestId),r=await tx.get(path);check(r?.status==='menunggu','Pengajuan sudah diproses.');tx.update(path,{status:'ditolak',reviewNote:str(d.note,1000,true),reviewedBy:ctx.uid,reviewedAt:iso()});return {ok:true};});}
       case 'claimAction':return claimAction(ctx,{...d,action:d.operation});
       case 'review':return review(ctx,d);
