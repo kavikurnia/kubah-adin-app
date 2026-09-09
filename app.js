@@ -1031,7 +1031,7 @@ function showOperational(module){
   frame.onload=()=>{try{if(!frame.contentDocument?.getElementById('content'))inspect();}catch{inspect();}};
   const page=module.split('/')[0];
   if(['shipping','couriers','slots','products','suppliers','calculator','neworder','pricing'].includes(page)){frame.src='planning-admin.html?v=admin-lengkap-20260909&embed=1#'+(({couriers:'shipping/kurir',slots:'shipping/jadwal',pricing:'products/migrasi'})[module]||module);}
-  else frame.src=module==='resellers'?'reseller-admin.html?v=admin-lengkap-20260909&embed=1#ringkasan':'admin-website.html?v=admin-lengkap-20260909&embed=1#'+module;
+  else frame.src=page==='resellers'?'reseller-admin.html?v=admin-lengkap-20260909&embed=1#'+(module.split('/')[1]||'ringkasan'):'admin-website.html?v=admin-lengkap-20260909&embed=1#'+module;
   moduleTimer=setTimeout(inspect,20000);
   document.getElementById('module-retry').onclick=()=>showOperational(module);toggleDrawer(false);
 }
@@ -4765,6 +4765,6 @@ window.addEventListener('unhandledrejection',event=>{event.preventDefault();if(e
 
 function openProductModal(product){showOperational("products/"+(product?.id||"new"));}
 
-window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==document.getElementById('operational-frame')?.contentWindow||e.data?.type!=='kubah-admin-route')return;const route=e.data.route;if(/^(shipping|products|suppliers|calculator|neworder)(\/[A-Za-z0-9_-]*){0,2}$/.test(route))history.replaceState(null,'','#module/'+route);});
+window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==document.getElementById('operational-frame')?.contentWindow||e.data?.type!=='kubah-admin-route')return;const route=e.data.route;if(/^(shipping|products|suppliers|calculator|neworder|resellers|orders|reconcile|claims|settings)(\/[A-Za-z0-9_-]*){0,2}$/.test(route))history.replaceState(null,'','#module/'+route);});
 function restoreAdminRoute(){if(els.appRoot?.hidden)return;const path=location.hash.slice(1);if(path.startsWith('module/'))showOperational(path.slice(7));else if(path.startsWith('view/'))navigateTo(path.slice(5));else if(path==='jadwal')showOperational('shipping/jadwal');else if(path==='pengiriman')showOperational('shipping/kelola');}
 window.addEventListener('popstate',restoreAdminRoute);
