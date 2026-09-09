@@ -1,4 +1,4 @@
-import {connect,login,logout,ensureAdminAccess,api,esc,money} from './shop-client.js?v=admin-supplier-20260909-r3';
+import {connect,login,logout,ensureAdminAccess,api,esc,money} from './shop-client.js?v=katalog-penawaran-20260909-r4';
 import {manualStore} from './manual-store.js?v=admin-supplier-20260909-r3';
 import {resellerService,totals,need} from './reseller-service.js?v=admin-supplier-20260909-r3';
 import {prepareDocument,documentStorage,storageConfiguration} from './document-storage.js?v=admin-supplier-20260909-r3';

@@ -1,4 +1,4 @@
-import {esc,money,date,api,formValues,message,busy} from './shop-client.js?v=admin-supplier-20260909-r3';
+import {esc,money,date,api,formValues,message,busy} from './shop-client.js?v=katalog-penawaran-20260909-r4';
 import {wibDay} from './planning-domain.js?v=admin-supplier-20260909-r3';
 export {esc,money,date,api,formValues,message,busy};
 export const $=s=>document.querySelector(s);

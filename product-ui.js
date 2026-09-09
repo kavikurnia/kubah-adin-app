@@ -1,4 +1,4 @@
-import {$,esc,money,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download} from './planning-ui.js?v=admin-supplier-20260909-r3';
+import {$,esc,money,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download} from './planning-ui.js?v=katalog-penawaran-20260909-r4';
 import {CATEGORIES,IMPORT_COLUMNS,IMPORT_LABELS,importPreview,pricingInput,skuId,csv,unitPrice} from './planning-domain.js?v=admin-supplier-20260909-r3';
 import {productService} from './product-service.js?v=admin-supplier-20260909-r3';
 import {check,num} from './manual-domain.js?v=admin-supplier-20260909-r3';

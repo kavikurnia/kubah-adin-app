@@ -1,6 +1,6 @@
 import {salesChannel,CHANNELS} from './planning-domain.js?v=admin-supplier-20260909-r3';
 import {priceCart,config} from './manual-domain.js?v=admin-supplier-20260909-r3';
-import {api,connect,logout,ensureAdminAccess,viewEvidence,money,date,esc,$,label,formValues,message,busy} from './shop-client.js?v=admin-supplier-20260909-r3';
+import {api,connect,logout,ensureAdminAccess,viewEvidence,money,date,esc,$,label,formValues,message,busy} from './shop-client.js?v=katalog-penawaran-20260909-r4';
 if(new URLSearchParams(location.search).get('embed')==='1'&&window.parent!==window)document.body.classList.add('embedded');
 let data,authorized=false;
 const input=(name,text,value='',type='text',extra='')=>`<label class="field">${text}<input name="${name}" type="${type}" value="${esc(value)}" ${extra}></label>`;
