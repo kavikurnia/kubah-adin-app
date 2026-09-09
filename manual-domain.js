@@ -1,4 +1,4 @@
-import {sha256} from './sha256.js?v=manual-20260908-2';
+import {sha256} from './sha256.js?v=admin-lengkap-20260909';
 const randomUUID=()=>crypto.randomUUID();
 export class Fault extends Error { constructor(message, code='failed-precondition') {super(message);this.code=code;} }
 export function check(ok, message, code) {if(!ok) throw new Fault(message,code);}
@@ -55,6 +55,7 @@ export function normalizeProduct(raw, old={}) {
     const prev=previous.get(v.id)||{};
     const out={...prev,...v,id:v.id?id(v.id):randomUUID(),stock:num(v.stock),reserved:prev.reserved||0};
     for(const k of ['hpp','priceOffline','priceOnline']) if(out[k]!=null) num(out[k]);
+    if(out.pricing){out.pricing={retail:out.pricing.retail?num(out.pricing.retail,1):null,wholesale:out.pricing.wholesale?num(out.pricing.wholesale,1):null};}
     for(const k of ['color','size','sku']) out[k]=str(out[k]||'',100);
     out.image=safeURL(out.image);return out;
   });
@@ -71,6 +72,7 @@ export function validatePricing(raw={}) {
   num(w.retail);num(w.packPcs,1,10000);check(['all','product','variant'].includes(w.combine),'Gabungan grosir tidak valid.');
   str(w.group,80);check(Array.isArray(w.tiers)&&w.tiers.length<=10,'Tingkat grosir tidak valid.');
   w.tiers=w.tiers.map(t=>({minPcs:num(t.minPcs,1,1000000),price:num(t.price,1)})).sort((a,b)=>a.minPcs-b.minPcs);
+  check(new Set(w.tiers.map(t=>t.minPcs)).size===w.tiers.length,'Minimum tingkat grosir tidak boleh berulang.');
   w.reseller={price:num(w.reseller?.price||0),minPcs:num(w.reseller?.minPcs||20,1,1000000)};
   if(w.enabled)check(w.retail>0,'Harga website harus diatur secara eksplisit.');return w;
 }
@@ -79,8 +81,8 @@ export function publicProduct(p,productId) {
   const w=validatePricing(p.website);if(p.status!=='aktif'||!w.enabled)return null;
   return {id:productId,name:p.name,category:p.category||'',description:p.description||'',specifications:String(p.specifications||''),sku:p.sku||'',weight:p.weight||0,
     images:(p.images?.length?p.images:[{url:p.photoUrl}]).filter(i=>safeURL(i.url)).map(i=>({url:safeURL(i.url),isPrimary:!!i.isPrimary})),
-    price:w.retail,packPcs:w.packPcs,promo:!!w.promo,tiers:w.tiers,combine:w.combine,group:w.group,
-    variants:p.variants.map(v=>({id:v.id,color:v.color||v.name||'',size:v.size||'',sku:v.sku||'',image:safeURL(v.image),stock:v.stock}))};
+    saleUnit:p.saleUnit||'unit',subcategory:p.subcategory||'',collections:p.collections?.includes('paket-grosir')?['paket-grosir']:[],price:w.retail,packPcs:w.packPcs,promo:!!w.promo,tiers:w.tiers,combine:w.combine,group:w.group,
+    variants:p.variants.map(v=>({id:v.id,color:v.color||v.name||'',size:v.size||'',sku:v.sku||'',image:safeURL(v.image),stock:v.stock,pricing:{retail:v.pricing?.retail||null,wholesale:v.pricing?.wholesale||null}}))};
 }
 export function cartInput(items) {
   check(Array.isArray(items)&&items.length>0&&items.length<=60,'Isi 1–60 baris keranjang.','invalid-argument');
@@ -99,8 +101,8 @@ export function priceCart(input,products,mode,reseller,c,voucherCode='',time=Dat
   const groups=new Map();for(const r of rows) {const k=groupKey(r,r.w,r.w.combine);groups.set(k,(groups.get(k)||0)+r.pcs);}
   let usesReseller=false;
   const items=rows.map(r=>{
-    const n=groups.get(groupKey(r,r.w,r.w.combine));let price=r.w.retail,priceKind='eceran';
-    if(mode==='grosir')for(const tier of r.w.tiers)if(n>=tier.minPcs){price=tier.price;priceKind='grosir';}
+    const n=groups.get(groupKey(r,r.w,r.w.combine));let price=r.v.pricing?.retail||r.w.retail,priceKind='eceran';
+    if(mode==='grosir')for(const tier of r.w.tiers)if(n>=tier.minPcs){price=r.v.pricing?.wholesale||tier.price;priceKind='grosir';}
     if(reseller?.status==='disetujui'&&r.w.reseller.price>0&&n>=r.w.reseller.minPcs){price=r.w.reseller.price;priceKind='reseller';usesReseller=true;}
     const next=r.w.tiers.find(t=>t.minPcs>n);
     return {productId:r.productId,variantId:r.variantId,productName:r.p.name,variant:[r.v.color||r.v.name,r.v.size].filter(Boolean).join(' / '),sku:r.v.sku||'',qty:r.qty,packPcs:r.w.packPcs,pcs:r.pcs,price,priceKind,lineTotal:price*r.qty,weight:r.p.weight||0,promo:!!r.w.promo,extraWholesalePcs:next?next.minPcs-n:0};

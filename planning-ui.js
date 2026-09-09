@@ -1,0 +1,14 @@
+import {esc,money,date,api,formValues,message,busy} from './shop-client.js?v=admin-lengkap-20260909';
+import {wibDay} from './planning-domain.js?v=admin-lengkap-20260909';
+export {esc,money,date,api,formValues,message,busy};
+export const $=s=>document.querySelector(s);
+export const input=(name,label,value='',type='text',extra='')=>`<label class="field">${esc(label)}<input name="${esc(name)}" type="${type}" value="${esc(value??'')}" ${extra}></label>`;
+export const area=(name,label,value='')=>`<label class="field full">${esc(label)}<textarea name="${esc(name)}" maxlength="10000">${esc(value)}</textarea></label>`;
+export const select=(name,label,options,value='')=>`<label class="field">${esc(label)}<select name="${esc(name)}">${options.map(o=>{const [v,t]=Array.isArray(o)?o:[o,o];return `<option value="${esc(v)}" ${String(v)===String(value)?'selected':''}>${esc(t)}</option>`;}).join('')}</select></label>`;
+export const checkbox=(name,label,checked=false)=>`<label class="pill-check"><input type="checkbox" name="${name}" ${checked?'checked':''}>${esc(label)}</label>`;
+export const tabs=(base,items,active)=>`<nav class="tabs" aria-label="Tab modul">${items.map(([key,label])=>`<a href="#${base}/${key}" ${key===active?'aria-current="page"':''}>${esc(label)}</a>`).join('')}</nav>`;
+export const table=(headers,rows)=>`<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map(c=>`<td>${c??'—'}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${headers.length}">Belum ada data sesuai filter.</td></tr>`}</tbody></table></div>`;
+export const form=(id,html,button='Simpan')=>`<form id="${id}" class="panel"><div class="form-grid">${html}</div><button class="primary">${button}</button></form>`;
+export const bindForm=(id,fn)=>{const f=document.getElementById(id);if(f)f.onsubmit=e=>{e.preventDefault();busy(e.submitter,()=>fn(formValues(f),f,e));};};
+export function download(name,content,type='text/csv;charset=utf-8'){const url=URL.createObjectURL(content instanceof Blob?content:new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+export function filtered(rows,f){const q=(f.query||'').toLowerCase();return rows.filter(r=>{const period=r.period||'',raw=r.date||r.createdAt?.toDate?.().toISOString()||r.createdAt||'',at=raw?(/^\d{4}-\d{2}-\d{2}$/.test(String(raw))?String(raw):wibDay(raw)):'',from=period?String(f.from||'').slice(0,7):f.from,to=period?String(f.to||'').slice(0,7):f.to,d=period||at;return (!f.supplierId||r.supplierId===f.supplierId||r.id===f.supplierId)&&(!f.status||(r.status||(r.active===true?'aktif':r.active===false?'nonaktif':''))===f.status)&&(!from||d>=from)&&(!to||d<=to)&&(!q||[r.name,r.number,r.reference,r.supplierName,r.code,r.productName].some(x=>String(x||'').toLowerCase().includes(q)));});}

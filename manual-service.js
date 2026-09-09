@@ -1,5 +1,6 @@
+import {unitPrice} from './planning-domain.js?v=admin-lengkap-20260909';
 const randomUUID=()=>crypto.randomUUID();
-import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=manual-20260908-2';
+import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=admin-lengkap-20260909';
 
 // Store contract: get/list outside a transaction; tx.get(path), tx.set/update/delete inside.
 // Every transaction below completes reads before staging writes. Firestore retries conflicts.
@@ -24,7 +25,7 @@ export function commerce(store,providers={}) {
   async function createOrder(ctx,d,manual=false){
     if(manual)admin(ctx);else user(ctx);
     const items=cartInput(d.items),a=address(d.address),key=id(d.key),method=d.shippingMethod;
-    const payload={items,address:a,mode:d.mode,shippingMethod:method,slotId:d.slotId||'',paymentMethod:d.paymentMethod,voucher:d.voucher||'',note:str(d.note||'',1000),requestId:d.requestId||'',verifiedFee:d.verifiedFee??null,verifiedDistanceKm:d.verifiedDistanceKm??null,verificationNote:d.verificationNote||''};
+    const payload={items,address:a,mode:d.mode,shippingMethod:method,slotId:d.slotId||'',paymentMethod:d.paymentMethod,voucher:d.voucher||'',note:str(d.note||'',1000),requestId:d.requestId||'',orderOrigin:d.orderOrigin||'website',verifiedFee:d.verifiedFee??null,verifiedDistanceKm:d.verifiedDistanceKm??null,verificationNote:d.verificationNote||''};
     const fingerprint=hash(payload),oid='KN-'+hash([ctx.uid,key]).slice(0,32),path='orders/'+oid;
     const existing=await store.get(path);if(existing){check(existing.requestHash===fingerprint,'Kunci checkout telah dipakai untuk rincian lain.');return {id:oid,invoiceNo:existing.invoiceNo};}
     const c0=await settings(),route=await routeFor(a,c0),configHash=hash(c0);
@@ -34,6 +35,8 @@ export function commerce(store,providers={}) {
       if(d.requestId)check(request&&request.customerId===ctx.uid&&request.status==='menunggu_konfirmasi_admin','Permintaan sudah diproses atau bukan milik pelanggan.');
       const c=config(await tx.get('settings/ecommerce'));check(hash(c)===configHash,'Pengaturan berubah. Hitung ulang checkout.');check(c.enabled||manual,'Toko belum menerima pesanan.');
       const r=await tx.get('resellers/'+ctx.uid),m=await productMap(tx,items);
+      const channel=d.orderOrigin==='reseller'?'reseller':d.requestId?'website':manual?'manual_admin':'website';
+      if(channel==='reseller')check(r?.status==='disetujui','Pesanan reseller memerlukan reseller aktif.');
       let priced=priceCart(items,m,d.mode,r,c,d.voucher,time());
       const ship=d.requestId?(method==='store'?shipping(priced,method,{km:d.verifiedDistanceKm},c):method==='pickup'?shipping(priced,method,null,c):{shippingCost:num(d.verifiedFee),shippingState:'confirmed',distanceKm:null,promoApplied:false}):shipping(priced,method,route,c);
       if(d.requestId){str(d.verificationNote,1000,true);check(ship.shippingCost!==null,'Admin harus memverifikasi ongkir/rute jalan.');}
@@ -46,7 +49,7 @@ export function commerce(store,providers={}) {
       // A quoted total must match current server pricing; a pending quote must remain pending.
       check(d.requestId||d.expectedTotal===total,'Harga / ongkir berubah. Tinjau ulang rincian.');
       const expiresAt=new Date(time()+c.reservationMinutes*60000).toISOString();
-      const o={schemaVersion:2,source:d.requestId?'website':manual?'admin':'website',manualWorkflow:true,requestId:d.requestId||null,customerId:ctx.uid,invoiceNo:oid,requestHash:fingerprint,createdAt:iso(),expiresAt,
+      const o={schemaVersion:2,salesChannel:channel,resellerId:channel==='reseller'?ctx.uid:null,channelAudit:{origin:channel,by:ctx.actorId||ctx.uid,at:iso()},source:d.requestId?'website':manual?'admin':'website',manualWorkflow:true,requestId:d.requestId||null,customerId:ctx.uid,invoiceNo:oid,requestHash:fingerprint,createdAt:iso(),expiresAt,
         customerName:a.name,phone:a.phone,address:a.text,addressData:a,items:priced.items,subtotal:priced.subtotal,discount:priced.discount,pcs:priced.pcs,
         eligiblePcs:priced.eligiblePcs,usesReseller:priced.usesReseller,shippingMethod:method,...ship,total,totalAccepted:!d.requestId&&total!==null,quoteVersion:1,productIds:[...new Set(items.map(i=>i.productId))],
         mode:d.mode,voucher:d.voucher||'',note:payload.note,paymentMethod:d.paymentMethod,paymentStatus:'belum_dibayar',paidAmount:0,refundCommitted:0,refundedAmount:0,
@@ -95,6 +98,7 @@ export function commerce(store,providers={}) {
   function ledger(tx,key,o,amount,type,description,ctx){tx.set('transactions/'+key,{date:iso().slice(0,10),createdAt:iso(),type,amount,description,category:type==='masuk'?'Penjualan':'Refund',orderId:o.invoiceNo,verifiedBy:ctx.uid||'gateway',managed:true});}
   async function payment(ctx,d){admin(ctx);return store.run(async tx=>{
     const path='orders/'+id(d.orderId),o=await tx.get(path);check(o,'Pesanan tidak tersedia.');canPay(o,time());
+    check(!o.resellerPaymentFlow&&o.salesChannel!=='reseller','Gunakan tab Pembayaran Reseller untuk pesanan asal reseller.');
     const key='income_'+d.orderId,old=await tx.get('transactions/'+key);
     if(o.paidAmount===o.total&&old)return {ok:true};
     check(o.paymentMethod==='transfer','Verifikasi ini hanya untuk transfer.');check(d.amount===o.total,'Nominal dana masuk harus sama dengan total.');
@@ -133,7 +137,7 @@ export function commerce(store,providers={}) {
     });
   }
   function taskProjection(o,oid,uid){return {id:oid,courierId:uid,invoiceNo:o.invoiceNo,customerName:o.customerName,phone:o.phone,addressData:o.addressData,
-    items:o.items.map(i=>({productName:i.productName,variant:i.variant,qty:i.qty,pcs:i.pcs})),slot:o.slot,note:o.note,amountToCollect:o.paymentMethod==='cash_store'?o.total:0,cashStatus:o.cashStatus,status:o.status,detailStatus:o.detailStatus};}
+    packageCount:o.packageCount||null,packageNote:o.packageNote||'',items:o.items.map(i=>({productName:i.productName,variant:i.variant,qty:i.qty,pcs:i.pcs})),slot:o.slot,note:o.note,amountToCollect:o.paymentMethod==='cash_store'?o.total:0,cashStatus:o.cashStatus,status:o.status,detailStatus:o.detailStatus};}
   async function cash(ctx,d){user(ctx);return store.run(async tx=>{
     const path='orders/'+id(d.orderId),o=await tx.get(path);check(o,'Pesanan tidak tersedia.');canPay(o,time());check(o.paymentMethod.startsWith('cash_')&&o.cashConfirmed,'Pesanan tunai belum dikonfirmasi.');
     const isCourier=ctx.role==='courier'&&o.courierId===ctx.uid&&o.paymentMethod==='cash_store';
@@ -226,11 +230,12 @@ export function commerce(store,providers={}) {
     const rid=hash([d.orderId,d.productId]),prev=await tx.get('reviews/'+rid);check(!prev,'Ulasan sudah dikirim.');tx.set('reviews/'+rid,{productId:id(d.productId),rating:num(d.rating,1,5),text:str(d.text,2000,true),buyerLabel:'Pembeli terverifikasi',createdAt:iso()});return {ok:true};});}
   async function saveProduct(ctx,d){admin(ctx);const pid=d.productId?id(d.productId):randomUUID();return store.run(async tx=>{const old=await tx.get('products/'+pid);check(!old||d.expectedRevision===(old.revision||0),'Produk / stok berubah. Muat ulang sebelum menyimpan.');
     const p=normalizeProduct(d.product,old||{});p.createdAt=old?.createdAt||iso();const pub=publicProduct(p,pid);tx.set('products/'+pid,p);if(pub){tx.set('catalog/'+pid,pub);tx.set('resellerPrices/'+pid,{productId:pid,...p.website.reseller});}else{tx.delete('catalog/'+pid);tx.delete('resellerPrices/'+pid);}return {id:pid};});}
-  async function legacyManualOrder(ctx,d){admin(ctx);const items=cartInput(d.items),oid='ADM-'+hash([ctx.uid,id(d.key)]).slice(0,32),fingerprint=hash({items,customerName:d.customerName,phone:d.phone,address:d.address,shippingCost:d.shippingCost});
+  async function legacyManualOrder(ctx,d){admin(ctx);const items=cartInput(d.items),oid='ADM-'+hash([ctx.uid,id(d.key)]).slice(0,32),fingerprint=hash({items,customerName:d.customerName,phone:d.phone,address:d.address,shippingCost:d.shippingCost,mode:d.mode||'eceran',resellerId:d.resellerId||''});
     return store.run(async tx=>{const existing=await tx.get('orders/'+oid);if(existing){check(existing.requestHash===fingerprint,'Rincian berubah pada percobaan ulang. Tutup form untuk membuat pesanan lain.');return {id:oid,invoiceNo:oid};}
-      const m=await productMap(tx,items);const lines=items.map(i=>{const p=m.get(i.productId),v=p.variants.find(v=>v.id===i.variantId);check(p.status==='aktif'&&v&&v.stock>=i.qty,'Stok / varian tidak tersedia. Jalankan migrasi ID terlebih dahulu.');const price=num(v.priceOffline??p.priceOffline??v.price??p.price??0,1);return {...i,productName:p.name,variant:[v.color||v.name,v.size].filter(Boolean).join(' / '),price,lineTotal:price*i.qty,packPcs:p.website?.packPcs||1,pcs:i.qty*(p.website?.packPcs||1),promo:false};});
+      const resellerId=d.resellerId?id(d.resellerId):null,r=resellerId?await tx.get('resellers/'+resellerId):null;if(resellerId)check(r?.status==='disetujui','Reseller harus aktif.');
+      const m=await productMap(tx,items);const lines=items.map(i=>{const p=m.get(i.productId),v=p.variants.find(v=>v.id===i.variantId);check(p.status==='aktif'&&v&&v.stock>=i.qty,'Stok / varian tidak tersedia. Jalankan migrasi ID terlebih dahulu.');const price=unitPrice(p,v,i.qty,d.mode||'eceran',!!resellerId,items.filter(x=>p.website.combine==='variant'?x.productId===i.productId&&x.variantId===i.variantId:p.website.combine==='all'?m.get(x.productId).website.combine==='all'&&m.get(x.productId).website.group===p.website.group:x.productId===i.productId).reduce((n,x)=>n+x.qty*m.get(x.productId).website.packPcs,0)).price;return {...i,productName:p.name,variant:[v.color||v.name,v.size].filter(Boolean).join(' / '),price,lineTotal:price*i.qty,packPcs:p.website?.packPcs||1,pcs:i.qty*(p.website?.packPcs||1),promo:false};});
       const subtotal=lines.reduce((s,i)=>s+i.lineTotal,0),shippingCost=num(d.shippingCost),total=subtotal+shippingCost;
-      const o={schemaVersion:2,manualWorkflow:true,source:'admin',productIds:[...new Set(items.map(i=>i.productId))],invoiceNo:oid,requestHash:fingerprint,customerId:ctx.uid,customerName:str(d.customerName,150,true),phone:str(d.phone||'',30),address:str(d.address||'',1000),addressData:{name:d.customerName,phone:d.phone||'',text:d.address||'',lat:0,lng:0},items:lines,subtotal,discount:0,shippingCost,total,pcs:lines.reduce((s,i)=>s+i.pcs,0),eligiblePcs:0,usesReseller:false,shippingMethod:'regular',shippingState:'confirmed',totalAccepted:true,quoteVersion:1,paymentMethod:'transfer',paymentStatus:'belum_dibayar',paidAmount:0,refundedAmount:0,refundCommitted:0,cashStatus:'belum_dibayar',status:'menunggu_pembayaran',detailStatus:'Menunggu pembayaran',reservationState:'reserved',slotId:null,slot:null,slotReleased:true,courier:'',trackingNumber:'',note:'Pesanan dibuat admin. Pin belum diverifikasi; tidak untuk promo jarak.',createdAt:iso(),expiresAt:new Date(time()+120*60000).toISOString(),statusHistory:[{status:'menunggu_pembayaran',at:iso(),by:ctx.uid,note:'Harga offline dihitung server; pembayaran belum diverifikasi.'}]};
+      const o={schemaVersion:2,manualWorkflow:true,source:'admin',salesChannel:resellerId?'reseller':'manual_admin',resellerId,channelAudit:{origin:resellerId?'reseller':'manual_admin',by:ctx.uid,at:iso()},productIds:[...new Set(items.map(i=>i.productId))],invoiceNo:oid,requestHash:fingerprint,customerId:resellerId||ctx.uid,customerName:str(d.customerName,150,true),phone:str(d.phone||'',30),address:str(d.address||'',1000),addressData:{name:d.customerName,phone:d.phone||'',text:d.address||'',lat:0,lng:0},items:lines,subtotal,discount:0,shippingCost,total,pcs:lines.reduce((s,i)=>s+i.pcs,0),eligiblePcs:0,usesReseller:false,shippingMethod:'regular',shippingState:'confirmed',totalAccepted:true,quoteVersion:1,paymentMethod:'transfer',paymentStatus:'belum_dibayar',paidAmount:0,refundedAmount:0,refundCommitted:0,cashStatus:'belum_dibayar',status:'menunggu_pembayaran',detailStatus:'Menunggu pembayaran',reservationState:'reserved',slotId:null,slot:null,slotReleased:true,courier:'',trackingNumber:'',note:'Pesanan dibuat admin. Pin belum diverifikasi; tidak untuk promo jarak.',createdAt:iso(),expiresAt:new Date(time()+120*60000).toISOString(),statusHistory:[{status:'menunggu_pembayaran',at:iso(),by:ctx.uid,note:'Harga Eceran/Grosir dihitung dari produk; pembayaran belum diverifikasi.'}]};
       reserve(lines,m,-1);writeProducts(tx,m);tx.set('orders/'+oid,o);return {id:oid,invoiceNo:oid};});}
   async function slotSave(ctx,d){admin(ctx);const sid=d.id?id(d.id):randomUUID();return store.run(async tx=>{const old=await tx.get('deliverySlots/'+sid);const s={id:sid,startAt:validDate(d.startAt),endAt:validDate(d.endAt),cutoffAt:validDate(d.cutoffAt),capacity:num(d.capacity,1,10000),used:old?.used||0,enabled:d.enabled===true,courierId:d.courierId?id(d.courierId):''};check(s.capacity>=s.used,'Kuota di bawah jumlah pesanan terjadwal.');if(s.used)check(s.startAt===old.startAt&&s.endAt===old.endAt,'Slot berisi pesanan: gunakan penjadwalan ulang pesanan.');check(Date.parse(s.endAt)>Date.parse(s.startAt)&&Date.parse(s.cutoffAt)<=Date.parse(s.startAt),'Waktu slot tidak valid.');tx.set('deliverySlots/'+sid,s);return {id:sid};});}
   async function profile(ctx,d){user(ctx);check(Array.isArray(d.addresses)&&d.addresses.length<=10,'Maksimal 10 alamat.');const p={name:str(d.name,150,true),phone:str(d.phone,30),addresses:d.addresses.map(address),updatedAt:iso()};await store.set('profiles/'+ctx.uid,p);return {ok:true};}
@@ -294,4 +299,3 @@ export function commerce(store,providers={}) {
   }
   return {dispatch,gatewayPaid,expire:oid=>cancel({system:true,uid:'system'},{orderId:oid},true)};
 }
-

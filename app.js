@@ -37,7 +37,7 @@ function connect(){return ready??=(async()=>{
   }
   return {app,auth,a,db,fs};
 })().catch(error=>{ready=undefined;throw error;});}
-async function api(action,data={}){return withDeadline(import('./manual-api.js?v=manual-20260908-2').then(async m=>m.manualApi(await connect(),action,data)),30000,'manual/unavailable');}
+async function api(action,data={}){return withDeadline(import('./manual-api.js?v=admin-lengkap-20260909').then(async m=>m.manualApi(await connect(),action,data)),30000,'manual/unavailable');}
 async function ensureAdminAccess(user){return withDeadline(manualAccess(await connect(),user),15000,'free/unavailable');}
 async function upload(){throw Object.assign(new Error('Unggah berkas belum aktif: penyimpanan privat belum dikonfigurasi. Foto produk dapat memakai URL HTTPS; bukti dikirim manual ke admin.'),{code:'free/unavailable'});}
 async function viewEvidence(){throw Object.assign(new Error('Bukti lama tersimpan pada layanan versi lengkap. Versi gratis tidak mengunduh bukti pembayaran.'),{code:'free/unavailable'});}
@@ -358,7 +358,7 @@ async function retryAdminLogin(){
 /** Tampilkan dashboard, sembunyikan layar login. */
 function enterApp() {
   els.authScreen.hidden = true;
-  els.appRoot.hidden = false;
+  els.appRoot.hidden = false;queueMicrotask(restoreAdminRoute);
 }
 
 /** Tampilkan layar login, sembunyikan dashboard. */
@@ -532,7 +532,7 @@ function saveDemoData() {
 async function updateOrder(orderId, patch, historyLabel) {
   const order = state.orders.find(o => o.id === orderId);
   if (order?.schemaVersion === 2) {
-    window.location.href = 'admin-website.html?v=manual-20260908-2#orders/' + encodeURIComponent(orderId); return;
+    window.location.href = 'admin-website.html?v=admin-lengkap-20260909#orders/' + encodeURIComponent(orderId); return;
   }
   await shopApi('orderAction', { orderId, operation: 'legacy', ...patch });
 }
@@ -933,7 +933,8 @@ function claimNeedsAction(c) {
 }
 function readyToShip(o){return o.status==='diproses'&&o.shippingMethod!=='pickup'&&(o.schemaVersion!==2||(['Dikemas','Menunggu kurir','Siap dikirim'].includes(o.detailStatus)&&(o.paymentStatus==='lunas'||o.cashConfirmed&&String(o.paymentMethod).startsWith('cash_'))));}
 function outstandingCourierCash(orders){return orders.filter(o=>o.paymentMethod==='cash_store'&&['diterima_kurir','disetor_kurir'].includes(o.cashStatus)&&o.paidAmount>0).reduce((n,o)=>n+Number(o.paidAmount),0);}
-function orderChannel(o){return o.source==='website'?'website':o.source==='admin'?'admin':'historis';}
+function orderChannel(o){return ['website','manual_admin','reseller'].includes(o.salesChannel)?o.salesChannel:o.source==='website'?'website':o.source==='admin'?'manual_admin':'unknown';}
+function channelLabel(o){return ({website:'Website',manual_admin:'Manual Admin',reseller:'Reseller'})[orderChannel(o)]||'Belum diklasifikasikan';}
 function salesEntries(orders,transactions) {
   const lookup=new Map();orders.forEach(o=>{lookup.set(o.id,o);if(o.invoiceNo)lookup.set(o.invoiceNo,o);});
   const result=new Map();
@@ -1019,16 +1020,18 @@ function renderSalesChart(){
 }
 let moduleTimer;
 function showOperational(module){
-  const allowed=['orders','couriers','slots','resellers','pricing','claims','settings','reconcile'];if(!allowed.includes(module.split('/')[0]))return;
-  const view={resellers:'reseller',couriers:'pengiriman',slots:'jadwal',claims:'retur',orders:'pesanan',reconcile:'keuangan',pricing:'pengaturan',settings:'pengaturan'}[module.split('/')[0]];
+  const allowed=['orders','couriers','slots','shipping','products','suppliers','calculator','neworder','resellers','pricing','claims','settings','reconcile'];if(!allowed.includes(module.split('/')[0]))return;
+  const view={suppliers:'supplier',products:'produk',calculator:'kalkulator',neworder:'pesanan',shipping:'pengiriman',resellers:'reseller',couriers:'pengiriman',slots:'pengiriman',claims:'retur',orders:'pesanan',reconcile:'keuangan',pricing:'pengaturan',settings:'pengaturan'}[module.split('/')[0]];
   state.view='operasional';document.querySelectorAll('.view').forEach(v=>v.hidden=true);document.getElementById('view-operasional').hidden=false;
   document.querySelectorAll('.nav-item[data-view]').forEach(b=>b.classList.toggle('is-active',b.dataset.view===view));
-  document.getElementById('breadcrumb-title').textContent=({reseller:'Reseller',pengiriman:'Pengiriman & Kurir',jadwal:'Jadwal Pengiriman',retur:'Retur & Komplain',pesanan:'Pesanan Website',keuangan:'Rekonsiliasi',pengaturan:'Pengaturan operasional'})[view];
+  document.getElementById('breadcrumb-title').textContent=({supplier:'Supplier',produk:'Produk',kalkulator:'Kalkulator Harga',reseller:'Reseller',pengiriman:'Pengiriman & Kurir',jadwal:'Jadwal Pengiriman',retur:'Retur & Komplain',pesanan:'Pesanan Website',keuangan:'Rekonsiliasi',pengaturan:'Pengaturan operasional'})[view];
   clearTimeout(moduleTimer);document.getElementById('module-error').hidden=true;
   const frame=document.getElementById('operational-frame');
   const inspect=()=>{try{const content=frame.contentDocument?.getElementById('content');if(!content||/Memeriksa/.test(content.textContent)){document.getElementById('module-error').hidden=false;}}catch{document.getElementById('module-error').hidden=false;}};
   frame.onload=()=>{try{if(!frame.contentDocument?.getElementById('content'))inspect();}catch{inspect();}};
-  frame.src='admin-website.html?v=manual-20260908-2&embed=1#'+module;
+  const page=module.split('/')[0];
+  if(['shipping','couriers','slots','products','suppliers','calculator','neworder','pricing'].includes(page)){frame.src='planning-admin.html?v=admin-lengkap-20260909&embed=1#'+(({couriers:'shipping/kurir',slots:'shipping/jadwal',pricing:'products/migrasi'})[module]||module);}
+  else frame.src=module==='resellers'?'reseller-admin.html?v=admin-lengkap-20260909&embed=1#ringkasan':'admin-website.html?v=admin-lengkap-20260909&embed=1#'+module;
   moduleTimer=setTimeout(inspect,20000);
   document.getElementById('module-retry').onclick=()=>showOperational(module);toggleDrawer(false);
 }
@@ -1057,6 +1060,7 @@ function bindAdminDashboard(){
   document.querySelectorAll('[data-recent]').forEach(b=>b.onclick=()=>{state.recentTab=b.dataset.recent;renderDashboard();});
   document.querySelectorAll('[data-follow]').forEach(b=>b.onclick=()=>followActivity(b.dataset.follow));document.querySelectorAll('[data-module]').forEach(b=>b.onclick=()=>showOperational(b.dataset.module));
   document.getElementById('global-search-form').onsubmit=e=>{e.preventDefault();navigateTo('pencarian');};
+  document.getElementById('export-orders-channel').onclick=async()=>{try{const {csv,CHANNELS,salesChannel}=await import('./planning-domain.js?v=admin-lengkap-20260909');const {download}=await import('./planning-ui.js?v=admin-lengkap-20260909');const q=state.orderSearch.trim().toLowerCase(),rows=state.orders.filter(o=>(state.orderChannel==='semua'||orderChannel(o)===state.orderChannel)&&(state.orderTab==='semua'||o.status===state.orderTab)&&(!q||[o.invoiceNo,o.customerName].some(v=>String(v||'').toLowerCase().includes(q))));download('Pesanan-Sales-Channel.csv',csv(rows,[{key:'id',label:'ID pesanan'},{key:'invoiceNo',label:'No. Invoice'},{key:'customerName',label:'Pelanggan'},{key:'total',label:'Total'},{key:'salesChannel',label:'Sales Channel',value:o=>CHANNELS[salesChannel(o)]},{key:'status',label:'Status'}]));}catch(e){showToast(e.message);}};
   document.getElementById('order-channel').onchange=e=>{state.orderChannel=e.target.value;renderOrdersView();};
   document.getElementById('view-store').onclick=()=>{};
   document.getElementById('open-menu').onclick=()=>toggleDrawer(true);document.getElementById('close-menu').onclick=()=>toggleDrawer(false);document.getElementById('drawer-backdrop').onclick=()=>toggleDrawer(false);
@@ -1068,7 +1072,7 @@ function bindAdminDashboard(){
 function renderOrderRows(tbody, orders, withAction) {
   tbody.innerHTML = "";
   if (orders.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="table-empty">Tidak ada pesanan.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="table-empty">Tidak ada pesanan.</td></tr>`;
     return;
   }
   orders.forEach((o) => {
@@ -1078,6 +1082,7 @@ function renderOrderRows(tbody, orders, withAction) {
       <td>${escapeHtml(o.invoiceNo)}</td>
       <td>${escapeHtml(o.customerName)}</td>
       <td>${(o.total == null ? "Menunggu konfirmasi" : formatRupiah(o.total))}</td>
+      ${withAction?`<td><span class="tag">${escapeHtml(channelLabel(o))}</span></td>`:''}
       <td><span class="tag tag--${escapeHtml(o.status)}">${(STATUS_META[o.status]?.label || "Status tidak dikenal")}</span></td>
       ${withAction ? `<td></td>` : ""}
     `;
@@ -1254,7 +1259,7 @@ function renderOrdersView() {
   els.orderTabs.innerHTML = "";
   const tabs = [{ key: "semua", label: "Semua" }, ...STATUS_ORDER.map((s) => ({ key: s, label: STATUS_META[s].label }))];
   tabs.forEach((t) => {
-    const channelOrders=state.orders.filter(o=>state.orderChannel==='semua'||orderChannel(o)===state.orderChannel);
+    const channelOrders=state.orders.filter(o=>(state.orderChannel==='semua'||orderChannel(o)===state.orderChannel)&&(!state.orderSearch.trim()||[o.invoiceNo,o.customerName].some(v=>String(v||'').toLowerCase().includes(state.orderSearch.trim().toLowerCase()))));
     const count=t.key==='semua'?channelOrders.length:channelOrders.filter(o=>o.status===t.key).length;
     const btn = document.createElement("button");
     btn.className = "tab" + (state.orderTab === t.key ? " is-active" : "");
@@ -3536,7 +3541,7 @@ function renderOrderModalBody(orderId) {
   els.orderModalBody.innerHTML = `
     <div class="od-head">
       <div>
-        <h2>${escapeHtml(o.invoiceNo)}</h2>
+        <h2>${escapeHtml(o.invoiceNo)}</h2><p>Sales Channel: ${escapeHtml(channelLabel(o))}</p>
         <span class="tag tag--${escapeHtml(o.status)}">${(STATUS_META[o.status]?.label || "Status tidak dikenal")}</span>
       </div>
     </div>
@@ -3743,7 +3748,7 @@ function resetProductForm() {
 }
 
 /** Buka modal produk. Tanpa argumen = mode tambah baru. Dengan argumen produk = mode edit, form terisi otomatis. */
-function openProductModal(product) {
+function legacyOpenProductModal(product) {
   resetProductForm();
   if (product) {
     state.editingProductId = product.id;
@@ -3950,7 +3955,8 @@ function updatePreview() {
 // 4. NAVIGATION & EVENTS
 // ============================================================
 function navigateTo(view) {
-  const module={reseller:'resellers',pengiriman:'couriers',jadwal:'slots',retur:'claims'}[view];
+  if(location.hash!=='#view/'+view)history.pushState(null,'','#view/'+view);
+  const module={supplier:'suppliers/ringkasan',produk:'products',kalkulator:'calculator',reseller:'resellers',pengiriman:'shipping/kelola',jadwal:'shipping/jadwal',retur:'claims'}[view];
   if(module){showOperational(module);return;}
   const destination=document.getElementById('view-'+view);if(!destination)return;
   clearTimeout(moduleTimer);document.getElementById('operational-frame').onload=null;
@@ -3990,7 +3996,7 @@ function bindEvents() {
 
   els.orderSearch.addEventListener("input", (e) => { state.orderSearch = e.target.value; renderOrdersView(); });
 
-  els.btnAddOrder.addEventListener("click", openCreateOrderModal);
+  els.btnAddOrder.addEventListener("click", ()=>showOperational("neworder"));
   els.btnAddOrderItem.addEventListener("click", addOrderItemRow);
   els.createOrderForm.elements["shippingCost"].addEventListener("input", updateCreateOrderTotals);
 
@@ -4756,3 +4762,9 @@ async function init() {
 init();
 
 window.addEventListener('unhandledrejection',event=>{event.preventDefault();if(els.appRoot?.hidden){authSubmitPending=false;authCheckPending=false;showLoginScreen();setLoginBusy();loginFailure(event.reason);}else showToast('Operasi belum berhasil. Periksa koneksi dan coba lagi.');});
+
+function openProductModal(product){showOperational("products/"+(product?.id||"new"));}
+
+window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==document.getElementById('operational-frame')?.contentWindow||e.data?.type!=='kubah-admin-route')return;const route=e.data.route;if(/^(shipping|products|suppliers|calculator|neworder)(\/[A-Za-z0-9_-]*){0,2}$/.test(route))history.replaceState(null,'','#module/'+route);});
+function restoreAdminRoute(){if(els.appRoot?.hidden)return;const path=location.hash.slice(1);if(path.startsWith('module/'))showOperational(path.slice(7));else if(path.startsWith('view/'))navigateTo(path.slice(5));else if(path==='jadwal')showOperational('shipping/jadwal');else if(path==='pengiriman')showOperational('shipping/kelola');}
+window.addEventListener('popstate',restoreAdminRoute);
