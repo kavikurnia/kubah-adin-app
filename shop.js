@@ -105,7 +105,7 @@ async function orderDetail(oid){if(!requireLogin())return;const v=pageVersion,o=
 }
 async function route(){pageVersion++;$('#detail').close();const [page='katalog',oid]=location.hash.slice(1).split('/');try{
  if(page==='kerjasama'){const version=pageVersion,c=await connect();await renderSupplierPartnership({store:manualStore(c),c,user:S.user,isCurrent:()=>version===pageVersion});return;}
-  if(page==='katalog'||page==='wishlist')catalog(page==='wishlist');else if(page==='keranjang')cart();else if(page==='checkout')await checkout();else if(page==='akun')await account();else if(page==='reseller')await reseller();else if(page==='pesanan')oid?await orderDetail(oid):await orders();else catalog();
+  if(page==='katalog'||page==='wishlist'){if(page==='katalog'){const category=oid?decodeURIComponent(oid):'';S.category=CATEGORIES.includes(category)?category:'';}catalog(page==='wishlist');}else if(page==='keranjang')cart();else if(page==='checkout')await checkout();else if(page==='akun')await account();else if(page==='reseller')await reseller();else if(page==='pesanan')oid?await orderDetail(oid):await orders();else catalog();
 }catch(e){show(empty('Halaman belum dapat dimuat',e.message,'<button id="retry">Coba lagi</button>'));$('#retry').onclick=route;message(e.message,true);}}
 window.addEventListener('storage',e=>{if(e.key==='kn-cart'){S.cart=read('kn-cart',[]);S.quote=null;$('#cart-count').textContent=qtyCount();if(['#keranjang','#checkout'].includes(location.hash))route();}});
 $('#search-form').onsubmit=e=>{e.preventDefault();S.query=$('#search').value;if(location.hash==='#katalog')catalog();else location.hash='katalog';};

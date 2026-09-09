@@ -532,7 +532,7 @@ function saveDemoData() {
 async function updateOrder(orderId, patch, historyLabel) {
   const order = state.orders.find(o => o.id === orderId);
   if (order?.schemaVersion === 2) {
-    window.location.href = 'admin-website.html?v=checkout-cloud-20260909-r5#orders/' + encodeURIComponent(orderId); return;
+    window.location.href = 'admin-website.html?v=informasi-katalog-20260909-r6#orders/' + encodeURIComponent(orderId); return;
   }
   await shopApi('orderAction', { orderId, operation: 'legacy', ...patch });
 }
@@ -1022,18 +1022,18 @@ let moduleTimer;
 function showOperational(module){
   if(module.split('/')[0]==='webcontent')module='suppliers/pengajuan';
   if(module.split('/')[0]==='calculator'){navigateTo('kalkulator');selectCalculatorTab(module.split('/')[1]||'asli');return;}
-  const allowed=['orders','couriers','slots','shipping','products','suppliers','webcontent','calculator','neworder','resellers','pricing','claims','settings','reconcile'];if(!allowed.includes(module.split('/')[0]))return;
-  const view={webcontent:'dataweb',suppliers:'supplier',products:'produk',calculator:'kalkulator',neworder:'pesanan',shipping:'pengiriman',resellers:'reseller',couriers:'pengiriman',slots:'pengiriman',claims:'retur',orders:'pesanan',reconcile:'keuangan',pricing:'pengaturan',settings:'pengaturan'}[module.split('/')[0]];
+  const allowed=['messages','orders','couriers','slots','shipping','products','suppliers','webcontent','calculator','neworder','resellers','pricing','claims','settings','reconcile'];if(!allowed.includes(module.split('/')[0]))return;
+  const view={messages:'pelanggan',webcontent:'dataweb',suppliers:'supplier',products:'produk',calculator:'kalkulator',neworder:'pesanan',shipping:'pengiriman',resellers:'reseller',couriers:'pengiriman',slots:'pengiriman',claims:'retur',orders:'pesanan',reconcile:'keuangan',pricing:'pengaturan',settings:'pengaturan'}[module.split('/')[0]];
   state.view='operasional';document.querySelectorAll('.view').forEach(v=>v.hidden=true);document.getElementById('view-operasional').hidden=false;
   document.querySelectorAll('.nav-item[data-view]').forEach(b=>b.classList.toggle('is-active',b.dataset.view===view));
-  document.getElementById('breadcrumb-title').textContent=({dataweb:'Data Web Katalog',supplier:'Supplier',produk:'Produk',kalkulator:'Kalkulator Harga',reseller:'Reseller',pengiriman:'Pengiriman & Kurir',jadwal:'Jadwal Pengiriman',retur:'Retur & Komplain',pesanan:'Pesanan Website',keuangan:'Rekonsiliasi',pengaturan:'Pengaturan operasional'})[view];
+  document.getElementById('breadcrumb-title').textContent=({pelanggan:'Pesan & Kerja Sama',dataweb:'Data Web Katalog',supplier:'Supplier',produk:'Produk',kalkulator:'Kalkulator Harga',reseller:'Reseller',pengiriman:'Pengiriman & Kurir',jadwal:'Jadwal Pengiriman',retur:'Retur & Komplain',pesanan:'Pesanan Website',keuangan:'Rekonsiliasi',pengaturan:'Pengaturan operasional'})[view];
   clearTimeout(moduleTimer);document.getElementById('module-error').hidden=true;
   const frame=document.getElementById('operational-frame');
   const inspect=()=>{try{const content=frame.contentDocument?.getElementById('content');if(!content||/Memeriksa/.test(content.textContent)){document.getElementById('module-error').hidden=false;}}catch{document.getElementById('module-error').hidden=false;}};
   frame.onload=()=>{try{if(!frame.contentDocument?.getElementById('content'))inspect();}catch{inspect();}};
   const page=module.split('/')[0];
-  if(['shipping','couriers','slots','products','suppliers','webcontent','calculator','neworder','pricing'].includes(page)){frame.src='planning-admin.html?v=checkout-cloud-20260909-r5&embed=1#'+(({couriers:'shipping/kurir',slots:'shipping/jadwal',pricing:'products/migrasi'})[module]||module);}
-  else frame.src=page==='resellers'?'reseller-admin.html?v=checkout-cloud-20260909-r5&embed=1#'+(module.split('/')[1]||'ringkasan'):'admin-website.html?v=checkout-cloud-20260909-r5&embed=1#'+module;
+  if(['messages','shipping','couriers','slots','products','suppliers','webcontent','calculator','neworder','pricing'].includes(page)){frame.src='planning-admin.html?v=informasi-katalog-20260909-r6&embed=1#'+(({couriers:'shipping/kurir',slots:'shipping/jadwal',pricing:'products/migrasi'})[module]||module);}
+  else frame.src=page==='resellers'?'reseller-admin.html?v=checkout-cloud-20260909-r5&embed=1#'+(module.split('/')[1]||'ringkasan'):'admin-website.html?v=informasi-katalog-20260909-r6&embed=1#'+module;
   moduleTimer=setTimeout(inspect,20000);
   document.getElementById('module-retry').onclick=()=>showOperational(module);toggleDrawer(false);
 }
@@ -4756,6 +4756,7 @@ function cacheEls() {
 async function init() {
   cacheEls();
   bindEvents();
+  document.getElementById('btn-customer-messages').onclick=()=>showOperational('messages');
   document.getElementById('manual-request-orders').onclick=()=>showOperational('orders');
   document.getElementById('manual-add-image').onclick=()=>{const input=document.getElementById('manual-image-url');let url;try{url=new URL(input.value);if(url.protocol!=='https:')throw Error();}catch{showToast('Gunakan URL foto HTTPS publik.');return;}if(state.productImages.length>=9){showToast('Maksimal 9 foto.');return;}state.productImages.push({tempId:crypto.randomUUID(),url:url.href,isPrimary:state.productImages.length===0,order:state.productImages.length});input.value='';renderProductPhotoGallery();updatePreview();};
   await initDataLayer();
@@ -4768,7 +4769,7 @@ window.addEventListener('unhandledrejection',event=>{event.preventDefault();if(e
 
 function openProductModal(product){showOperational("products/"+(product?.id||"new"));}
 
-window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==document.getElementById('operational-frame')?.contentWindow||e.data?.type!=='kubah-admin-route')return;const route=e.data.route;if(/^(webcontent|shipping|products|suppliers|calculator|neworder|resellers|orders|reconcile|claims|settings)(\/[A-Za-z0-9_-]*){0,2}$/.test(route))history.replaceState(null,'','#module/'+route);});
+window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==document.getElementById('operational-frame')?.contentWindow||e.data?.type!=='kubah-admin-route')return;const route=e.data.route;if(/^(messages|webcontent|shipping|products|suppliers|calculator|neworder|resellers|orders|reconcile|claims|settings)(\/[A-Za-z0-9_-]*){0,2}$/.test(route))history.replaceState(null,'','#module/'+route);});
 function restoreAdminRoute(){if(els.appRoot?.hidden)return;const path=location.hash.slice(1);if(path.startsWith('module/'))showOperational(path.slice(7));else if(path.startsWith('view/'))navigateTo(path.slice(5));else if(path==='jadwal')showOperational('shipping/jadwal');else if(path==='pengiriman')showOperational('shipping/kelola');}
 window.addEventListener('popstate',restoreAdminRoute);
 
@@ -4776,6 +4777,6 @@ function selectCalculatorTab(tab){
  const current=tab==='perbandingan'?'perbandingan':'asli';
  document.querySelectorAll('[data-calculator-tab]').forEach(b=>{const selected=b.dataset.calculatorTab===current;b.classList.toggle('is-active',selected);b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;});
  document.getElementById('calculator-original').hidden=current!=='asli';document.getElementById('calculator-comparison').hidden=current!=='perbandingan';
- const frame=document.getElementById('comparison-frame');if(current==='perbandingan'&&!frame.getAttribute('src'))frame.src='planning-admin.html?v=checkout-cloud-20260909-r5&embed=1#calculator';
+ const frame=document.getElementById('comparison-frame');if(current==='perbandingan'&&!frame.getAttribute('src'))frame.src='planning-admin.html?v=informasi-katalog-20260909-r6&embed=1#calculator';
  history.replaceState(null,'','#module/calculator/'+current);
 }
