@@ -1,6 +1,6 @@
-import {unitPrice} from './planning-domain.js?v=admin-lengkap-20260909-r2';
+import {unitPrice} from './planning-domain.js?v=admin-supplier-20260909-r3';
 const randomUUID=()=>crypto.randomUUID();
-import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=admin-lengkap-20260909-r2';
+import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=admin-supplier-20260909-r3';
 
 // Store contract: get/list outside a transaction; tx.get(path), tx.set/update/delete inside.
 // Every transaction below completes reads before staging writes. Firestore retries conflicts.

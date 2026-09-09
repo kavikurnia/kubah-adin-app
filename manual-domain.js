@@ -1,4 +1,4 @@
-import {sha256} from './sha256.js?v=admin-lengkap-20260909-r2';
+import {sha256} from './sha256.js?v=admin-supplier-20260909-r3';
 const randomUUID=()=>crypto.randomUUID();
 export class Fault extends Error { constructor(message, code='failed-precondition') {super(message);this.code=code;} }
 export function check(ok, message, code) {if(!ok) throw new Fault(message,code);}

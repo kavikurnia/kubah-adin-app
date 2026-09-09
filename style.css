@@ -434,6 +434,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 .tab:hover { border-color: var(--garnet); color: var(--text); }
 .tab.is-active { background: var(--ink); border-color: var(--ink); color: #fff; }
+#calculator-tabs { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; }
+#calculator-tabs .tab { flex: 0 0 auto; white-space: nowrap; }
 
 .toolbar {
   display: flex;

@@ -1,5 +1,5 @@
-import {check,id,hash,normalizeProduct,publicProduct} from './manual-domain.js?v=admin-lengkap-20260909-r2';
-import {CATEGORIES,skuKey,skuId} from './planning-domain.js?v=admin-lengkap-20260909-r2';
+import {check,id,hash,normalizeProduct,publicProduct} from './manual-domain.js?v=admin-supplier-20260909-r3';
+import {CATEGORIES,skuKey,skuId} from './planning-domain.js?v=admin-supplier-20260909-r3';
 export function productService(store,{stamp=()=>new Date().toISOString()}={}){
  return {async save(ctx,d){check(ctx.role==='admin'&&ctx.uid,'Izin admin diperlukan.','permission-denied');const pid=id(d.id),eid='product-'+hash([pid,d.key]),fingerprint=d.importHash||hash({product:d.product,stock:!!d.stock});
   const commit=()=>store.run(async tx=>{const event=await tx.get('productEvents/'+eid);if(event){check(event.fingerprint===fingerprint,'Kunci perubahan sudah dipakai.');return {id:pid,reused:true};}const old=await tx.get('products/'+pid);check((old?.revision||0)===d.expectedRevision,'Produk/stok berubah sejak pratinjau. Muat ulang dan tinjau kembali.');

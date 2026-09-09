@@ -1,4 +1,4 @@
-import {check,num,str,hash} from './manual-domain.js?v=admin-lengkap-20260909-r2';
+import {check,num,str,hash} from './manual-domain.js?v=admin-supplier-20260909-r3';
 export const CATEGORIES=['Sajadah','Sarung','Atasan Pria','Mukenah & Atasan Wanita','Aksesoris & Songkok','Parfum','Makanan & Minuman'];
 export const CHANNELS={website:'Website',manual_admin:'Manual Admin',reseller:'Reseller',unknown:'Belum diklasifikasikan'};
 export function salesChannel(o){return ['website','manual_admin','reseller'].includes(o.salesChannel)?o.salesChannel:o.source==='website'?'website':o.source==='admin'?'manual_admin':'unknown';}

@@ -1,4 +1,6 @@
-import {api,connect,login,logout,upload,viewEvidence,money,date,esc,safeURL,$,label,formValues,message,busy} from './shop-client.js?v=admin-lengkap-20260909-r2';
+import {api,connect,login,logout,upload,viewEvidence,money,date,esc,safeURL,$,label,formValues,message,busy} from './shop-client.js?v=admin-supplier-20260909-r3';
+import {manualStore} from './manual-store.js?v=admin-supplier-20260909-r3';
+import {renderSupplierPartnership} from './partnership-ui.js?v=admin-supplier-20260909-r3';
 const read=(key,def)=>{try{return JSON.parse(localStorage.getItem(key))??def;}catch{return def;}};
 const S={products:[],settings:{},user:null,mode:read('kn-mode','eceran'),cart:read('kn-cart',[]),wish:read('kn-wish',[]),category:'',sort:'name',onlyStock:false,onlyWholesale:false,query:'',account:null,resellerPrices:[],quote:null,checkoutDraft:read('kn-checkout',null)};
 let pageVersion=0,detailProduct=null;
@@ -100,6 +102,7 @@ async function orderDetail(oid){if(!requireLogin())return;const v=pageVersion,o=
   $('#review-form')?.addEventListener('submit',e=>{e.preventDefault();const f=formValues(e.currentTarget);busy(e.submitter,async()=>{await api('review',{orderId:oid,...f,rating:Number(f.rating)});message('Ulasan tersimpan.');});});
 }
 async function route(){pageVersion++;$('#detail').close();const [page='katalog',oid]=location.hash.slice(1).split('/');try{
+ if(page==='kerjasama'){const version=pageVersion,c=await connect();await renderSupplierPartnership({store:manualStore(c),c,user:S.user,isCurrent:()=>version===pageVersion});return;}
   if(page==='katalog'||page==='wishlist')catalog(page==='wishlist');else if(page==='keranjang')cart();else if(page==='checkout')await checkout();else if(page==='akun')await account();else if(page==='reseller')await reseller();else if(page==='pesanan')oid?await orderDetail(oid):await orders();else catalog();
 }catch(e){show(empty('Halaman belum dapat dimuat',e.message,'<button id="retry">Coba lagi</button>'));$('#retry').onclick=route;message(e.message,true);}}
 $('#search-form').onsubmit=e=>{e.preventDefault();S.query=$('#search').value;if(location.hash==='#katalog')catalog();else location.hash='katalog';};

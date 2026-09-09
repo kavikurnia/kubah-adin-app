@@ -1,4 +1,4 @@
-import {sha256} from './sha256.js?v=admin-lengkap-20260909-r2';
+import {sha256} from './sha256.js?v=admin-supplier-20260909-r3';
 export const MAX_DOCUMENT_BYTES=2*1024*1024;
 export function need(ok,message){if(!ok)throw new Error(message);}
 export function safeId(v){need(typeof v==='string'&&/^[A-Za-z0-9_-]{1,260}$/.test(v),'ID dokumen tidak valid.');return v;}
