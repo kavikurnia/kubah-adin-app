@@ -1,5 +1,5 @@
-import {priceCart,config} from './manual-domain.js?v=admin-supplier-20260909-r3';
-export {CATEGORIES} from './planning-domain.js?v=admin-supplier-20260909-r3';
+import {priceCart,config} from './manual-domain.js?v=checkout-cloud-20260909-r5';
+export {CATEGORIES} from './planning-domain.js?v=checkout-cloud-20260909-r5';
 // The cart, detail preview and checkout estimate share the existing order pricing engine.
 export function catalogEstimate(items,products,mode,settings={},resellerPrices=[]){
  const mapped=new Map(products.map(p=>[p.id,{...p,status:'aktif',website:{enabled:true,retail:p.price,packPcs:p.packPcs,promo:p.promo,combine:p.combine,group:p.group||'',tiers:p.tiers,reseller:resellerPrices.find(r=>r.productId===p.id)||{price:0,minPcs:20}}}]));

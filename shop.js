@@ -1,7 +1,7 @@
-import {api,connect,login,logout,upload,viewEvidence,money,date,esc,safeURL,$,label,formValues,message,busy} from './shop-client.js?v=katalog-penawaran-20260909-r4';
+import {api,connect,login,logout,upload,viewEvidence,money,date,esc,safeURL,$,label,formValues,message,busy} from './shop-client.js?v=checkout-cloud-20260909-r5';
 import {manualStore} from './manual-store.js?v=admin-supplier-20260909-r3';
-import {renderSupplierPartnership} from './partnership-ui.js?v=katalog-penawaran-20260909-r4';
-import {CATEGORIES,catalogEstimate,cardPrice,shippingText,submitOrderRequest} from './catalog-domain.js?v=katalog-penawaran-20260909-r4';
+import {renderSupplierPartnership} from './partnership-ui.js?v=checkout-cloud-20260909-r5';
+import {CATEGORIES,catalogEstimate,cardPrice,shippingText,submitOrderRequest} from './catalog-domain.js?v=checkout-cloud-20260909-r5';
 const read=(key,def)=>{try{return JSON.parse(localStorage.getItem(key))??def;}catch{return def;}};
 const S={products:[],settings:{},user:null,mode:read('kn-mode','eceran'),cart:read('kn-cart',[]),wish:read('kn-wish',[]),category:'',sort:'name',onlyStock:false,onlyWholesale:false,query:'',account:null,resellerPrices:[],quote:null,checkoutDraft:read('kn-checkout',null)};
 let pageVersion=0,detailProduct=null;

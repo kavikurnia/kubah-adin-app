@@ -1,6 +1,6 @@
-import {check,id,str,num,hash} from './manual-domain.js?v=admin-supplier-20260909-r3';
-import {day,skuId} from './planning-domain.js?v=admin-supplier-20260909-r3';
-import {purchaseLines,compareDocuments,partnershipInput,applicationInput,applicationNumber,APPLICATION_LABELS} from './supplier-workflow-domain.js?v=katalog-penawaran-20260909-r4';
+import {check,id,str,num,hash} from './manual-domain.js?v=checkout-cloud-20260909-r5';
+import {day,skuId} from './planning-domain.js?v=checkout-cloud-20260909-r5';
+import {purchaseLines,compareDocuments,partnershipInput,applicationInput,applicationNumber,APPLICATION_LABELS} from './supplier-workflow-domain.js?v=checkout-cloud-20260909-r5';
 export const purchaseOrderId=(sid,number)=>'po-'+hash([sid,String(number).trim().toUpperCase()]).slice(0,32);
 export function supplierWorkflow(store,{stamp=()=>new Date().toISOString()}={}){
  const admin=c=>check(c?.uid&&c.role==='admin','Akses hanya untuk admin berwenang.','permission-denied');

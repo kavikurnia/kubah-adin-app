@@ -1,6 +1,6 @@
-import {$,esc,input,area,checkbox,tabs,form,bindForm,message,date} from './planning-ui.js?v=katalog-penawaran-20260909-r4';
-import {supplierWorkflow} from './supplier-workflow-service.js?v=katalog-penawaran-20260909-r4';
-import {PARTNERSHIP_DEFAULT,APPLICATION_LABELS,applicationNumber} from './supplier-workflow-domain.js?v=katalog-penawaran-20260909-r4';
+import {$,esc,input,area,checkbox,tabs,form,bindForm,message,date} from './planning-ui.js?v=checkout-cloud-20260909-r5';
+import {supplierWorkflow} from './supplier-workflow-service.js?v=checkout-cloud-20260909-r5';
+import {PARTNERSHIP_DEFAULT,APPLICATION_LABELS,applicationNumber} from './supplier-workflow-domain.js?v=checkout-cloud-20260909-r5';
 export async function renderWebContent(U){
  const old=await U.store.get('siteContent/supplierPartnership'),content=old||PARTNERSHIP_DEFAULT;if(!U.isCurrent())return;
  $('#content').innerHTML='<h1>Data Web Katalog</h1>'+tabs('webcontent',[['kerjasama','Kerja Sama']],'kerjasama')+'<h2>Menjadi Supplier</h2><p>Konten ini tampil pada bagian Kerja Sama di katalog. Pengajuan diperiksa melalui modul Supplier.</p>'+form('partnership-content',input('title','Judul',content.title,'text','required maxlength="150"')+area('description','Deskripsi',content.description)+area('requirements','Persyaratan kerja sama',content.requirements)+input('buttonText','Teks tombol pendaftaran',content.buttonText,'text','required maxlength="80"')+checkbox('active','Aktifkan pendaftaran Supplier',content.active),'Simpan konten')+'<a href="toko.html#kerjasama" target="_blank">Lihat bagian Kerja Sama di katalog</a>';

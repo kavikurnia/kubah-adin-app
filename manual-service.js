@@ -1,6 +1,6 @@
-import {unitPrice} from './planning-domain.js?v=admin-supplier-20260909-r3';
+import {unitPrice} from './planning-domain.js?v=checkout-cloud-20260909-r5';
 const randomUUID=()=>crypto.randomUUID();
-import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=admin-supplier-20260909-r3';
+import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=checkout-cloud-20260909-r5';
 
 // Store contract: get/list outside a transaction; tx.get(path), tx.set/update/delete inside.
 // Every transaction below completes reads before staging writes. Firestore retries conflicts.
@@ -38,7 +38,7 @@ export function commerce(store,providers={}) {
       const channel=d.orderOrigin==='reseller'?'reseller':d.requestId?'website':manual?'manual_admin':'website';
       if(channel==='reseller')check(r?.status==='disetujui','Pesanan reseller memerlukan reseller aktif.');
       let priced=priceCart(items,m,d.mode,r,c,d.voucher,time());
-      const ship=d.requestId?(method==='store'?shipping(priced,method,{km:d.verifiedDistanceKm},c):method==='pickup'?shipping(priced,method,null,c):{shippingCost:num(d.verifiedFee),shippingState:'confirmed',distanceKm:null,promoApplied:false}):shipping(priced,method,route,c);
+      const ship=d.requestId?(method==='store'?shipping(priced,method,{km:d.verifiedDistanceKm,fee:d.verifiedFee},c):method==='pickup'?shipping(priced,method,null,c):{shippingCost:num(d.verifiedFee),shippingState:'confirmed',distanceKm:null,promoApplied:false}):shipping(priced,method,route,c);
       if(d.requestId){str(d.verificationNote,1000,true);check(ship.shippingCost!==null,'Admin harus memverifikasi ongkir/rute jalan.');}
       const total=ship.shippingCost===null?null:priced.subtotal-priced.discount+ship.shippingCost;
       check(c.payments[d.paymentMethod]===true,'Metode pembayaran belum aktif.');
@@ -83,7 +83,7 @@ export function commerce(store,providers={}) {
     const path='orders/'+id(d.orderId),o=await tx.get(path);check(o&&o.schemaVersion===2,'Pesanan tidak tersedia.');
     check(o.shippingState!=='confirmed'&&o.paidAmount===0&&o.status!=='dibatalkan','Ongkir sudah final atau pesanan tidak dapat diubah.');
     const c=config(await tx.get('settings/ecommerce'));const note=str(d.note,1000,true);let ship;
-    if(o.shippingMethod==='store'){check(Number.isFinite(d.distanceKm)&&d.distanceKm>=0,'Masukkan jarak rute jalan terverifikasi.');ship=shipping(o,'store',{km:d.distanceKm},c);}
+    if(o.shippingMethod==='store'){check(Number.isFinite(d.distanceKm)&&d.distanceKm>=0,'Masukkan jarak rute jalan terverifikasi.');ship=shipping(o,'store',{km:d.distanceKm,fee:d.fee},c);check(ship.shippingCost!==null,'Isi tarif di luar promo setelah diperiksa admin.');}
     else ship={shippingCost:num(d.fee),distanceKm:null,shippingState:'confirmed'};
     const total=o.subtotal-o.discount+ship.shippingCost;if(o.paymentMethod.startsWith('cash_'))check(total<=c.cashLimit,'Total melebihi batas tunai. Batalkan atau ubah metode melalui pesanan baru.');
     tx.update(path,{...ship,total,totalAccepted:false,quoteVersion:o.quoteVersion+1,shippingVerifiedBy:ctx.uid,shippingVerificationNote:note,detailStatus:'Menunggu persetujuan total',statusHistory:history(o,o.status,ctx,'Ongkir dikonfirmasi: '+note)});return {total};

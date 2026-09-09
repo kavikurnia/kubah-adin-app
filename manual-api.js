@@ -1,9 +1,9 @@
-import {commerce} from './manual-service.js?v=admin-supplier-20260909-r3';
-import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=admin-supplier-20260909-r3';
+import {commerce} from './manual-service.js?v=checkout-cloud-20260909-r5';
+import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=checkout-cloud-20260909-r5';
 import {manualStore} from './manual-store.js?v=admin-supplier-20260909-r3';
 import {manualAccess} from './manual-access.js?v=admin-supplier-20260909-r3';
 
-import {catalogEstimate} from './catalog-domain.js?v=katalog-penawaran-20260909-r4';
+import {catalogEstimate} from './catalog-domain.js?v=checkout-cloud-20260909-r5';
 const iso=()=>new Date().toISOString();
 const adminActions=new Set(['adminData','savePayroll','saveConfig','saveProduct','saveSlot','saveCourier','reviewReseller','confirmShipping','verifyPayment','orderAction','reschedule','cancellationRefund','createManualOrder','legacyManualOrder','confirmRequest','rejectRequest','confirmClaimRequest','rejectClaimRequest','expireOrder']);
 export function publicSettings(raw){const c=config(raw||{});return {enabled:c.enabled,whatsapp:c.whatsapp,categories:c.categories,promos:c.promos,warehouse:c.warehouse,shipping:c.shipping,payments:c.payments,banks:c.banks,freeShipping:c.freeShipping,returnPolicy:c.returnPolicy,returnDays:c.returnDays,operatingDays:c.operatingDays,holidays:c.holidays};}

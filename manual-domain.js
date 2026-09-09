@@ -12,7 +12,7 @@ export const DEFAULTS = {
   enabled:false, whatsapp:'', categories:[], promos:[], warehouse:{address:'',lat:null,lng:null},
   shipping:{store:true,instant:false,regular:false,cargo:false,pickup:true},
   freeShipping:{enabled:true,minPcs:20,maxKm:25,combine:'all',allowReseller:false},
-  storeDelivery:{baseFee:15000,perKm:2000,maxKm:40},
+  storeDelivery:{pricingMode:'formula',baseFee:15000,perKm:2000,maxKm:40},
   payments:{transfer:false,cash_store:false,cash_pickup:true,gateway:false},
   banks:[], cashLimit:2000000,cashNeedsConfirmation:true, returnDays:7, returnPolicy:'Hubungi toko dan ajukan bukti melalui detail pesanan.',
   reservationMinutes:120, operatingDays:[1,2,3,4,5,6], holidays:[], resellerVoucher:false,
@@ -30,7 +30,10 @@ export function validateConfig(raw) {
   check(typeof c.freeShipping.enabled==='boolean','Status promo tidak valid.');
   num(c.cashLimit);num(c.returnDays,1,90);num(c.reservationMinutes,15,1440);num(c.freeShipping.minPcs,1,100000);
   for(const n of [c.freeShipping.maxKm,c.storeDelivery.maxKm])check(Number.isFinite(n)&&n>=0&&n<=1000,'Radius tidak valid.');
-  num(c.storeDelivery.baseFee);num(c.storeDelivery.perKm);check(['all','product','variant'].includes(c.freeShipping.combine),'Gabungan promo tidak valid.');
+  check(['formula','manual'].includes(c.storeDelivery.pricingMode),'Cara penentuan tarif tidak valid.');
+  if(c.storeDelivery.pricingMode==='manual'){c.storeDelivery.baseFee=null;c.storeDelivery.perKm=null;}
+  else {num(c.storeDelivery.baseFee);num(c.storeDelivery.perKm);}
+  check(['all','product','variant'].includes(c.freeShipping.combine),'Gabungan promo tidak valid.');
   check(['manual','google'].includes(c.routeProvider),'Penyedia rute tidak valid.');
   if(c.routeProvider==='google') location(c.warehouse);
   check(Array.isArray(c.operatingDays)&&c.operatingDays.every(v=>Number.isInteger(v)&&v>=0&&v<=6),'Hari kerja tidak valid.');
@@ -120,6 +123,10 @@ export function shipping(price,method,route,c) {
   if(method!=='store'||!route||!Number.isFinite(route.km))return {shippingCost:null,shippingState:'pending_admin',distanceKm:null,promoApplied:false};
   check(route.km>=0,'Jarak tidak valid.');check(route.km<=c.storeDelivery.maxKm,'Alamat di luar area layanan kurir toko.');
   const free=c.freeShipping.enabled&&price.eligiblePcs>=c.freeShipping.minPcs&&route.km<=c.freeShipping.maxKm&&(!price.usesReseller||c.freeShipping.allowReseller);
+  if(!free&&c.storeDelivery.pricingMode==='manual'){
+    if(route.fee==null)return {shippingCost:null,shippingState:'pending_admin',distanceKm:route.km,promoApplied:false};
+    return {shippingCost:num(route.fee,1),shippingState:'confirmed',distanceKm:route.km,promoApplied:false};
+  }
   return {shippingCost:free?0:c.storeDelivery.baseFee+Math.ceil(route.km)*c.storeDelivery.perKm,shippingState:'confirmed',distanceKm:route.km,promoApplied:!!free};
 }
 export function validateSlot(s,c,time=Date.now()) {
