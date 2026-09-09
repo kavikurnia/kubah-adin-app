@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="style.css?v=admin-lengkap-20260909" />
+<link rel="stylesheet" href="style.css?v=admin-lengkap-20260909-r2" />
 </head>
 <body>
 
@@ -19,13 +19,13 @@
       <span class="brand-mark">K</span>
       <span class="auth-brand-name" id="auth-store-name">Kubah Nabawi Store Admin</span>
     </div>
-    <p class="auth-sub">Masuk untuk mengelola toko · <a href="toko.html?v=admin-lengkap-20260909">Belanja sebagai pelanggan</a></p>
+    <p class="auth-sub">Masuk untuk mengelola toko · <a href="toko.html?v=admin-lengkap-20260909-r2">Belanja sebagai pelanggan</a></p>
 
     <p class="auth-checking" id="auth-checking">Memeriksa sesi…</p>
     <button id="bootstrap-retry" class="btn btn--outline" hidden onclick="location.reload()">Muat ulang halaman</button>
     <script>setTimeout(()=>{const status=document.getElementById('auth-checking');if(status&&!status.hidden){status.textContent='Aplikasi belum berhasil dimuat. Periksa koneksi dan file app.js serta firebase-config.js, lalu muat ulang.';document.getElementById('bootstrap-retry').hidden=false;}},25000);</script>
 
-    <p class="footer-note">Versi manual-20260908-2 · Login Auth + Firestore</p><form id="login-form" hidden>
+    <p class="footer-note">Versi admin-lengkap-20260909-r2 · Login Auth + Firestore</p><form id="login-form" hidden>
       <label class="field">
         <span>Email</span>
         <input type="email" name="email" required autocomplete="username" />
@@ -1176,10 +1176,10 @@
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast" hidden></div>
 
-<script src="firebase-config.js?v=admin-lengkap-20260909"></script>
+<script src="firebase-config.js?v=admin-lengkap-20260909-r2"></script>
 <script async src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script async src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script async src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script type="module" src="app.js?v=admin-lengkap-20260909"></script>
+<script type="module" src="app.js?v=admin-lengkap-20260909-r2"></script>
 </body>
 </html>

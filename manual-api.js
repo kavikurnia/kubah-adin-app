@@ -1,7 +1,7 @@
-import {commerce} from './manual-service.js?v=admin-lengkap-20260909';
-import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=admin-lengkap-20260909';
-import {manualStore} from './manual-store.js?v=admin-lengkap-20260909';
-import {manualAccess} from './manual-access.js?v=admin-lengkap-20260909';
+import {commerce} from './manual-service.js?v=admin-lengkap-20260909-r2';
+import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=admin-lengkap-20260909-r2';
+import {manualStore} from './manual-store.js?v=admin-lengkap-20260909-r2';
+import {manualAccess} from './manual-access.js?v=admin-lengkap-20260909-r2';
 
 const iso=()=>new Date().toISOString();
 const adminActions=new Set(['adminData','savePayroll','saveConfig','saveProduct','saveSlot','saveCourier','reviewReseller','confirmShipping','verifyPayment','orderAction','reschedule','cancellationRefund','createManualOrder','legacyManualOrder','confirmRequest','rejectRequest','confirmClaimRequest','rejectClaimRequest','expireOrder']);

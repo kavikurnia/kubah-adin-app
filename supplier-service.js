@@ -1,5 +1,5 @@
-import {check,id,str,num,hash,publicProduct} from './manual-domain.js?v=admin-lengkap-20260909';
-import {day,skuId} from './planning-domain.js?v=admin-lengkap-20260909';
+import {check,id,str,num,hash,publicProduct} from './manual-domain.js?v=admin-lengkap-20260909-r2';
+import {day,skuId} from './planning-domain.js?v=admin-lengkap-20260909-r2';
 export const supplierDocumentId=(sid,kind,number)=>kind+'-'+hash([sid,String(number).trim().toUpperCase()]).slice(0,32);
 export function supplierService(store,{stamp=()=>new Date().toISOString()}={}){
  const admin=c=>check(c?.uid&&c.role==='admin','Akses Supplier hanya untuk admin berwenang.','permission-denied');

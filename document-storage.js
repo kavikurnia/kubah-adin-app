@@ -1,4 +1,4 @@
-import {MAX_DOCUMENT_BYTES,need,filePath} from './reseller-service.js?v=admin-lengkap-20260909';
+import {MAX_DOCUMENT_BYTES,need,filePath} from './reseller-service.js?v=admin-lengkap-20260909-r2';
 export async function blobHash(blob){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),x=>x.toString(16).padStart(2,'0')).join('');}
 export async function detectedMime(file){
  const b=new Uint8Array(await file.slice(0,12).arrayBuffer());

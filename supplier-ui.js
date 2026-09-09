@@ -1,8 +1,8 @@
-import {$,esc,money,date,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download,filtered} from './planning-ui.js?v=admin-lengkap-20260909';
-import {supplierService,supplierDocumentId} from './supplier-service.js?v=admin-lengkap-20260909';
-import {storageConfiguration,prepareDocument,documentStorage} from './document-storage.js?v=admin-lengkap-20260909';
-import {wibDay,dueState,csv} from './planning-domain.js?v=admin-lengkap-20260909';
-import {check} from './manual-domain.js?v=admin-lengkap-20260909';
+import {$,esc,money,date,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download,filtered} from './planning-ui.js?v=admin-lengkap-20260909-r2';
+import {supplierService,supplierDocumentId} from './supplier-service.js?v=admin-lengkap-20260909-r2';
+import {storageConfiguration,prepareDocument,documentStorage} from './document-storage.js?v=admin-lengkap-20260909-r2';
+import {wibDay,dueState,csv} from './planning-domain.js?v=admin-lengkap-20260909-r2';
+import {check} from './manual-domain.js?v=admin-lengkap-20260909-r2';
 const TABS=[['ringkasan','Ringkasan'],['data','Data Supplier'],['penerimaan','Surat Jalan & Penerimaan'],['tagihan','Tagihan & Nota'],['pembayaran','Pembayaran']];
 const REPORT_LABELS={code:'Kode',name:'Nama Supplier',pic:'PIC',phone:'Telepon',email:'Email',address:'Alamat',category:'Kategori',paymentTerms:'Termin (hari)',active:'Aktif',productName:'Produk',sku:'SKU',receiptId:'ID surat jalan',documentNo:'No. dokumen',quality:'Kualitas',delivery:'Ketepatan kirim',completeness:'Kelengkapan jumlah',response:'Respons komplain',scoredCount:'Aspek dinilai',average:'Rata-rata',notes:'Catatan',actor:'Penilai',number:'No. dokumen',poRef:'Referensi PO',status:'Status',shortage:'Kurang (unit)',damaged:'Rusak (unit)',documentId:'ID dokumen',reference:'Referensi',amount:'Nominal (Rp)',verifiedPaid:'Terbayar (Rp)',credits:'Kredit (Rp)',remaining:'Sisa (Rp)',dueDate:'Jatuh tempo',allocations:'Alokasi tagihan',total:'Nilai barang layak (Rp)'};
 const EVENT_LABELS={receipt_revision:'Revisi surat jalan',receipt_verified:'Barang diterima',receipt_correction:'Perbaikan surat jalan',invoice_revision:'Revisi nota',invoice_review:'Pemeriksaan nota',payment_revision:'Revisi pembayaran',payment_verified:'Pembayaran diverifikasi',payment_correction:'Perbaikan bukti pembayaran',payment_reversed:'Pengembalian dana',invoice_cancelled:'Nota dibatalkan',return_credit:'Kredit retur',evaluation:'Evaluasi',supplier:'Data Supplier'};

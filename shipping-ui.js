@@ -1,7 +1,7 @@
-import {label} from './shop-client.js?v=admin-lengkap-20260909';
-import { $,esc,money,date,input,area,select,checkbox,tabs,table,form,bindForm,api,busy,message,download } from './planning-ui.js?v=admin-lengkap-20260909';
-import {wibDay,unitPrice,salesChannel,CHANNELS,csv} from './planning-domain.js?v=admin-lengkap-20260909';
-import {check,hash} from './manual-domain.js?v=admin-lengkap-20260909';
+import {label} from './shop-client.js?v=admin-lengkap-20260909-r2';
+import { $,esc,money,date,input,area,select,checkbox,tabs,table,form,bindForm,api,busy,message,download } from './planning-ui.js?v=admin-lengkap-20260909-r2';
+import {wibDay,unitPrice,salesChannel,CHANNELS,csv} from './planning-domain.js?v=admin-lengkap-20260909-r2';
+import {check,hash} from './manual-domain.js?v=admin-lengkap-20260909-r2';
 let filters={query:'',status:'',courier:'',date:''};
 const invoice=o=>esc(o.invoiceNo||'Belum ada invoice');
 export async function renderShipping(U){const data=await api('adminData');if(!U.isCurrent())return;const tab=['kelola','kurir','jadwal'].includes(U.tab)?U.tab:'kelola';

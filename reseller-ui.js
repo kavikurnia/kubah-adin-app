@@ -1,7 +1,7 @@
-import {connect,login,logout,ensureAdminAccess,api,esc,money} from './shop-client.js?v=admin-lengkap-20260909';
-import {manualStore} from './manual-store.js?v=admin-lengkap-20260909';
-import {resellerService,totals,need} from './reseller-service.js?v=admin-lengkap-20260909';
-import {prepareDocument,documentStorage,storageConfiguration} from './document-storage.js?v=admin-lengkap-20260909';
+import {connect,login,logout,ensureAdminAccess,api,esc,money} from './shop-client.js?v=admin-lengkap-20260909-r2';
+import {manualStore} from './manual-store.js?v=admin-lengkap-20260909-r2';
+import {resellerService,totals,need} from './reseller-service.js?v=admin-lengkap-20260909-r2';
+import {prepareDocument,documentStorage,storageConfiguration} from './document-storage.js?v=admin-lengkap-20260909-r2';
 const adminPage=document.body.dataset.audience==='admin',root=document.getElementById('reseller-content');
 const $=s=>document.querySelector(s),today=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Jakarta'});
 const tabs=adminPage?[['ringkasan','Ringkasan'],['data','Data Reseller'],['pendaftaran','Pendaftaran'],['resi','Resi & Pengiriman'],['pembayaran','Pembayaran']]:[['ringkasan','Ringkasan'],['resi','Resi & Pengiriman'],['pembayaran','Pembayaran']];
