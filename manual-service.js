@@ -1,5 +1,6 @@
+import {RETURN_REASONS,LEGACY_REASONS,stageChange,caseStage} from './return-domain.js?v=dokumen-privat-20260913-r8b';
 import {unitPrice} from './planning-domain.js?v=katalog-pembeli-20260909-r7';
-import {claimEvidence} from './buyer-domain.js?v=katalog-pembeli-20260909-r7';
+import {claimEvidence} from './buyer-domain.js?v=dokumen-privat-20260913-r8b';
 const randomUUID=()=>crypto.randomUUID();
 import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
 
@@ -183,15 +184,16 @@ export function commerce(store,providers={}) {
     const patch={slotId:d.slotId,slot:{startAt:slot.startAt,endAt:slot.endAt},statusHistory:history(o,o.status,ctx,'Jadwal diubah: '+str(d.note,500,true))};tx.update(path,patch);if(o.courierId)tx.set('courierTasks/'+d.orderId,taskProjection({...o,...patch},d.orderId,o.courierId));return {ok:true};});}
   async function reseller(ctx,d){user(ctx);const path='resellers/'+ctx.uid;return store.run(async tx=>{const r=await tx.get(path);check(!r||['ditolak'].includes(r.status),'Pengajuan sudah ada / akses dinonaktifkan.');const data={name:str(d.name,150,true),phone:str(d.phone,30,true),storeName:str(d.storeName,150,true),address:str(d.address,1000,true),channel:str(d.channel,500,true),status:'menunggu',createdAt:iso(),customerId:ctx.uid,note:''};tx.set(path,data);return {ok:true};});}
   async function reviewReseller(ctx,d){admin(ctx);check(['disetujui','ditolak','dinonaktifkan'].includes(d.status),'Status reseller tidak valid.');return store.run(async tx=>{const path='resellers/'+id(d.customerId),r=await tx.get(path);check(r,'Pengajuan tidak ditemukan.');tx.update(path,{status:d.status,note:str(d.note,1000),reviewedBy:ctx.uid,reviewedAt:iso()});return {ok:true};});}
-  async function claim(ctx,d){user(ctx);const oid=id(d.orderId),cid='R-'+hash([ctx.uid,id(d.key)]).slice(0,32);await verifyEvidence(ctx,oid,d.evidence||[]);
+  async function claim(ctx,d){user(ctx);const oid=id(d.orderId),cid='R-'+hash([ctx.uid,id(d.key)]).slice(0,32);check((d.evidence||[]).length<=3,'Maksimal 3 bukti.');await verifyEvidence(ctx,oid,d.evidence||[]);
     return store.run(async tx=>{const prev=await tx.get('claims/'+cid);if(prev){check(prev.customerId===ctx.uid&&prev.orderId===oid,'Kunci pengajuan berbeda.');return {id:cid};}
       const request=d.requestId?await tx.get('claimRequests/'+id(d.requestId)):null;if(d.requestId)check(request?.customerId===ctx.uid&&request.status==='menunggu','Pengajuan sudah diproses.');
       const o=await tx.get('orders/'+oid);owner(ctx,o);const c=config(await tx.get('settings/ecommerce'));
-      check(['dikirim','selesai'].includes(o.status),'Komplain tersedia setelah dikirim.');check(!c.returnPolicyConfirmed||!o.deliveredAt||time()<=Date.parse(o.deliveredAt)+c.returnDays*86400000,'Batas pengajuan retur telah lewat.');
+      check(['dikirim','selesai'].includes(o.status),'Komplain tersedia setelah dikirim.');// Jangan memakai kebijakan saat ini untuk membatasi pesanan lama. Batas ditinjau admin terhadap versi saat transaksi, bukan ditolak otomatis.
+
       const lines=cartInput(d.items),counts={...(o.claimedQuantities||{})};let maxRefund=0;
       for(const x of lines){const i=o.items.find(i=>i.productId===x.productId&&i.variantId===x.variantId);check(i,'Barang bukan bagian pesanan.');const k=x.productId+'_'+x.variantId;check((counts[k]||0)+x.qty<=i.qty,'Jumlah komplain melebihi hak pesanan.');counts[k]=(counts[k]||0)+x.qty;maxRefund+=Math.floor(i.price*x.qty*(o.subtotal-o.discount)/o.subtotal);}
-      const reasons=['Barang salah','Varian salah','Jumlah kurang','Barang rusak','Barang belum diterima','Lainnya'];check(reasons.includes(d.reason),'Alasan tidak valid.');
-      const data={id:cid,orderId:oid,customerId:ctx.uid,items:lines,reason:d.reason,description:str(d.description,3000,true),evidence:d.evidence||[],createdAt:iso(),status:'diajukan',maxRefund,refundAmount:0,refundPaid:false,restocked:false,messages:[]};
+      const reasons=[...RETURN_REASONS,...LEGACY_REASONS];check(reasons.includes(d.reason),'Alasan tidak valid.');
+      const data={id:cid,requestId:d.requestId||null,orderId:oid,customerId:ctx.uid,items:lines,reason:d.reason,description:str(d.description,3000,true),evidence:d.evidence||[],createdAt:iso(),status:'diajukan',stage:'diajukan',invoiceNo:o.invoiceNo||oid,policySnapshot:o.returnPolicySnapshot||null,stageHistory:[],maxRefund,refundAmount:0,refundPaid:false,restocked:false,messages:[]};
       if(d.requestId)tx.update('claimRequests/'+d.requestId,{status:'dikonfirmasi',claimId:cid,reviewedBy:ctx.actorId,reviewedAt:iso()});
       tx.set('claims/'+cid,data);tx.update('orders/'+oid,{claimedQuantities:counts});return {id:cid};
     });
@@ -201,23 +203,24 @@ export function commerce(store,providers={}) {
     const opath='orders/'+r.orderId,o=await tx.get(opath);check(o,'Pesanan tidak tersedia.');
     if(d.action==='reply'){check((r.messages||[]).length<200,'Riwayat tanggapan penuh.');tx.update(path,{messages:[...(r.messages||[]),{text:str(d.text,3000,true),by:ctx.role==='admin'?'Admin':'Pembeli',at:iso()}]});return {ok:true};}
     admin(ctx);
+    if(d.action==='stage'){if(r.stage===d.stage)return {ok:true};const stage=stageChange(r,d.stage,d.note);tx.update(path,{stage,stageHistory:[...(r.stageHistory||[]),{stage,note:str(d.note,1000,true),by:ctx.uid,at:iso()}]});return {ok:true};}
     if(d.action==='resolve'){
       check(r.status==='diajukan','Solusi sudah ditentukan.');check(['kirim_kekurangan','penggantian','retur','refund','ditolak'].includes(d.resolution),'Solusi tidak valid.');
-      const amount=num(d.amount||0);check(amount<=r.maxRefund&&(o.refundCommitted||0)+amount<=o.paidAmount,'Refund melebihi hak / pembayaran diterima.');
+      const returnInstructions=d.resolution==='retur'?str(d.returnInstructions,2000,true):'';const amount=num(d.amount||0);check(amount<=r.maxRefund&&(o.refundCommitted||0)+amount<=o.paidAmount,'Refund melebihi hak / pembayaran diterima.');
       const counts={...(o.claimedQuantities||{})};if(d.resolution==='ditolak'){check(amount===0,'Penolakan tidak memiliki refund.');for(const i of r.items){const k=i.productId+'_'+i.variantId;counts[k]-=i.qty;}}
       tx.update(opath,{refundCommitted:(o.refundCommitted||0)+amount,claimedQuantities:counts});
-      tx.update(path,{status:d.resolution,resolutionNote:str(d.note,1000,true),refundAmount:amount,refundStatus:amount?'disetujui':'tidak_ada',approvedBy:ctx.uid});return {ok:true};
+      tx.update(path,{status:d.resolution,stage:d.resolution==='ditolak'?'ditolak':d.resolution==='retur'?'menunggu_pengembalian':'penyelesaian_diproses',returnRequired:d.resolution==='retur',returnInstructions,stageHistory:[...(r.stageHistory||[]),{stage:d.resolution==='ditolak'?'ditolak':'penyelesaian_diproses',note:str(d.note,1000,true),by:ctx.uid,at:iso()}],resolutionNote:str(d.note,1000,true),refundAmount:amount,refundStatus:amount?'disetujui':'tidak_ada',approvedBy:ctx.uid});return {ok:true};
     }
     if(d.action==='refundPaid'){
-      if(r.refundPaid)return {ok:true};check(r.refundAmount>0,'Refund belum disetujui.');check(r.status!=='retur'||r.returnInspected,'Periksa retur dahulu.');
+      if(r.refundPaid)return {ok:true};check(r.refundAmount>0,'Refund belum disetujui.');check(!r.returnRequired||r.returnInspected,'Periksa retur dahulu.');
       const key='refund_'+d.claimId,prev=await tx.get('transactions/'+key);check((o.refundedAmount||0)+r.refundAmount<=o.paidAmount,'Refund melebihi pembayaran.');
-      if(!prev)ledger(tx,key,o,r.refundAmount,'keluar','Refund '+str(d.reference,200,true),ctx);
+      check(!prev,'Jurnal refund sudah ada tetapi status belum sesuai. Periksa rekonsiliasi; jangan mencatat ulang.');ledger(tx,key,o,r.refundAmount,'keluar','Refund '+str(d.reference,200,true),ctx);
       tx.update(path,{refundPaid:true,refundStatus:'dibayarkan',refundReference:d.reference,refundedAt:iso()});tx.update(opath,{refundedAmount:(o.refundedAmount||0)+r.refundAmount});return {ok:true};
     }
     if(d.action==='inspectReturn'){
       check(r.status==='retur'||r.status==='penggantian','Solusi bukan retur / penggantian.');if(r.returnInspected)return {ok:true};
       const m=await productMap(tx,r.items);if(d.sellable===true){for(const i of r.items){const v=m.get(i.productId).variants.find(v=>v.id===i.variantId);check(v,'Varian retur hilang.');v.stock+=i.qty;}writeProducts(tx,m);}
-      tx.update(path,{returnInspected:true,restocked:d.sellable===true,inspectionNote:str(d.note,1000,true),inspectedBy:ctx.uid,inspectedAt:iso()});return {ok:true};
+      tx.update(path,{stage:'barang_diterima',returnInspected:true,restocked:d.sellable===true,inspectionNote:str(d.note,1000,true),inspectedBy:ctx.uid,inspectedAt:iso()});return {ok:true};
     }
     if(d.action==='fulfill'){check(['kirim_kekurangan','penggantian'].includes(r.status),'Solusi tidak memerlukan pengiriman.');if(r.fulfilled)return {ok:true};const m=await productMap(tx,r.items);for(const i of r.items){const v=m.get(i.productId).variants.find(v=>v.id===i.variantId);check(v&&v.stock>=i.qty,'Stok penggantian kurang.');v.stock-=i.qty;}writeProducts(tx,m);tx.update(path,{fulfilled:true,trackingNumber:str(d.reference,200,true),fulfilledAt:iso()});return {ok:true};}
     throw new Fault('Aksi retur tidak valid.');
@@ -238,7 +241,8 @@ export function commerce(store,providers={}) {
       const subtotal=lines.reduce((s,i)=>s+i.lineTotal,0),shippingCost=num(d.shippingCost),total=subtotal+shippingCost;
       const o={schemaVersion:2,manualWorkflow:true,source:'admin',salesChannel:resellerId?'reseller':'manual_admin',resellerId,channelAudit:{origin:resellerId?'reseller':'manual_admin',by:ctx.uid,at:iso()},productIds:[...new Set(items.map(i=>i.productId))],invoiceNo:oid,requestHash:fingerprint,customerId:resellerId||ctx.uid,customerName:str(d.customerName,150,true),phone:str(d.phone||'',30),address:str(d.address||'',1000),addressData:{name:d.customerName,phone:d.phone||'',text:d.address||'',lat:0,lng:0},items:lines,subtotal,discount:0,shippingCost,total,pcs:lines.reduce((s,i)=>s+i.pcs,0),eligiblePcs:0,usesReseller:false,shippingMethod:'regular',shippingState:'confirmed',totalAccepted:true,quoteVersion:1,paymentMethod:'transfer',paymentStatus:'belum_dibayar',paidAmount:0,refundedAmount:0,refundCommitted:0,cashStatus:'belum_dibayar',status:'menunggu_pembayaran',detailStatus:'Menunggu pembayaran',reservationState:'reserved',slotId:null,slot:null,slotReleased:true,courier:'',trackingNumber:'',note:'Pesanan dibuat admin. Pin belum diverifikasi; tidak untuk promo jarak.',createdAt:iso(),expiresAt:new Date(time()+120*60000).toISOString(),statusHistory:[{status:'menunggu_pembayaran',at:iso(),by:ctx.uid,note:'Harga Eceran/Grosir dihitung dari produk; pembayaran belum diverifikasi.'}]};
       reserve(lines,m,-1);writeProducts(tx,m);tx.set('orders/'+oid,o);return {id:oid,invoiceNo:oid};});}
-  async function slotSave(ctx,d){admin(ctx);const sid=d.id?id(d.id):randomUUID();return store.run(async tx=>{const old=await tx.get('deliverySlots/'+sid);const s={id:sid,startAt:validDate(d.startAt),endAt:validDate(d.endAt),cutoffAt:validDate(d.cutoffAt),capacity:num(d.capacity,1,10000),used:old?.used||0,enabled:d.enabled===true,courierId:d.courierId?id(d.courierId):''};check(s.capacity>=s.used,'Kuota di bawah jumlah pesanan terjadwal.');if(s.used)check(s.startAt===old.startAt&&s.endAt===old.endAt,'Slot berisi pesanan: gunakan penjadwalan ulang pesanan.');check(Date.parse(s.endAt)>Date.parse(s.startAt)&&Date.parse(s.cutoffAt)<=Date.parse(s.startAt),'Waktu slot tidak valid.');tx.set('deliverySlots/'+sid,s);return {id:sid};});}
+  async function slotSave(ctx,d){admin(ctx);const sid=d.id?id(d.id):randomUUID();return store.run(async tx=>{const old=await tx.get('deliverySlots/'+sid);const s={id:sid,startAt:validDate(d.startAt),endAt:validDate(d.endAt),cutoffAt:validDate(d.cutoffAt),capacity:num(d.capacity,1,10000),used:old?.used||0,enabled:d.enabled===true,courierId:d.courierId?id(d.courierId):'',capacityUnit:'pesanan'};// Kapasitas boleh diturunkan; pesanan lama/used dipertahankan, validateSlot menutup pesanan baru.
+if(s.used)check(Date.parse(s.startAt)===Date.parse(old.startAt)&&Date.parse(s.endAt)===Date.parse(old.endAt),'Slot berisi pesanan: gunakan penjadwalan ulang pesanan.');check(Date.parse(s.endAt)>Date.parse(s.startAt)&&Date.parse(s.cutoffAt)<=Date.parse(s.startAt),'Waktu slot tidak valid.');tx.set('deliverySlots/'+sid,s);return {id:sid};});}
   async function profile(ctx,d){user(ctx);check(Array.isArray(d.addresses)&&d.addresses.length<=10,'Maksimal 10 alamat.');const p={name:str(d.name,150,true),phone:str(d.phone,30),addresses:d.addresses.map(address),updatedAt:iso()};await store.set('profiles/'+ctx.uid,p);return {ok:true};}
   async function gatewaySession(ctx,d){user(ctx);const oid=id(d.orderId),o=await store.get('orders/'+oid);owner(ctx,o);canPay(o,time());check(o.paymentMethod==='gateway'&&o.paidAmount===0,'Pembayaran gateway tidak tersedia.');check(providers.gatewaySession,'Gateway belum dikonfigurasi.');
     // Provider order_id is deterministic. A lost response can be reconciled without a new charge.
@@ -300,3 +304,4 @@ export function commerce(store,providers={}) {
   }
   return {dispatch,gatewayPaid,expire:oid=>cancel({system:true,uid:'system'},{orderId:oid},true)};
 }
+
