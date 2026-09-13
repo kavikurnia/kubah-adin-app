@@ -1,5 +1,5 @@
 import {MAX_DOCUMENT_BYTES,need,filePath} from './reseller-service.js?v=admin-supplier-20260909-r3';
-import {buyerFilePath} from './buyer-domain.js?v=dokumen-privat-20260913-r8b';
+import {buyerFilePath} from './buyer-domain.js?v=kebijakan-20260913-r9';
 export async function blobHash(blob){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),x=>x.toString(16).padStart(2,'0')).join('');}
 export async function detectedMime(file){
  const b=new Uint8Array(await file.slice(0,12).arrayBuffer());

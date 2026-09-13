@@ -1,4 +1,4 @@
-import {$,esc,table,form,select,area,bindForm,message,date} from './planning-ui.js?v=dokumen-privat-20260913-r8b';
+import {$,esc,table,form,select,area,bindForm,message,date} from './planning-ui.js?v=kebijakan-20260913-r9';
 import {customerMessages,PROGRAMS,MESSAGE_STATUS,messageNumber} from './customer-message-service.js?v=katalog-pembeli-20260909-r7';
 export async function renderCustomerMessages(U){
   const rows=await U.store.list('customerMessages');if(!U.isCurrent())return;

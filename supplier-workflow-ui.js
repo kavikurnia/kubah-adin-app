@@ -1,4 +1,4 @@
-import {$,esc,money,date,input,area,select,checkbox,table,form,bindForm,busy,message,download} from './planning-ui.js?v=dokumen-privat-20260913-r8b';
+import {$,esc,money,date,input,area,select,checkbox,table,form,bindForm,busy,message,download} from './planning-ui.js?v=kebijakan-20260913-r9';
 import {check} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
 import {wibDay} from './planning-domain.js?v=katalog-pembeli-20260909-r7';
 import {supplierWorkflow} from './supplier-workflow-service.js?v=katalog-pembeli-20260909-r7';

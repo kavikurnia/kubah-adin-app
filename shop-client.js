@@ -22,10 +22,10 @@ export function connect(){return ready??=(async()=>{
   }
   return {app,auth,a,db,fs};
 })().catch(error=>{ready=undefined;throw error;});}
-export async function api(action,data={}){return withDeadline(import('./manual-api.js?v=dokumen-privat-20260913-r8b').then(async m=>m.manualApi(await connect(),action,data)),30000,'manual/unavailable');}
+export async function api(action,data={}){return withDeadline(import('./manual-api.js?v=kebijakan-20260913-r9').then(async m=>m.manualApi(await connect(),action,data)),30000,'manual/unavailable');}
 export async function ensureAdminAccess(user){return withDeadline(manualAccess(await connect(),user),15000,'free/unavailable');}
 export async function upload(){throw Object.assign(new Error('Unggah berkas belum aktif: penyimpanan privat belum dikonfigurasi. Foto produk dapat memakai URL HTTPS; bukti dikirim manual ke admin.'),{code:'free/unavailable'});}
-export async function viewEvidence(raw){if(typeof raw==='object'||String(raw).startsWith('{')){const {openBuyerDocument}=await import('./buyer-document-ui.js?v=dokumen-privat-20260913-r8b');return openBuyerDocument(raw);}throw Object.assign(new Error('Bukti lama tersimpan pada layanan versi lengkap. Versi gratis tidak mengunduh bukti pembayaran.'),{code:'free/unavailable'});}
+export async function viewEvidence(raw){if(typeof raw==='object'||String(raw).startsWith('{')){const {openBuyerDocument}=await import('./buyer-document-ui.js?v=kebijakan-20260913-r9');return openBuyerDocument(raw);}throw Object.assign(new Error('Bukti lama tersimpan pada layanan versi lengkap. Versi gratis tidak mengunduh bukti pembayaran.'),{code:'free/unavailable'});}
 export async function login(email,password,register=false){const c=await connect();return register?c.auth.createUserWithEmailAndPassword(c.a,email,password):c.auth.signInWithEmailAndPassword(c.a,email,password);}
 export async function logout(){const c=await connect();return c.auth.signOut(c.a);}
 export function formValues(form){return Object.fromEntries(new FormData(form));}

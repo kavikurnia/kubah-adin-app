@@ -1,6 +1,6 @@
-import {caseId} from './return-domain.js?v=dokumen-privat-20260913-r8b';
-import {documentStorage,storageConfiguration,prepareDocument} from './document-storage.js?v=dokumen-privat-20260913-r8b';
-import {connect,esc} from './shop-client.js?v=dokumen-privat-20260913-r8b';
+import {caseId} from './return-domain.js?v=kebijakan-20260913-r9';
+import {documentStorage,storageConfiguration,prepareDocument} from './document-storage.js?v=kebijakan-20260913-r9';
+import {connect,esc} from './shop-client.js?v=kebijakan-20260913-r9';
 export function evidenceButtons(files=[]){return files.map((file,i)=>'<button type="button" data-evidence="'+esc(typeof file==='object'?JSON.stringify(file):file)+'">Bukti '+(i+1)+'</button>').join('');}
 export async function openBuyerDocument(raw){
  const file=typeof raw==='string'?JSON.parse(raw):raw,c=await connect(),uid=c.a.currentUser?.uid,blob=await documentStorage(c).read(file);

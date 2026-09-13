@@ -1,4 +1,4 @@
-import {$,esc,money,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download} from './planning-ui.js?v=dokumen-privat-20260913-r8b';
+import {$,esc,money,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download} from './planning-ui.js?v=kebijakan-20260913-r9';
 import {CATEGORIES,IMPORT_COLUMNS,IMPORT_LABELS,importPreview,pricingInput,skuId,csv,unitPrice} from './planning-domain.js?v=katalog-pembeli-20260909-r7';
 import {productService} from './product-service.js?v=katalog-pembeli-20260909-r7';
 import {check,num} from './manual-domain.js?v=katalog-pembeli-20260909-r7';

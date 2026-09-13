@@ -1,6 +1,6 @@
-import {RETURN_REASONS,LEGACY_REASONS,stageChange,caseStage} from './return-domain.js?v=dokumen-privat-20260913-r8b';
+import {RETURN_REASONS,LEGACY_REASONS,stageChange,caseStage} from './return-domain.js?v=kebijakan-20260913-r9';
 import {unitPrice} from './planning-domain.js?v=katalog-pembeli-20260909-r7';
-import {claimEvidence} from './buyer-domain.js?v=dokumen-privat-20260913-r8b';
+import {claimEvidence} from './buyer-domain.js?v=kebijakan-20260913-r9';
 const randomUUID=()=>crypto.randomUUID();
 import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
 

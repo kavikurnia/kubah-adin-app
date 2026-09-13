@@ -1,12 +1,12 @@
-import {caseId} from './return-domain.js?v=dokumen-privat-20260913-r8b';
-import {policyDraft} from './return-domain.js?v=dokumen-privat-20260913-r8b';
-import {commerce} from './manual-service.js?v=dokumen-privat-20260913-r8b';
+import {caseId} from './return-domain.js?v=kebijakan-20260913-r9';
+import {policyDraft} from './return-domain.js?v=kebijakan-20260913-r9';
+import {commerce} from './manual-service.js?v=kebijakan-20260913-r9';
 import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
 import {manualStore} from './manual-store.js?v=admin-supplier-20260909-r3';
 import {manualAccess} from './manual-access.js?v=admin-supplier-20260909-r3';
 
 import {catalogEstimate,quoteSignature} from './catalog-domain.js?v=katalog-pembeli-20260909-r7';
-import {claimInput,claimEvidence} from './buyer-domain.js?v=dokumen-privat-20260913-r8b';
+import {claimInput,claimEvidence} from './buyer-domain.js?v=kebijakan-20260913-r9';
 const iso=()=>new Date().toISOString();
 const adminActions=new Set(['savePolicyDraft','adminData','savePayroll','saveConfig','saveProduct','saveSlot','saveCourier','reviewReseller','confirmShipping','verifyPayment','orderAction','reschedule','cancellationRefund','createManualOrder','legacyManualOrder','confirmRequest','rejectRequest','confirmClaimRequest','rejectClaimRequest','expireOrder']);
 export function publicSettings(raw){const c=config(raw||{});return {enabled:c.enabled,whatsapp:c.whatsapp,categories:c.categories,promos:c.promos,warehouse:c.warehouse,shipping:c.shipping,payments:c.payments,banks:c.banks,freeShipping:c.freeShipping,returnPolicy:c.returnPolicy,returnDays:c.returnDays,returnPolicyConfirmed:c.returnPolicyConfirmed===true,operatingDays:c.operatingDays,holidays:c.holidays};}
@@ -25,7 +25,7 @@ async function checkoutReview(reader,p,uid){
 }
 export async function manualApi(c,action,d={}){
   const store=manualStore(c),user=c.a.currentUser;
-  const core=commerce(store,{verifyFile:async file=>{const {documentStorage}=await import('./document-storage.js?v=dokumen-privat-20260913-r8b');await documentStorage(c).read(file);}});
+  const core=commerce(store,{verifyFile:async file=>{const {documentStorage}=await import('./document-storage.js?v=kebijakan-20260913-r9');await documentStorage(c).read(file);}});
   if(action==='catalog'){return {products:await store.list('catalog'),settings:publicSettings(await store.get('publicSettings/store'))};}
   if(action==='reviews')return store.list('reviews',[['productId','==',id(d.productId)]]);
   check(user,'Silakan masuk.','unauthenticated');const uid=user.uid,ctx={uid,role:'buyer'};
