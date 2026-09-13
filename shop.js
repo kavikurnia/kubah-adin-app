@@ -1,4 +1,4 @@
-import {catalogHero,categoryStrip} from './catalog-design.js?v=desain-20260913-r10';
+import {catalogHero,categoryStrip} from './catalog-design.js?v=banner-20260913-r11';
 import {APPROVED_POLICY_SUMMARY} from './return-domain.js?v=kebijakan-20260913-r9';
 import {mountBuyerRevisions} from './return-evidence-ui.js?v=kebijakan-20260913-r9';
 import {RETURN_REASONS,RETURN_STAGES,caseStage,caseId} from './return-domain.js?v=kebijakan-20260913-r9';
@@ -29,7 +29,7 @@ function bindCatalog(){
   const setMode=mode=>{S.mode=mode;invalidateCheckout();save();catalog(S.wishlistView);};
   document.querySelectorAll('[data-catalog-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.catalogMode));
   document.querySelector('[data-wholesale]')?.addEventListener('click',()=>{S.category='';S.material='';S.size='';S.onlyWholesale=false;setMode('grosir');$('#product-results').scrollIntoView({behavior:'smooth',block:'start'});});
-  $('#shop-now')?.addEventListener('click',()=>$('#product-results').scrollIntoView({behavior:'smooth',block:'start'}));
+  $('#shop-now')?.addEventListener('click',e=>{e.preventDefault();history.replaceState(null,'','#katalog');$('#product-results').scrollIntoView({behavior:'smooth',block:'start'});});
 }
 function catalog(wishlist=false){
   S.wishlistView=wishlist;const options=catalogOptions(S.products,S.category),source=S.products.filter(p=>!wishlist||S.wish.includes(p.id)),products=filterCatalog(source,S,S.mode),unavailable=wishlist?S.wish.filter(id=>!S.products.some(p=>p.id===id)):[],hero=S.products.find(p=>safeURL(photo(p)));
