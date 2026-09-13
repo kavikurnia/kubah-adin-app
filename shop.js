@@ -1,4 +1,4 @@
-import {catalogHero,categoryStrip} from './catalog-design.js?v=banner-20260913-r11';
+import {catalogHero,categoryStrip} from './catalog-design.js?v=header-20260913-r12';
 import {APPROVED_POLICY_SUMMARY} from './return-domain.js?v=kebijakan-20260913-r9';
 import {mountBuyerRevisions} from './return-evidence-ui.js?v=kebijakan-20260913-r9';
 import {RETURN_REASONS,RETURN_STAGES,caseStage,caseId} from './return-domain.js?v=kebijakan-20260913-r9';
