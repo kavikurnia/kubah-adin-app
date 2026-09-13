@@ -2,3 +2,7 @@
 
 /* Keep long balances and inner tables inside the phone viewport. */
 main,#content,.panel,.kpis>article{min-width:0}.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.kpis strong{overflow-wrap:anywhere}.page-head>div{min-width:0}.notice{overflow-wrap:anywhere}@media(max-width:760px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:420px){.kpis{grid-template-columns:1fr}}
+
+/* Private manual product movement */
+.movement-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}.movement-summary .panel{display:flex;flex-direction:column;gap:8px;margin:0}.movement-summary strong{font-size:1.6rem}.movement-badge{display:inline-block;border-radius:999px;padding:5px 10px;font-size:.8rem;font-weight:600;white-space:nowrap}.movement-fast{background:#def1e5;color:#145b32}.movement-medium{background:#e2eafa;color:#244678}.movement-slow{background:#fff0cd;color:#795000}.movement-dead{background:#f5dfe1;color:#832633}.movement-unrated{background:#ecebea;color:#484540}.movement-photo{width:52px;height:52px;object-fit:contain;border-radius:8px}#movement-editor button,[data-movement]{min-height:44px}#movement-editor:empty{display:none}
+.product-tabs{flex-wrap:wrap;white-space:normal}.product-tabs a{min-height:44px;box-sizing:border-box}

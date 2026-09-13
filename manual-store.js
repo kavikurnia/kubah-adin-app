@@ -1,6 +1,7 @@
 export function manualStore({fs,db}){
   const ref=p=>fs.doc(db,p);
   return {
+    serverTimestamp:()=>fs.serverTimestamp(),
     async get(p){const s=await fs.getDocFromServer(ref(p));return s.exists()?s.data():null;},
     async list(path,filters=[]){const q=fs.query(fs.collection(db,path),...filters.map(([k,op,v])=>fs.where(k,op,v)));const s=await fs.getDocsFromServer(q);return s.docs.map(d=>({...d.data(),id:d.id}));},
     set:(p,d)=>fs.setDoc(ref(p),d),

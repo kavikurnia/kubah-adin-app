@@ -1,7 +1,7 @@
 import {connect,ensureAdminAccess,esc,message} from './shop-client.js?v=kebijakan-20260913-r9';
-import {manualStore} from './manual-store.js?v=admin-supplier-20260909-r3';
+import {manualStore} from './manual-store.js?v=movement-r13';
 import {renderShipping,renderNewOrder} from './shipping-ui.js?v=kebijakan-20260913-r9';
-import {renderProducts,renderCalculator} from './product-ui.js?v=kebijakan-20260913-r9';
+import {renderProducts,renderCalculator} from './product-ui.js?v=movement-r13';
 import {renderSuppliers} from './supplier-ui.js?v=kebijakan-20260913-r9';
 import {renderCustomerMessages} from './customer-message-ui.js?v=kebijakan-20260913-r9';
 
