@@ -1,8 +1,8 @@
-import {RETURN_REASONS,LEGACY_REASONS,stageChange,caseStage} from './return-domain.js?v=kebijakan-20260913-r9';
-import {unitPrice} from './planning-domain.js?v=katalog-pembeli-20260909-r7';
-import {claimEvidence} from './buyer-domain.js?v=kebijakan-20260913-r9';
+import {RETURN_REASONS,LEGACY_REASONS,stageChange,caseStage} from './return-domain.js?v=launch-20260915-r14';
+import {unitPrice} from './planning-domain.js?v=launch-20260915-r14';
+import {claimEvidence} from './buyer-domain.js?v=launch-20260915-r14';
 const randomUUID=()=>crypto.randomUUID();
-import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
+import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=launch-20260915-r14';
 
 // Store contract: get/list outside a transaction; tx.get(path), tx.set/update/delete inside.
 // Every transaction below completes reads before staging writes. Firestore retries conflicts.

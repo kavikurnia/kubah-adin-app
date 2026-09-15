@@ -1,4 +1,4 @@
-import {check,hash,str} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
+import {check,hash,str} from './manual-domain.js?v=launch-20260915-r14';
 
 export const PROGRAMS = [
   ['haji','Kebutuhan Oleh-Oleh Haji & Umroh','Ajukan kebutuhan produk berdasarkan jumlah penerima, anggaran, dan tanggal kebutuhan.'],

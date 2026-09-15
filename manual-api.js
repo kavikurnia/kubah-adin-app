@@ -1,12 +1,12 @@
-import {caseId} from './return-domain.js?v=kebijakan-20260913-r9';
-import {policyDraft} from './return-domain.js?v=kebijakan-20260913-r9';
-import {commerce} from './manual-service.js?v=kebijakan-20260913-r9';
-import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
-import {manualStore} from './manual-store.js?v=admin-supplier-20260909-r3';
-import {manualAccess} from './manual-access.js?v=admin-supplier-20260909-r3';
+import {caseId} from './return-domain.js?v=launch-20260915-r14';
+import {policyDraft} from './return-domain.js?v=launch-20260915-r14';
+import {commerce} from './manual-service.js?v=launch-20260915-r14';
+import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=launch-20260915-r14';
+import {manualStore} from './manual-store.js?v=launch-20260915-r14';
+import {manualAccess} from './manual-access.js?v=launch-20260915-r14';
 
-import {catalogEstimate,quoteSignature} from './catalog-domain.js?v=katalog-pembeli-20260909-r7';
-import {claimInput,claimEvidence} from './buyer-domain.js?v=kebijakan-20260913-r9';
+import {catalogEstimate,quoteSignature} from './catalog-domain.js?v=launch-20260915-r14';
+import {claimInput,claimEvidence} from './buyer-domain.js?v=launch-20260915-r14';
 const iso=()=>new Date().toISOString();
 const adminActions=new Set(['savePolicyDraft','adminData','savePayroll','saveConfig','saveProduct','saveSlot','saveCourier','reviewReseller','confirmShipping','verifyPayment','orderAction','reschedule','cancellationRefund','createManualOrder','legacyManualOrder','confirmRequest','rejectRequest','confirmClaimRequest','rejectClaimRequest','expireOrder']);
 export function publicSettings(raw){const c=config(raw||{});return {enabled:c.enabled,whatsapp:c.whatsapp,categories:c.categories,promos:c.promos,warehouse:c.warehouse,shipping:c.shipping,payments:c.payments,banks:c.banks,freeShipping:c.freeShipping,returnPolicy:c.returnPolicy,returnDays:c.returnDays,returnPolicyConfirmed:c.returnPolicyConfirmed===true,operatingDays:c.operatingDays,holidays:c.holidays};}
@@ -24,8 +24,8 @@ async function checkoutReview(reader,p,uid){
  return {...q,pricingSignature:quoteSignature(q)};
 }
 export async function manualApi(c,action,d={}){
-  const store=manualStore(c),user=c.a.currentUser;
-  const core=commerce(store,{verifyFile:async file=>{const {documentStorage}=await import('./document-storage.js?v=kebijakan-20260913-r9');await documentStorage(c).read(file);}});
+  const user=c.a.currentUser,store=manualStore(['catalog','reviews'].includes(action)?{...c,a:null}:{...c,expectedUser:user});
+  const core=commerce(store,{verifyFile:async file=>{const {documentStorage}=await import('./document-storage.js?v=launch-20260915-r14');await documentStorage(c).read(file);}});
   if(action==='catalog'){return {products:await store.list('catalog'),settings:publicSettings(await store.get('publicSettings/store'))};}
   if(action==='reviews')return store.list('reviews',[['productId','==',id(d.productId)]]);
   check(user,'Silakan masuk.','unauthenticated');const uid=user.uid,ctx={uid,role:'buyer'};
@@ -107,8 +107,8 @@ export async function manualApi(c,action,d={}){
     return once(store,'claimMessages/'+hash([uid,claimId,key]),{customerId:uid,claimId,text,requestHash:hash(text),createdAt:c.fs.serverTimestamp()});
   }
   if(action==='review'){
-    const orderId=id(d.orderId),productId=id(d.productId),rid=hash([orderId,productId]);const old=await store.get('reviews/'+rid);if(old)return {ok:true};
-    await store.set('reviews/'+rid,{customerId:uid,orderId,productId,rating:num(d.rating,1,5),text:str(d.text,2000,true),buyerLabel:'Pembeli terverifikasi',createdAt:c.fs.serverTimestamp()});return {ok:true};
+    const orderId=id(d.orderId),productId=id(d.productId),rid=hash([orderId,productId]),rating=num(d.rating,1,5),text=str(d.text,2000,true);
+    return store.run(async tx=>{const o=await tx.get('orders/'+orderId),old=await tx.get('reviews/'+rid);check(o?.customerId===uid&&o.status==='selesai'&&o.paidAmount===o.total&&o.productIds?.includes(productId),'Ulasan hanya untuk produk pada pesanan Anda yang selesai dan lunas.','permission-denied');if(old){check(old.customerId===uid,'Ulasan bukan milik akun ini.','permission-denied');return {ok:true,reused:true};}tx.set('reviews/'+rid,{customerId:uid,orderId,productId,rating,text,buyerLabel:'Pembeli terverifikasi',createdAt:c.fs.serverTimestamp()});return {ok:true,reused:false};});
   }
   throw Object.assign(new Error('Tindakan belum tersedia dalam pemasangan tanpa Blaze.'),{code:'manual/unavailable'});
 }

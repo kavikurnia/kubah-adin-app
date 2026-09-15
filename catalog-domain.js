@@ -1,5 +1,5 @@
-import {priceCart,config} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
-export {CATEGORIES} from './planning-domain.js?v=katalog-pembeli-20260909-r7';
+import {priceCart,config} from './manual-domain.js?v=launch-20260915-r14';
+export {CATEGORIES} from './planning-domain.js?v=launch-20260915-r14';
 // The cart, detail preview and checkout estimate share the existing order pricing engine.
 export function catalogEstimate(items,products,mode,settings={},resellerPrices=[],stockCheck=false){
  const mapped=new Map(products.map(p=>[p.id,{...p,status:'aktif',website:{enabled:true,retail:p.price,packPcs:p.packPcs,promo:p.promo,combine:p.combine,group:p.group||'',tiers:p.tiers,reseller:resellerPrices.find(r=>r.productId===p.id)||{price:0,minPcs:20}}}]));
@@ -40,15 +40,24 @@ export function cardPrice(p,mode='eceran'){
  return {price:Math.min(...(values.length?values:[p.price])),varies:new Set(values).size>1,kind:tier?'Grosir':'Eceran',minimum:tier?.minPcs||null};
 }
 export const shippingText=o=>o.shippingCost==null||o.shippingState==='pending_admin'?'Menunggu Konfirmasi Ongkir':o.shippingCost===0?(o.shippingMethod==='pickup'?'Ambil sendiri':o.promoApplied?'Gratis ongkir kurir toko':'Rp0 · Dikonfirmasi admin'):null;
-export async function submitOrderRequest({uid,data,storage,locks,send}){
+export const pendingOrderKey=(uid,intent='legacy')=>'kn-pending-v2:'+encodeURIComponent(uid)+':'+intent;
+export async function submitOrderRequest({uid,intent='legacy',data,storage,locks,send}){
  const submit=async()=>{
-  const signature=JSON.stringify(data);let pending;
-  try{pending=JSON.parse(storage.getItem('kn-pending'));}catch{}
+  if(!uid)throw Error('Masuk kembali sebelum mengirim pesanan.');
+  const signature=JSON.stringify(data),storageKey=pendingOrderKey(uid,intent);let pending;
+  try{pending=JSON.parse(storage.getItem(storageKey));}catch{}
+  if(pending&&pending.signature!==signature&&pending.state==='pending')throw Error('Hasil permintaan sebelumnya belum pasti. Gunakan tombol percobaan ulang permintaan yang sama sebelum mengirim rincian berbeda.');
   const key=pending?.uid===uid&&pending.signature===signature?pending.key:crypto.randomUUID();
-  storage.setItem('kn-pending',JSON.stringify({uid,key,signature}));
-  const result=await send({...data,key});
+  storage.setItem(storageKey,JSON.stringify({uid,key,signature,data,state:'pending'}));
+  let result;try{result=await send({...data,key});}catch(error){
+   // Only a definitive validation/access rejection releases this intent for editing.
+   // A timeout, disconnect or unknown error keeps the original key for recovery.
+   if(['failed-precondition','invalid-argument','permission-denied','unauthenticated'].includes(String(error?.code||'').split('/').pop()))storage.setItem(storageKey,JSON.stringify({uid,key,signature,data,state:'rejected'}));
+   throw error;
+  }
   if(!result?.id)throw Error('Pesanan belum dikonfirmasi, keranjang tetap disimpan.');
-  // Retain the key for a delayed second tab or a lost response. A cart edit starts a new purchase.
+  storage.setItem(storageKey,JSON.stringify({uid,key,signature,data,state:'confirmed',result}));
+  // Keep the confirmed key for stale tabs. A new cart uses a new purchase intent.
   return result;
  };
  return locks?.request?locks.request('kn-order-'+uid,submit):submit();

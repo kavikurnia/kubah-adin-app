@@ -37,7 +37,7 @@ function connect(){return ready??=(async()=>{
   }
   return {app,auth,a,db,fs};
 })().catch(error=>{ready=undefined;throw error;});}
-async function api(action,data={}){return withDeadline(import('./manual-api.js?v=kebijakan-20260913-r9').then(async m=>m.manualApi(await connect(),action,data)),30000,'manual/unavailable');}
+async function api(action,data={}){return withDeadline(import('./manual-api.js?v=launch-20260915-r14').then(async m=>m.manualApi(await connect(),action,data)),30000,'manual/unavailable');}
 async function ensureAdminAccess(user){return withDeadline(manualAccess(await connect(),user),15000,'free/unavailable');}
 async function upload(){throw Object.assign(new Error('Unggah berkas belum aktif: penyimpanan privat belum dikonfigurasi. Foto produk dapat memakai URL HTTPS; bukti dikirim manual ke admin.'),{code:'free/unavailable'});}
 async function viewEvidence(){throw Object.assign(new Error('Bukti lama tersimpan pada layanan versi lengkap. Versi gratis tidak mengunduh bukti pembayaran.'),{code:'free/unavailable'});}
@@ -532,7 +532,7 @@ function saveDemoData() {
 async function updateOrder(orderId, patch, historyLabel) {
   const order = state.orders.find(o => o.id === orderId);
   if (order?.schemaVersion === 2) {
-    window.location.href = 'admin-website.html?v=kebijakan-20260913-r9#orders/' + encodeURIComponent(orderId); return;
+    window.location.href = 'admin-website.html?v=launch-20260915-r14#orders/' + encodeURIComponent(orderId); return;
   }
   await shopApi('orderAction', { orderId, operation: 'legacy', ...patch });
 }
@@ -578,67 +578,12 @@ async function updateProduct(productId, patch) {
 }
 
 
-/** Tambah pelanggan baru (manual ATAU otomatis dari sinkronisasi pesanan). */
-/**
- * Tambah pelanggan BARU, atau perbarui data yang sudah ada jika no. HP/WhatsApp
- * sudah terdaftar. No. HP jadi kunci unik agar tidak ada data ganda.
- * Di mode Firebase, pengecekan dilakukan lewat query langsung ke Firestore
- * (bukan hanya cache lokal) supaya aman dari race condition saat data baru dimuat.
- */
-async function upsertCustomer(customerData) {
-  const phone = (customerData.phone || "").trim();
+// Customer updates retain history. No customer delete action is exposed.
+async function customerCore(){const c=await connectShop(),[{customerService},{manualStore}]=await Promise.all([import('./customer-service.js?v=launch-20260915-r14'),import('./manual-store.js?v=launch-20260915-r14')]);await ensureAdminAccess(c.a.currentUser);return {service:customerService(manualStore({...c,expectedUser:c.a.currentUser})),ctx:{uid:c.a.currentUser.uid,role:'admin'}};}
+async function upsertCustomer(data){const {service,ctx}=await customerCore();return service.save(ctx,data);}
+async function updateCustomer(customerId,patch){const {service,ctx}=await customerCore();return service.save(ctx,patch,customerId);}
+async function setCustomerActive(customerId,active){const {service,ctx}=await customerCore();return service.setActive(ctx,customerId,active);}
 
-  if (state.mode === "firebase") {
-    const { collection, query, where, limit, getDocs, addDoc, updateDoc, doc, serverTimestamp } = fb;
-    if (phone) {
-      const existingSnap = await getDocs(query(collection(fb.db, "customers"), where("phone", "==", phone), limit(1)));
-      if (!existingSnap.empty) {
-        const existingId = existingSnap.docs[0].id;
-        await updateDoc(doc(fb.db, "customers", existingId), customerData);
-        return { id: existingId, updated: true };
-      }
-    }
-    const ref = await addDoc(collection(fb.db, "customers"), { ...customerData, createdAt: serverTimestamp() });
-    return { id: ref.id, updated: false };
-  } else {
-    const existing = phone ? state.customers.find((c) => (c.phone || "").trim() === phone) : null;
-    if (existing) {
-      Object.assign(existing, customerData);
-      saveDemoData();
-      renderAll();
-      return { id: existing.id, updated: true };
-    }
-    const newCustomer = { ...customerData, id: "demo-customer-" + Date.now() + Math.random().toString(36).slice(2, 6), createdAt: new Date().toISOString() };
-    state.customers.push(newCustomer);
-    saveDemoData();
-    renderAll();
-    return { id: newCustomer.id, updated: false };
-  }
-}
-
-async function updateCustomer(customerId, patch) {
-  if (state.mode === "firebase") {
-    const { doc, updateDoc } = fb;
-    await updateDoc(doc(fb.db, "customers", customerId), patch);
-  } else {
-    const customer = state.customers.find((c) => c.id === customerId);
-    Object.assign(customer, patch);
-    saveDemoData();
-    renderAll();
-  }
-}
-
-/** Hapus data pelanggan dari koleksi customers. */
-async function deleteCustomer(customerId) {
-  if (state.mode === "firebase") {
-    const { doc, deleteDoc } = fb;
-    await deleteDoc(doc(fb.db, "customers", customerId));
-  } else {
-    state.customers = state.customers.filter((c) => c.id !== customerId);
-    saveDemoData();
-    renderAll();
-  }
-}
 
 /** Catat transaksi kas manual; jurnal pesanan wajib melalui verifikasi pembayaran atomik. */
 async function addTransaction(tx) {
@@ -969,7 +914,7 @@ function renderAdminChrome() {
   logo.onerror=()=>{logo.hidden=true;document.getElementById('sidebar-monogram').hidden=false;};
   document.getElementById('admin-display-name').textContent=u?.name||'Admin';document.getElementById('admin-display-name').title=u?.email||'';
   document.getElementById('admin-initial').textContent=(u?.name||'A').trim().slice(0,1).toUpperCase();document.getElementById('admin-role').textContent=u?.superAdmin?'Super Admin':'Administrator';
-  const storeLink=document.getElementById('view-store'),storeUrl=safeStoreUrl(s.storeUrl);storeLink.href=storeUrl||'toko.html?v=kebijakan-20260913-r9';storeLink.dataset.configured='true';
+  const storeLink=document.getElementById('view-store'),storeUrl=safeStoreUrl(s.storeUrl);storeLink.href=storeUrl||'toko.html?v=launch-20260915-r14';storeLink.dataset.configured='true';
   const counts=activityCounts(),rows=[['reseller',counts.reseller,'pengajuan reseller menunggu',state.ready.resellers],['retur',counts.claims,'komplain belum selesai',state.ready.claims],['payment',counts.payment,'pembayaran perlu verifikasi',state.ready.orders]];
   document.getElementById('notification-dot').hidden=!rows.some(r=>r[3]&&r[1]>0);
   const panel=document.getElementById('notification-items');panel.innerHTML=rows.filter(r=>r[3]&&r[1]>0).map(r=>`<button data-activity="${r[0]}"><strong>${r[1]}</strong> ${r[2]} <span aria-hidden="true">›</span></button>`).join('')||'<p>Tidak ada tindak lanjut pada data yang sudah tersinkron.</p>';
@@ -1032,8 +977,8 @@ function showOperational(module){
   const inspect=()=>{try{const content=frame.contentDocument?.getElementById('content');if(!content||/Memeriksa/.test(content.textContent)){document.getElementById('module-error').hidden=false;}}catch{document.getElementById('module-error').hidden=false;}};
   frame.onload=()=>{try{if(!frame.contentDocument?.getElementById('content'))inspect();}catch{inspect();}};
   const page=module.split('/')[0];
-  if(['messages','shipping','couriers','slots','products','suppliers','webcontent','calculator','neworder','pricing'].includes(page)){frame.src='planning-admin.html?v=movement-r13&embed=1#'+(({couriers:'shipping/kurir',slots:'shipping/jadwal',pricing:'products/migrasi'})[module]||module);}
-  else frame.src=page==='resellers'?'reseller-admin.html?v=kebijakan-20260913-r9&embed=1#'+(module.split('/')[1]||'ringkasan'):'admin-website.html?v=kebijakan-20260913-r9&embed=1#'+module;
+  if(['messages','shipping','couriers','slots','products','suppliers','webcontent','calculator','neworder','pricing'].includes(page)){frame.src='planning-admin.html?v=launch-20260915-r14&embed=1#'+(({couriers:'shipping/kurir',slots:'shipping/jadwal',pricing:'products/migrasi'})[module]||module);}
+  else frame.src=page==='resellers'?'reseller-admin.html?v=launch-20260915-r14&embed=1#'+(module.split('/')[1]||'ringkasan'):'admin-website.html?v=launch-20260915-r14&embed=1#'+module;
   moduleTimer=setTimeout(inspect,20000);
   document.getElementById('module-retry').onclick=()=>showOperational(module);toggleDrawer(false);
 }
@@ -1062,7 +1007,7 @@ function bindAdminDashboard(){
   document.querySelectorAll('[data-recent]').forEach(b=>b.onclick=()=>{state.recentTab=b.dataset.recent;renderDashboard();});
   document.querySelectorAll('[data-follow]').forEach(b=>b.onclick=()=>followActivity(b.dataset.follow));document.querySelectorAll('[data-module]').forEach(b=>b.onclick=()=>showOperational(b.dataset.module));
   document.getElementById('global-search-form').onsubmit=e=>{e.preventDefault();navigateTo('pencarian');};
-  document.getElementById('export-orders-channel').onclick=async()=>{try{const {csv,CHANNELS,salesChannel}=await import('./planning-domain.js?v=katalog-pembeli-20260909-r7');const {download}=await import('./planning-ui.js?v=kebijakan-20260913-r9');const q=state.orderSearch.trim().toLowerCase(),rows=state.orders.filter(o=>(state.orderChannel==='semua'||orderChannel(o)===state.orderChannel)&&(state.orderTab==='semua'||o.status===state.orderTab)&&(!q||[o.invoiceNo,o.customerName].some(v=>String(v||'').toLowerCase().includes(q))));download('Pesanan-Sales-Channel.csv',csv(rows,[{key:'id',label:'ID pesanan'},{key:'invoiceNo',label:'No. Invoice'},{key:'customerName',label:'Pelanggan'},{key:'total',label:'Total'},{key:'salesChannel',label:'Sales Channel',value:o=>CHANNELS[salesChannel(o)]},{key:'status',label:'Status'}]));}catch(e){showToast(e.message);}};
+  document.getElementById('export-orders-channel').onclick=async()=>{try{const {csv,CHANNELS,salesChannel}=await import('./planning-domain.js?v=launch-20260915-r14');const {download}=await import('./planning-ui.js?v=launch-20260915-r14');const q=state.orderSearch.trim().toLowerCase(),rows=state.orders.filter(o=>(state.orderChannel==='semua'||orderChannel(o)===state.orderChannel)&&(state.orderTab==='semua'||o.status===state.orderTab)&&(!q||[o.invoiceNo,o.customerName].some(v=>String(v||'').toLowerCase().includes(q))));download('Pesanan-Sales-Channel.csv',csv(rows,[{key:'id',label:'ID pesanan'},{key:'invoiceNo',label:'No. Invoice'},{key:'customerName',label:'Pelanggan'},{key:'total',label:'Total'},{key:'salesChannel',label:'Sales Channel',value:o=>CHANNELS[salesChannel(o)]},{key:'status',label:'Status'}]));}catch(e){showToast(e.message);}};
   document.getElementById('order-channel').onchange=e=>{state.orderChannel=e.target.value;renderOrdersView();};
   document.getElementById('view-store').onclick=()=>{};
   document.getElementById('open-menu').onclick=()=>toggleDrawer(true);document.getElementById('close-menu').onclick=()=>toggleDrawer(false);document.getElementById('drawer-backdrop').onclick=()=>toggleDrawer(false);
@@ -1421,7 +1366,7 @@ function renderPelangganView() {
       const { totalOrders, totalSpent } = customerStatsFor(c);
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><strong>${escapeHtml(c.name)}</strong></td>
+        <td><strong>${escapeHtml(c.name)}</strong>${c.active===false?'<br><span class="tag tag--dibatalkan">Nonaktif</span>':''}</td>
         <td>${escapeHtml(c.phone || "-")}</td>
         <td>${escapeHtml(c.address || "-")}</td>
         <td>${totalOrders} pesanan</td>
@@ -1440,12 +1385,12 @@ function renderPelangganView() {
       delBtn.className = "btn btn--danger";
       delBtn.style.padding = "5px 10px";
       delBtn.style.fontSize = "12px";
-      delBtn.textContent = "Nonaktifkan";
+      delBtn.textContent = c.active===false ? "Aktifkan" : "Nonaktifkan";
       delBtn.addEventListener("click", async () => {
-        if (confirm(`Yakin ingin menghapus data pelanggan "${c.name}"?`)) {
-          await deleteCustomer(c.id);
-          showToast(`Data pelanggan "${c.name}" dihapus.`);
-        }
+        if(delBtn.disabled)return;delBtn.disabled=true;
+        try{await setCustomerActive(c.id,c.active===false);showToast(`Status pelanggan "${c.name}" diperbarui. Data dan riwayat tetap tersimpan.`);}
+        catch(error){showToast("Gagal mengubah status: "+error.message);}
+        finally{delBtn.disabled=false;}
       });
       actionTd.appendChild(editBtn);
       actionTd.appendChild(delBtn);
@@ -2590,12 +2535,12 @@ function renderDeductionRows() {
     const div = document.createElement("div");
     div.className = "deduction-row";
     div.innerHTML = `
-      <select data-field="type" class="stock-input" style="flex:1.4;min-width:150px;">
+      <select data-field="type" aria-label="Jenis potongan ${i + 1}" class="stock-input" style="flex:1.4;min-width:150px;">
         ${DEDUCTION_TYPES.map((t) => `<option value="${t}" ${row.type === t ? "selected" : ""}>${t}</option>`).join("")}
       </select>
-      <input type="date" data-field="date" class="stock-input" value="${row.date || ""}" style="width:140px;" />
-      <input type="text" data-field="description" class="stock-input" placeholder="Keterangan" value="${escapeHtml(row.description || "")}" style="flex:1.6;min-width:150px;" />
-      <input type="number" min="0" data-field="amount" class="stock-input" placeholder="Nominal" value="${row.amount || ""}" style="width:120px;" />
+      <input type="date" data-field="date" aria-label="Tanggal potongan ${i + 1}" class="stock-input" value="${row.date || ""}" style="width:140px;" />
+      <input type="text" data-field="description" aria-label="Keterangan potongan ${i + 1}" class="stock-input" placeholder="Keterangan" value="${escapeHtml(row.description || "")}" style="flex:1.6;min-width:150px;" />
+      <input type="number" min="0" data-field="amount" aria-label="Nominal potongan ${i + 1}" class="stock-input" placeholder="Nominal" value="${row.amount || ""}" style="width:120px;" />
       <button type="button" class="btn btn--ghost" style="padding:5px 9px;font-size:12px;" aria-label="Hapus potongan">&times;</button>
     `;
     div.querySelectorAll("[data-field]").forEach((input) => {
@@ -4454,6 +4399,8 @@ function bindEvents() {
 
   els.customerForm.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if(els.customerSubmitBtn.disabled)return;els.customerSubmitBtn.disabled=true;
+    try {
     const f = new FormData(els.customerForm);
     const customer = {
       name: f.get("name").trim(),
@@ -4469,6 +4416,8 @@ function bindEvents() {
     }
     closeModals();
     navigateTo("pelanggan");
+    }catch(error){showToast("Pelanggan belum dikonfirmasi tersimpan: "+error.message+". Isian tetap tersedia untuk dicoba kembali.");}
+    finally{els.customerSubmitBtn.disabled=false;}
   });
 
   // ---- Keuangan ----
@@ -4777,6 +4726,6 @@ function selectCalculatorTab(tab){
  const current=tab==='perbandingan'?'perbandingan':'asli';
  document.querySelectorAll('[data-calculator-tab]').forEach(b=>{const selected=b.dataset.calculatorTab===current;b.classList.toggle('is-active',selected);b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;});
  document.getElementById('calculator-original').hidden=current!=='asli';document.getElementById('calculator-comparison').hidden=current!=='perbandingan';
- const frame=document.getElementById('comparison-frame');if(current==='perbandingan'&&!frame.getAttribute('src'))frame.src='planning-admin.html?v=movement-r13&embed=1#calculator';
+ const frame=document.getElementById('comparison-frame');if(current==='perbandingan'&&!frame.getAttribute('src'))frame.src='planning-admin.html?v=launch-20260915-r14&embed=1#calculator';
  history.replaceState(null,'','#module/calculator/'+current);
 }

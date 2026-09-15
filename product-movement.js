@@ -1,4 +1,4 @@
-import {check,id} from './manual-domain.js?v=katalog-pembeli-20260909-r7';
+import {check,id} from './manual-domain.js?v=launch-20260915-r14';
 export const MOVEMENTS=[['fast','Fast Moving'],['medium','Medium'],['slow','Slow Moving'],['dead','Dead Stok']];
 export const movementOptions=[['','Belum dinilai'],...MOVEMENTS];
 export const movementStatus=m=>MOVEMENTS.some(([key])=>key===m?.status)?m.status:'';
