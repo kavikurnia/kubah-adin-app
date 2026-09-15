@@ -25,7 +25,7 @@
     <button id="bootstrap-retry" class="btn btn--outline" hidden onclick="location.reload()">Muat ulang halaman</button>
     <script>setTimeout(()=>{const status=document.getElementById('auth-checking');if(status&&!status.hidden){status.textContent='Aplikasi belum berhasil dimuat. Periksa koneksi dan file app.js?v=launch-20260915-r14 serta firebase-config.js, lalu muat ulang.';document.getElementById('bootstrap-retry').hidden=false;}},25000);</script>
 
-    <p class="footer-note">Versi katalog-penawaran-20260909-r4 · Login Auth + Firestore</p><form id="login-form" hidden>
+    <p class="footer-note">Masuk dengan akun admin yang berwenang.</p><form id="login-form" hidden>
       <label class="field">
         <span>Email</span>
         <input type="email" name="email" required autocomplete="username" />
