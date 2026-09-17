@@ -1,11 +1,11 @@
-import {APPROVED_POLICY_SUMMARY} from './return-domain.js?v=launch-20260915-r14';
-import {mountActivation,mountAdminRevisions} from './return-evidence-ui.js?v=launch-20260915-r14';
-import {mountPolicyDraft} from './return-policy-ui.js?v=launch-20260915-r14';
-import {RETURN_STAGES,caseStage} from './return-domain.js?v=launch-20260915-r14';
-import {evidenceButtons} from './buyer-document-ui.js?v=launch-20260915-r14';
-import {salesChannel,CHANNELS} from './planning-domain.js?v=launch-20260915-r14';
-import {priceCart,config} from './manual-domain.js?v=launch-20260915-r14';
-import {api,connect,logout,ensureAdminAccess,viewEvidence,money,date,esc,$,label,formValues,message,busy} from './shop-client.js?v=launch-20260915-r14';
+import {APPROVED_POLICY_SUMMARY} from './return-domain.js?v=products-20260917-r16';
+import {mountActivation,mountAdminRevisions} from './return-evidence-ui.js?v=products-20260917-r16';
+import {mountPolicyDraft} from './return-policy-ui.js?v=products-20260917-r16';
+import {RETURN_STAGES,caseStage} from './return-domain.js?v=products-20260917-r16';
+import {evidenceButtons} from './buyer-document-ui.js?v=products-20260917-r16';
+import {salesChannel,CHANNELS} from './planning-domain.js?v=products-20260917-r16';
+import {priceCart,config} from './manual-domain.js?v=products-20260917-r16';
+import {api,connect,logout,ensureAdminAccess,viewEvidence,money,date,esc,$,label,formValues,message,busy} from './shop-client.js?v=products-20260917-r16';
 if(new URLSearchParams(location.search).get('embed')==='1'&&window.parent!==window)document.body.classList.add('embedded');
 let data,authorized=false;
 const input=(name,text,value='',type='text',extra='')=>`<label class="field">${text}<input name="${name}" type="${type}" value="${esc(value)}" ${extra}></label>`;
@@ -58,7 +58,7 @@ function requestsMarkup(){
  const rows=(data.requests||[]).filter(r=>r.status==='menunggu_konfirmasi_admin');
  const expired=data.orders.filter(o=>o.expiresAt&&Date.parse(o.expiresAt)<Date.now()&&o.status!=='dibatalkan'&&o.paidAmount===0);
  return '<section class="panel"><h2>Permintaan pesanan pembeli ('+rows.length+')</h2><p>Harga, kelayakan reseller, stok, kuota, dan ongkir ditetapkan saat konfirmasi. Pembeli menyetujui total final sebelum diproses.</p>'+rows.map(r=>{
-  let q,error='';try{q=priceCart(r.payload.items,new Map(data.products.map(p=>[p.id,p])),r.payload.mode,data.resellers.find(x=>x.id===r.customerId),config(data.settings),r.payload.voucher);}catch(e){error=e.message;}
+  let q,error='';try{q=priceCart(r.payload.items,new Map(data.products.map(p=>[p.id,p])),r.payload.mode,data.resellers.find(x=>x.id===r.customerId),config(data.settings),r.payload.voucher,Date.now(),true,r.createdAt);}catch(e){error=e.message;}
   const p=r.payload,addr=p.address;
   return '<article class="panel"><h3>'+esc(addr.name)+' · '+esc(r.id)+'</h3><p>'+esc(addr.phone)+'<br>'+esc(addr.text)+'</p><p>'+esc(p.shippingMethod)+' · '+esc(p.paymentMethod)+' · Jadwal '+esc(p.slotId||'Tanpa jadwal')+'</p>'+(q?'<ul>'+q.items.map(i=>'<li>'+esc(i.productName+' / '+i.variant)+' × '+i.qty+' · '+money(i.price)+'</li>').join('')+'</ul><p>Subtotal '+money(q.subtotal)+' · Diskon '+money(q.discount)+' · '+q.pcs+' pcs</p>':'<p class="notice error">'+esc(error)+'</p>')+
    (q?actionForm('confirmRequest',{requestId:r.id},(p.shippingMethod==='store'?input('verifiedDistanceKm','Jarak rute jalan yang diperiksa admin (km)','','number','min="0" step="0.001" required')+(data.settings.storeDelivery.pricingMode==='manual'?input('verifiedFee','Tarif di luar promo hasil pemeriksaan admin (Rp)','','number','min="1" step="1"')+'<p>Tarif boleh kosong hanya jika memenuhi promo gratis ongkir. Verifikasi jarak melalui rute jalan dari gudang.</p>':''):p.shippingMethod==='pickup'?'<p>Ambil sendiri: ongkir Rp0.</p>':input('verifiedFee','Ongkir final dari layanan yang dipesan manual (Rp)','','number','min="0" required'))+input('verificationNote','Catatan pemeriksaan harga, alamat, rute dan jadwal','','text','required'),'Konfirmasi & cadangkan stok/kuota'):'' )+

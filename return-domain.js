@@ -1,4 +1,4 @@
-import {check,str,num,hash} from './manual-domain.js?v=launch-20260915-r14';
+import {check,str,num,hash} from './manual-domain.js?v=products-20260917-r16';
 export const RETURN_REASONS=['Barang berbeda dari pesanan','Varian salah','Barang rusak atau cacat saat diterima','Jumlah kurang','Tidak sesuai deskripsi','Produk kedaluwarsa','Permintaan penukaran karena pilihan pelanggan','Kendala lainnya'];
 export const LEGACY_REASONS=['Barang salah','Barang rusak','Barang belum diterima','Lainnya'];
 export const RETURN_STAGES={diajukan:'Diajukan',ditinjau:'Ditinjau',perlu_informasi:'Perlu Informasi Tambahan',menunggu_pengembalian:'Menunggu Pengembalian',barang_diterima:'Barang Diterima',penyelesaian_diproses:'Penyelesaian Diproses',selesai:'Selesai',ditolak:'Ditolak'};

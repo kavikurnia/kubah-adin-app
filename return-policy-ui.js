@@ -1,5 +1,5 @@
-import {POLICY_FIELDS,RETENTION_FIELDS,APPROVED_POLICY_SUMMARY,APPROVED_RETURN_ADDRESS,retentionPolicyHTML} from './return-domain.js?v=launch-20260915-r14';
-import {api,esc,busy,message} from './shop-client.js?v=launch-20260915-r14';
+import {POLICY_FIELDS,RETENTION_FIELDS,APPROVED_POLICY_SUMMARY,APPROVED_RETURN_ADDRESS,retentionPolicyHTML} from './return-domain.js?v=products-20260917-r16';
+import {api,esc,busy,message} from './shop-client.js?v=products-20260917-r16';
 export function mountPolicyDraft(host,settings){
  const d=settings.returnDraft||{};const section=document.createElement('section');section.className='panel';
  const field=(name,title,value='')=>`<label class="field">${esc(title)}<textarea name="${name}" maxlength="3000">${esc(value||'')}</textarea></label>`;

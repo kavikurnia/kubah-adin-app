@@ -58,7 +58,8 @@ export function normalizeProduct(raw, old={}) {
     const prev=previous.get(v.id)||{};
     const out={...prev,...v,id:v.id?id(v.id):randomUUID(),stock:num(v.stock),reserved:prev.reserved||0};
     for(const k of ['hpp','priceOffline','priceOnline']) if(out[k]!=null) num(out[k]);
-    if(out.pricing){out.pricing={retail:out.pricing.retail?num(out.pricing.retail,1):null,wholesale:out.pricing.wholesale?num(out.pricing.wholesale,1):null};}
+    if(out.pricing){out.pricing={retail:out.pricing.retail==null?null:num(out.pricing.retail,1),wholesale:out.pricing.wholesale==null?null:num(out.pricing.wholesale,1)};}
+    if(out.weight!=null)out.weight=num(out.weight,0,1000000);
     for(const k of ['color','size','sku']) out[k]=str(out[k]||'',100);
     out.image=safeURL(out.image);return out;
   });
@@ -81,11 +82,11 @@ export function validatePricing(raw={}) {
 }
 // Explicit allowlist: never spread an internal product/variant into a public document.
 export function publicProduct(p,productId) {
-  const w=validatePricing(p.website);if(p.status!=='aktif'||!w.enabled)return null;
+  if(p.deleted===true)return null;const w=validatePricing(p.website);if(p.status!=='aktif'||!w.enabled)return null;
   return {id:productId,name:p.name,category:p.category||'',description:p.description||'',specifications:String(p.specifications||''),sku:p.sku||'',weight:p.weight||0,createdAt:p.createdAt?.toDate?.().toISOString()||(typeof p.createdAt==='string'?p.createdAt:null),material:String(p.material||p.bahan||''),size:String(p.size||''),thickness:String(p.thickness||''),conditions:String(p.conditions||''),
     images:(p.images?.length?p.images:[{url:p.photoUrl}]).filter(i=>safeURL(i.url)).map(i=>({url:safeURL(i.url),isPrimary:!!i.isPrimary})),
     saleUnit:p.saleUnit||'unit',subcategory:p.subcategory||'',collections:p.collections?.includes('paket-grosir')?['paket-grosir']:[],price:w.retail,packPcs:w.packPcs,promo:!!w.promo,tiers:w.tiers,combine:w.combine,group:w.group,
-    variants:p.variants.map(v=>({id:v.id,color:v.color||v.name||'',size:v.size||'',sku:v.sku||'',image:safeURL(v.image),stock:v.stock,pricing:{retail:v.pricing?.retail||null,wholesale:v.pricing?.wholesale||null}}))};
+    variants:p.variants.map(v=>({id:v.id,color:v.color||v.name||'',size:v.size||'',sku:v.sku||'',image:safeURL(v.image),stock:v.stock,weight:v.weight??p.weight??0,pricing:{retail:v.pricing?.retail||null,wholesale:v.pricing?.wholesale||null}}))};
 }
 export function cartInput(items) {
   check(Array.isArray(items)&&items.length>0&&items.length<=60,'Isi 1–60 baris keranjang.','invalid-argument');
@@ -93,11 +94,14 @@ export function cartInput(items) {
   return [...m.values()].sort((a,b)=>(a.productId+a.variantId).localeCompare(b.productId+b.variantId));
 }
 function groupKey(line,w,combine) {return combine==='all'?'all:'+w.group:combine==='product'?line.productId:line.productId+'/'+line.variantId;}
-export function priceCart(input,products,mode,reseller,c,voucherCode='',time=Date.now(),stockCheck=true) {
+export function priceCart(input,products,mode,reseller,c,voucherCode='',time=Date.now(),stockCheck=true,priorRequestAt=null) {
   check(['eceran','grosir'].includes(mode),'Mode belanja tidak valid.');
   const rows=cartInput(input).map(x=>{
-    const p=products.get(x.productId);check(p&&p.status==='aktif','Produk sudah tidak aktif.');const w=validatePricing(p.website);
-    check(w.enabled,'Produk belum tersedia di website.');const v=p.variants.find(v=>v.id===x.variantId);check(v,'Varian sudah tidak tersedia.');
+    const p=products.get(x.productId);
+    const millis=v=>v?.toMillis?.()??(v?.toDate?+v.toDate():Date.parse(v));
+    const prior=!!p?.deletedAt&&Number.isFinite(millis(priorRequestAt))&&millis(priorRequestAt)<=millis(p.deletedAt);
+    check(p&&(prior||p.deleted!==true&&p.status==='aktif'),'Produk sudah tidak tersedia untuk pembelian baru.');const w=validatePricing(p.website);
+    check(prior||w.enabled,'Produk belum tersedia di website.');const v=p.variants.find(v=>v.id===x.variantId);check(v,'Varian sudah tidak tersedia.');
     check(!stockCheck||v.stock>=x.qty,`Stok ${p.name} / ${v.color||v.size||v.sku} tidak cukup.`);
     return {...x,p,v,w,pcs:x.qty*w.packPcs};
   });
@@ -108,7 +112,7 @@ export function priceCart(input,products,mode,reseller,c,voucherCode='',time=Dat
     if(mode==='grosir')for(const tier of r.w.tiers)if(n>=tier.minPcs){price=r.v.pricing?.wholesale||tier.price;priceKind='grosir';}
     if(reseller?.status==='disetujui'&&r.w.reseller.price>0&&n>=r.w.reseller.minPcs){price=r.w.reseller.price;priceKind='reseller';usesReseller=true;}
     const next=r.w.tiers.find(t=>t.minPcs>n);
-    return {productId:r.productId,variantId:r.variantId,productName:r.p.name,variant:[r.v.color||r.v.name,r.v.size].filter(Boolean).join(' / '),sku:r.v.sku||'',qty:r.qty,packPcs:r.w.packPcs,pcs:r.pcs,price,priceKind,lineTotal:price*r.qty,weight:r.p.weight||0,promo:!!r.w.promo,extraWholesalePcs:next?next.minPcs-n:0};
+    return {productId:r.productId,variantId:r.variantId,productName:r.p.name,variant:[r.v.color||r.v.name,r.v.size].filter(Boolean).join(' / '),sku:r.v.sku||'',qty:r.qty,packPcs:r.w.packPcs,pcs:r.pcs,price,priceKind,lineTotal:price*r.qty,weight:r.v.weight??r.p.weight??0,promo:!!r.w.promo,extraWholesalePcs:next?next.minPcs-n:0};
   });
   const subtotal=items.reduce((s,i)=>s+i.lineTotal,0);num(subtotal);
   let discount=0;const code=String(voucherCode||'').trim().toUpperCase();

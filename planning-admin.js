@@ -1,9 +1,9 @@
-import {connect,ensureAdminAccess,esc,message} from './shop-client.js?v=launch-20260915-r14';
+import {connect,ensureAdminAccess,esc,message} from './shop-client.js?v=products-20260917-r16';
 import {manualStore} from './manual-store.js?v=launch-20260915-r14';
-import {renderShipping,renderNewOrder} from './shipping-ui.js?v=launch-20260915-r14';
-import {renderProducts,renderCalculator} from './product-ui.js?v=launch-20260915-r14';
-import {renderSuppliers} from './supplier-ui.js?v=launch-20260915-r14';
-import {renderCustomerMessages} from './customer-message-ui.js?v=launch-20260915-r14';
+import {renderShipping,renderNewOrder} from './shipping-ui.js?v=products-20260917-r16';
+import {renderProducts,renderCalculator} from './product-ui.js?v=products-20260917-r16';
+import {renderSuppliers} from './supplier-ui.js?v=products-20260917-r16';
+import {renderCustomerMessages} from './customer-message-ui.js?v=products-20260917-r16';
 
 let context,generation=0;
 async function render(){if(!context)return;const seq=++generation;document.getElementById('notice').hidden=true;try{await ensureAdminAccess(context.c.a.currentUser);const [page='products',tab='',oid='']=location.hash.slice(1).split('/');if(page==='webcontent'){location.replace('#suppliers/pengajuan');return;}const modules={messages:renderCustomerMessages,shipping:renderShipping,couriers:renderShipping,slots:renderShipping,products:renderProducts,suppliers:renderSuppliers,calculator:renderCalculator,neworder:renderNewOrder};if(!modules[page])throw Error('Halaman tidak dikenal.');await modules[page]({...context,tab:page==='slots'?'jadwal':tab,oid,render,isCurrent:()=>seq===generation});document.querySelectorAll('.tabs a').forEach(a=>a.onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const links=[...a.parentNode.children],at=links.indexOf(a),next=e.key==='Home'?0:e.key==='End'?links.length-1:(at+(e.key==='ArrowRight'?1:-1)+links.length)%links.length;e.preventDefault();links[next].focus();links[next].click();});if(window.parent!==window)window.parent.postMessage({type:'kubah-admin-route',route:location.hash.slice(1)},location.origin);}catch(e){if(String(e.code).includes('permission-denied'))e=new Error('Data modul belum dapat diakses. Periksa pemasangan aturan dan izin Firebase, lalu coba lagi.');message(e.message,true);if(seq===generation)document.getElementById('content').innerHTML='<section class="panel"><h1>Halaman belum dapat dimuat</h1><p>'+esc(e.message)+'</p><button id="retry">Coba lagi</button> <a href="index.html?v=launch-20260915-r14" target="_top">Kembali ke admin</a></section>';document.getElementById('retry')?.addEventListener('click',render);}}

@@ -1,7 +1,7 @@
-import {returnPolicyHTML,retentionPolicyHTML} from './return-domain.js?v=launch-20260915-r14';
-import {connect,withDeadline,esc,date,message,busy} from './shop-client.js?v=launch-20260915-r14';
+import {returnPolicyHTML,retentionPolicyHTML} from './return-domain.js?v=products-20260917-r16';
+import {connect,withDeadline,esc,date,message,busy} from './shop-client.js?v=products-20260917-r16';
 import {manualStore} from './manual-store.js?v=launch-20260915-r14';
-import {PROGRAMS,customerMessages,messagePayload,messageNumber,MESSAGE_STATUS} from './customer-message-service.js?v=launch-20260915-r14';
+import {PROGRAMS,customerMessages,messagePayload,messageNumber,MESSAGE_STATUS} from './customer-message-service.js?v=products-20260917-r16';
 
 export const MAP_URL='https://maps.app.goo.gl/YEehCmwGr1Sjg6re6?g_st=ic';
 export const STORE_NAME='Kubah Nabawi Store';

@@ -1,7 +1,7 @@
-import {label} from './shop-client.js?v=launch-20260915-r14';
-import { $,esc,money,date,input,area,select,checkbox,tabs,table,form,bindForm,api,busy,message,download } from './planning-ui.js?v=launch-20260915-r14';
-import {wibDay,unitPrice,salesChannel,CHANNELS,csv} from './planning-domain.js?v=launch-20260915-r14';
-import {check,hash} from './manual-domain.js?v=launch-20260915-r14';
+import {label} from './shop-client.js?v=products-20260917-r16';
+import { $,esc,money,date,input,area,select,checkbox,tabs,table,form,bindForm,api,busy,message,download } from './planning-ui.js?v=products-20260917-r16';
+import {wibDay,unitPrice,salesChannel,CHANNELS,csv} from './planning-domain.js?v=products-20260917-r16';
+import {check,hash} from './manual-domain.js?v=products-20260917-r16';
 let filters={query:'',status:'',courier:'',date:''};
 const invoice=o=>esc(o.invoiceNo||'Belum ada invoice');
 const orderURL=id=>{const u=new URL('admin-website.html',location.href);u.searchParams.set('v','launch-20260915-r14');if(window.parent!==window)u.searchParams.set('embed','1');u.hash='orders/'+encodeURIComponent(id);return u.href;};

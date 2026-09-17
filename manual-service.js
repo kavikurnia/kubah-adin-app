@@ -1,8 +1,9 @@
-import {RETURN_REASONS,LEGACY_REASONS,stageChange,caseStage} from './return-domain.js?v=launch-20260915-r14';
-import {unitPrice} from './planning-domain.js?v=launch-20260915-r14';
-import {claimEvidence} from './buyer-domain.js?v=launch-20260915-r14';
+import {AVAILABILITY_PATH,writeAvailability} from './product-lifecycle.js?v=products-20260917-r16';
+import {RETURN_REASONS,LEGACY_REASONS,stageChange,caseStage} from './return-domain.js?v=products-20260917-r16';
+import {unitPrice} from './planning-domain.js?v=products-20260917-r16';
+import {claimEvidence} from './buyer-domain.js?v=products-20260917-r16';
 const randomUUID=()=>crypto.randomUUID();
-import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=launch-20260915-r14';
+import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=products-20260917-r16';
 
 // Store contract: get/list outside a transaction; tx.get(path), tx.set/update/delete inside.
 // Every transaction below completes reads before staging writes. Firestore retries conflicts.
@@ -39,7 +40,7 @@ export function commerce(store,providers={}) {
       const r=await tx.get('resellers/'+ctx.uid),m=await productMap(tx,items);
       const channel=d.orderOrigin==='reseller'?'reseller':d.requestId?'website':manual?'manual_admin':'website';
       if(channel==='reseller')check(r?.status==='disetujui','Pesanan reseller memerlukan reseller aktif.');
-      let priced=priceCart(items,m,d.mode,r,c,d.voucher,time());
+      let priced=priceCart(items,m,d.mode,r,c,d.voucher,time(),true,request?.createdAt);
       const ship=d.requestId?(method==='store'?shipping(priced,method,{km:d.verifiedDistanceKm,fee:d.verifiedFee},c):method==='pickup'?shipping(priced,method,null,c):{shippingCost:num(d.verifiedFee),shippingState:'confirmed',distanceKm:null,promoApplied:false}):shipping(priced,method,route,c);
       if(d.requestId){str(d.verificationNote,1000,true);check(ship.shippingCost!==null,'Admin harus memverifikasi ongkir/rute jalan.');}
       const total=ship.shippingCost===null?null:priced.subtotal-priced.discount+ship.shippingCost;
@@ -232,8 +233,8 @@ export function commerce(store,providers={}) {
     tx.update(p,{refundedAmount:o.paidAmount,refundStatus:'dibayarkan',refundReference:d.reference,paymentStatus:'refund_selesai'});return {ok:true};});}
   async function review(ctx,d){user(ctx);return store.run(async tx=>{const o=await tx.get('orders/'+id(d.orderId));owner(ctx,o);check(o.status==='selesai'&&o.paidAmount===o.total,'Ulasan hanya untuk pesanan selesai yang dibayar.');check(o.items.some(i=>i.productId===d.productId),'Produk tidak dibeli.');
     const rid=hash([d.orderId,d.productId]),prev=await tx.get('reviews/'+rid);check(!prev,'Ulasan sudah dikirim.');tx.set('reviews/'+rid,{productId:id(d.productId),rating:num(d.rating,1,5),text:str(d.text,2000,true),buyerLabel:'Pembeli terverifikasi',createdAt:iso()});return {ok:true};});}
-  async function saveProduct(ctx,d){admin(ctx);const pid=d.productId?id(d.productId):randomUUID();return store.run(async tx=>{const old=await tx.get('products/'+pid);check(!old||d.expectedRevision===(old.revision||0),'Produk / stok berubah. Muat ulang sebelum menyimpan.');
-    const p=normalizeProduct(d.product,old||{});p.createdAt=old?.createdAt||iso();const pub=publicProduct(p,pid);tx.set('products/'+pid,p);if(pub){tx.set('catalog/'+pid,pub);tx.set('resellerPrices/'+pid,{productId:pid,...p.website.reseller});}else{tx.delete('catalog/'+pid);tx.delete('resellerPrices/'+pid);}return {id:pid};});}
+  async function saveProduct(ctx,d){admin(ctx);const pid=d.productId?id(d.productId):randomUUID();return store.run(async tx=>{const old=await tx.get('products/'+pid);check(!old?.deleted,'Pulihkan produk dari Sampah sebelum mengeditnya.');const availability=await tx.get(AVAILABILITY_PATH);check(!old||d.expectedRevision===(old.revision||0),'Produk / stok berubah. Muat ulang sebelum menyimpan.');
+    const p=normalizeProduct(d.product,old||{});p.createdAt=old?.createdAt||iso();const pub=publicProduct(p,pid);writeAvailability(tx,availability,pid,!!pub,ctx,store.serverTimestamp);tx.set('products/'+pid,p);if(pub){tx.set('catalog/'+pid,pub);tx.set('resellerPrices/'+pid,{productId:pid,...p.website.reseller});}else{tx.delete('catalog/'+pid);tx.delete('resellerPrices/'+pid);}return {id:pid};});}
   async function legacyManualOrder(ctx,d){admin(ctx);const items=cartInput(d.items),oid='ADM-'+hash([ctx.uid,id(d.key)]).slice(0,32),fingerprint=hash({items,customerName:d.customerName,phone:d.phone,address:d.address,shippingCost:d.shippingCost,mode:d.mode||'eceran',resellerId:d.resellerId||''});
     return store.run(async tx=>{const existing=await tx.get('orders/'+oid);if(existing){check(existing.requestHash===fingerprint,'Rincian berubah pada percobaan ulang. Tutup form untuk membuat pesanan lain.');return {id:oid,invoiceNo:oid};}
       const resellerId=d.resellerId?id(d.resellerId):null,r=resellerId?await tx.get('resellers/'+resellerId):null;if(resellerId)check(r?.status==='disetujui','Reseller harus aktif.');
