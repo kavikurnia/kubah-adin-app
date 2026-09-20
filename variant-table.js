@@ -1,7 +1,7 @@
-import {esc,money} from './planning-ui.js?v=products-20260917-r16';
+import {esc,money} from './planning-ui.js?v=audit-20260920-r17';
 import {check} from './manual-domain.js?v=products-20260917-r16';
 import {applyVariantBulk,undoVariantBulk,variantNumber,variantValue,setVariantValue} from './variant-draft.js?v=products-20260917-r16';
-import {prepareProductPhoto,productPhotos} from './product-photos.js?v=products-20260917-r16';
+import {prepareProductPhoto,productPhotos} from './product-photos.js?v=audit-20260920-r17';
 
 export function mountVariantTable(host,{variants,parent={},c,onChange=()=>{},canEdit=true}){
  let rows=structuredClone(variants),selected=new Set(),undo=[],edited=new Set(),preparing=0,locked=false;

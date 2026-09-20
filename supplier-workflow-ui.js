@@ -1,4 +1,4 @@
-import {$,esc,money,date,input,area,select,checkbox,table,form,bindForm,busy,message,download} from './planning-ui.js?v=products-20260917-r16';
+import {$,esc,money,date,input,area,select,checkbox,table,form,bindForm,busy,message,download} from './planning-ui.js?v=audit-20260920-r17';
 import {check} from './manual-domain.js?v=products-20260917-r16';
 import {wibDay} from './planning-domain.js?v=products-20260917-r16';
 import {supplierWorkflow} from './supplier-workflow-service.js?v=products-20260917-r16';

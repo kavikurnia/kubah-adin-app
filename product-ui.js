@@ -1,10 +1,10 @@
 import {productLifecycle} from './product-lifecycle.js?v=products-20260917-r16';
-import {$,esc,money,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download} from './planning-ui.js?v=products-20260917-r16';
+import {$,esc,money,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download} from './planning-ui.js?v=audit-20260920-r17';
 import {CATEGORIES,IMPORT_COLUMNS,IMPORT_LABELS,importPreview,pricingInput,skuId,csv,unitPrice} from './planning-domain.js?v=products-20260917-r16';
 import {productService} from './product-service.js?v=products-20260917-r16';
 import {check,num} from './manual-domain.js?v=products-20260917-r16';
 import {movementService,movementOptions,movementStatus,movementLabel,movementRows,movementCounts} from './product-movement.js?v=products-20260917-r16';
-import {mountVariantTable} from './variant-table.js?v=products-20260917-r16';
+import {mountVariantTable} from './variant-table.js?v=audit-20260920-r17';
 import {applyFormChanges} from './variant-draft.js?v=products-20260917-r16';
 let filter={query:'',category:'',status:'',movement:'',publication:'',archive:'normal'};
 const badge=m=>`<span class="movement-badge movement-${movementStatus(m)||'unrated'}">${movementLabel(m)}</span>`;

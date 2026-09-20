@@ -1,4 +1,4 @@
-import {esc,money,date,api,formValues,message,busy} from './shop-client.js?v=products-20260917-r16';
+import {esc,money,date,api,formValues,message,busy} from './shop-client.js?v=audit-20260920-r17';
 import {wibDay} from './planning-domain.js?v=products-20260917-r16';
 export {esc,money,date,api,formValues,message,busy};
 export const $=s=>document.querySelector(s);

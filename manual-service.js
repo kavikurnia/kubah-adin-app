@@ -1,7 +1,7 @@
 import {AVAILABILITY_PATH,writeAvailability} from './product-lifecycle.js?v=products-20260917-r16';
-import {RETURN_REASONS,LEGACY_REASONS,stageChange,caseStage} from './return-domain.js?v=products-20260917-r16';
+import {RETURN_REASONS,LEGACY_REASONS,stageChange,caseStage} from './return-domain.js?v=audit-20260920-r17';
 import {unitPrice} from './planning-domain.js?v=products-20260917-r16';
-import {claimEvidence} from './buyer-domain.js?v=products-20260917-r16';
+import {claimEvidence} from './buyer-domain.js?v=audit-20260920-r17';
 const randomUUID=()=>crypto.randomUUID();
 import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=products-20260917-r16';
 
@@ -108,12 +108,18 @@ export function commerce(store,providers={}) {
     str(d.reference,200,true);ledger(tx,key,o,o.total,'masuk','Transfer terverifikasi '+d.reference,ctx);
     tx.update(path,{paidAmount:o.total,paymentStatus:'lunas',status:'diproses',detailStatus:'Disiapkan',expiresAt:null,paymentReference:d.reference,statusHistory:history(o,'diproses',ctx,'Dana transfer diverifikasi.')});return {ok:true};
   });}
+  function completionConfirmation(ctx,d){
+    check(d.buyerConfirmed===true||d.buyerConfirmed==='yes','Konfirmasi penerimaan dari pembeli diperlukan sebelum pesanan selesai.');
+    return {source:'buyer_confirmed_to_admin',note:str(d.confirmationNote,1000,true),recordedBy:ctx.uid,recordedAt:store.serverTimestamp?store.serverTimestamp():iso()};
+  }
   async function orderAction(ctx,d){admin(ctx);if(d.action==='cancel')return cancel(ctx,d);
     return store.run(async tx=>{
       const path='orders/'+id(d.orderId),o=await tx.get(path);check(o,'Pesanan tidak tersedia.');
+      if(o.status==='selesai'&&(d.action==='complete'||d.status==='selesai'))return {ok:true,reused:true};
       if(o.schemaVersion!==2){
         check(['diproses','dikirim','selesai','dibatalkan','menunggu_pembayaran'].includes(d.status),'Status lama tidak valid.');
-        tx.update(path,{status:d.status,courier:str(d.courier||o.courier||'',200),trackingNumber:str(d.trackingNumber||o.trackingNumber||'',200),statusHistory:history(o,d.status,ctx,'Perubahan pesanan historis; tidak mengubah stok atau kas otomatis.')});return {ok:true};
+        const confirmation=d.status==='selesai'?{completionConfirmation:completionConfirmation(ctx,d)}:{};
+        tx.update(path,{...confirmation,status:d.status,courier:str(d.courier||o.courier||'',200),trackingNumber:str(d.trackingNumber||o.trackingNumber||'',200),statusHistory:history(o,d.status,ctx,'Perubahan pesanan historis; tidak mengubah stok atau kas otomatis.')});return {ok:true};
       }
       check(o.status!=='dibatalkan','Pesanan dibatalkan.');
       if(d.action==='rejectProof'){check(o.paymentMethod==='transfer'&&o.paidAmount===0,'Bukti tidak dapat ditolak.');tx.update(path,{status:'menunggu_pembayaran',paymentStatus:'belum_dibayar',proofPath:null,statusHistory:history(o,'menunggu_pembayaran',ctx,str(d.note,500,true))});return {ok:true};}
@@ -126,13 +132,15 @@ export function commerce(store,providers={}) {
         tx.set('courierTasks/'+d.orderId,taskProjection({...o,detailStatus:'Menunggu kurir'},d.orderId,d.courierId));return {ok:true};}
       if(d.action==='ship'||d.action==='complete'){
         check(d.action==='ship'?o.status==='diproses':o.status==='dikirim'||o.shippingMethod==='pickup'&&o.status==='diproses','Urutan status tidak valid.');
+        const confirmation=d.action==='complete'?completionConfirmation(ctx,d):null;
         if(d.action==='complete'&&cash)check(o.paidAmount===o.total,'Catat penerimaan tunai terlebih dahulu.');
         if(d.action==='ship')check(o.shippingMethod!=='pickup','Ambil sendiri ditandai selesai.');
         const m=o.reservationState==='reserved'?await productMap(tx,o.items):null,slot=d.action==='complete'&&o.slotId&&!o.slotReleased?await tx.get('deliverySlots/'+o.slotId):null;
         if(m){for(const i of o.items){const v=m.get(i.productId).variants.find(v=>v.id===i.variantId);check(v&&v.reserved>=i.qty,'Reservasi tidak konsisten.');v.reserved-=i.qty;}writeProducts(tx,m);}
         if(slot)tx.update('deliverySlots/'+o.slotId,{used:Math.max(0,slot.used-1)});
         const status=d.action==='ship'?'dikirim':'selesai';const patch={status,reservationState:'consumed',slotReleased:d.action==='complete'||o.slotReleased,detailStatus:status==='selesai'?'Diterima':'Dalam perjalanan',expiresAt:null,
-          courier:str(d.courier||o.courier||'',200),trackingNumber:str(d.trackingNumber||o.trackingNumber||'',200),deliveredAt:status==='selesai'?iso():null,statusHistory:history(o,status,ctx)};
+          courier:str(d.courier||o.courier||'',200),trackingNumber:str(d.trackingNumber||o.trackingNumber||'',200),deliveredAt:status==='selesai'?(o.deliveredAt||iso()):null,statusHistory:history(o,status,ctx)};
+        if(confirmation)patch.completionConfirmation=confirmation;
         if(d.action==='ship'&&['instant','regular','cargo'].includes(o.shippingMethod))check(patch.courier&&patch.trackingNumber,'Isi penyedia dan referensi pengiriman manual.');
         tx.update(path,patch);if(o.courierId)tx.set('courierTasks/'+d.orderId,taskProjection({...o,...patch},d.orderId,o.courierId));return {ok:true};
       }
@@ -164,14 +172,15 @@ export function commerce(store,providers={}) {
     if(d.action==='deliver')str(d.receiptNote,1000,true);
     return store.run(async tx=>{
       const path='orders/'+id(d.orderId),o=await tx.get(path);check(o&&o.courierId===ctx.uid,'Tugas bukan milik kurir.','permission-denied');
-      check(o.status!=='dibatalkan'&&o.status!=='selesai','Tugas sudah ditutup.');let patch={};
+      if(d.action==='deliver'&&o.detailStatus==='Diterima')return {ok:true,reused:true};
+      check(o.status!=='dibatalkan'&&o.status!=='selesai'&&o.detailStatus!=='Diterima','Tugas sudah ditutup; penerimaan telah dicatat.');let patch={};
       if(d.action==='pickup'){
         throw new Fault('Admin perlu mengonfirmasi penyerahan paket melalui Tandai dikirim.');
         check(o.status==='diproses'&&o.totalAccepted&&(o.paymentStatus==='lunas'||o.paymentMethod==='cash_store'&&o.cashConfirmed),'Paket belum siap.');
         const m=await productMap(tx,o.items);for(const i of o.items){const v=m.get(i.productId).variants.find(v=>v.id===i.variantId);check(v&&v.reserved>=i.qty,'Reservasi tidak konsisten.');v.reserved-=i.qty;}writeProducts(tx,m);
         patch={status:'dikirim',detailStatus:'Paket diambil',reservationState:'consumed',expiresAt:null};
       }else if(d.action==='travel'){check(o.status==='dikirim','Paket belum diambil.');patch={detailStatus:'Dalam perjalanan'};}
-      else if(d.action==='deliver'){check(o.status==='dikirim','Paket belum diambil.');check(o.paymentMethod!=='cash_store'||o.paidAmount===o.total,'Catat uang diterima sebelum menyelesaikan.');patch={status:'selesai',detailStatus:'Diterima',deliveryReceiptNote:str(d.receiptNote,1000,true),deliveredAt:iso()};}
+      else if(d.action==='deliver'){check(o.status==='dikirim','Paket belum diambil.');check(o.paymentMethod!=='cash_store'||o.paidAmount===o.total,'Catat uang diterima sebelum menyelesaikan.');patch={status:'dikirim',detailStatus:'Diterima',deliveryReceiptNote:str(d.receiptNote,1000,true),deliveredAt:iso()};}
       else if(d.action==='fail'){check(o.status==='dikirim','Paket belum diambil.');patch={detailStatus:'Gagal antar',failureReason:str(d.reason,1000,true)};}
       else throw new Fault('Aksi kurir tidak valid.');
       // release slot only at delivery; the stock is never restored on a failed delivery.

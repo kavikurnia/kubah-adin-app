@@ -25,12 +25,12 @@ export function connect(){return ready??=(async()=>{
 })().catch(error=>{ready=undefined;throw error;});}
 export async function api(action,data={}){
  const c=await connect(),guard=['catalog','reviews'].includes(action)?()=>{}:identityGuard(c);
- try{const result=await withDeadline(import('./manual-api.js?v=products-20260917-r16').then(m=>{guard();return m.manualApi(c,action,data);}),30000,'manual/unavailable');guard();return result;}
+ try{const result=await withDeadline(import('./manual-api.js?v=audit-20260920-r17').then(m=>{guard();return m.manualApi(c,action,data);}),30000,'manual/unavailable');guard();return result;}
  catch(error){guard();if(['auth/user-token-expired','auth/invalid-user-token','unauthenticated'].includes(error?.code)&&typeof window!=='undefined')window.dispatchEvent(new Event('kubah-session-expired'));throw error;}
 }
 export async function ensureAdminAccess(user){return withDeadline(manualAccess(await connect(),user),15000,'free/unavailable');}
 export async function upload(){throw Object.assign(new Error('Unggah berkas belum aktif: penyimpanan privat belum dikonfigurasi. Foto produk dapat memakai URL HTTPS; bukti dikirim manual ke admin.'),{code:'free/unavailable'});}
-export async function viewEvidence(raw){if(typeof raw==='object'||String(raw).startsWith('{')){const {openBuyerDocument}=await import('./buyer-document-ui.js?v=products-20260917-r16');return openBuyerDocument(raw);}throw Object.assign(new Error('Bukti lama tersimpan pada layanan versi lengkap. Versi gratis tidak mengunduh bukti pembayaran.'),{code:'free/unavailable'});}
+export async function viewEvidence(raw){if(typeof raw==='object'||String(raw).startsWith('{')){const {openBuyerDocument}=await import('./buyer-document-ui.js?v=audit-20260920-r17');return openBuyerDocument(raw);}throw Object.assign(new Error('Bukti lama tersimpan pada layanan versi lengkap. Versi gratis tidak mengunduh bukti pembayaran.'),{code:'free/unavailable'});}
 export async function login(email,password,register=false){const c=await connect();return register?c.auth.createUserWithEmailAndPassword(c.a,email,password):c.auth.signInWithEmailAndPassword(c.a,email,password);}
 export async function logout(){const c=await connect();return c.auth.signOut(c.a);}
 export function formValues(form){return Object.fromEntries(new FormData(form));}

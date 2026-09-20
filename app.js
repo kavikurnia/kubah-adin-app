@@ -37,7 +37,7 @@ function connect(){return ready??=(async()=>{
   }
   return {app,auth,a,db,fs};
 })().catch(error=>{ready=undefined;throw error;});}
-async function api(action,data={}){return withDeadline(import('./manual-api.js?v=products-20260917-r16').then(async m=>m.manualApi(await connect(),action,data)),30000,'manual/unavailable');}
+async function api(action,data={}){return withDeadline(import('./manual-api.js?v=audit-20260920-r17').then(async m=>m.manualApi(await connect(),action,data)),30000,'manual/unavailable');}
 async function ensureAdminAccess(user){return withDeadline(manualAccess(await connect(),user),15000,'free/unavailable');}
 async function upload(){throw Object.assign(new Error('Unggah berkas belum aktif: penyimpanan privat belum dikonfigurasi. Foto produk dapat memakai URL HTTPS; bukti dikirim manual ke admin.'),{code:'free/unavailable'});}
 async function viewEvidence(){throw Object.assign(new Error('Bukti lama tersimpan pada layanan versi lengkap. Versi gratis tidak mengunduh bukti pembayaran.'),{code:'free/unavailable'});}
@@ -532,9 +532,16 @@ function saveDemoData() {
 async function updateOrder(orderId, patch, historyLabel) {
   const order = state.orders.find(o => o.id === orderId);
   if (order?.schemaVersion === 2) {
-    window.location.href = 'admin-website.html?v=launch-20260915-r14#orders/' + encodeURIComponent(orderId); return;
+    window.location.href = 'admin-website.html?v=audit-20260920-r17#orders/' + encodeURIComponent(orderId); return;
+  }
+  if(patch.status==='selesai'&&order?.status!=='selesai'){
+    const note=prompt('Catat nama penerima, waktu, dan cara konfirmasi pembeli bahwa barang sudah diterima. Batal untuk kembali.');
+    if(!note?.trim())return false;
+    if(!confirm('Pembeli sudah mengonfirmasi penerimaan barang dan catatan sudah diperiksa?'))return false;
+    patch={...patch,buyerConfirmed:true,confirmationNote:note.trim()};
   }
   await shopApi('orderAction', { orderId, operation: 'legacy', ...patch });
+  return true;
 }
 
 
@@ -914,7 +921,7 @@ function renderAdminChrome() {
   logo.onerror=()=>{logo.hidden=true;document.getElementById('sidebar-monogram').hidden=false;};
   document.getElementById('admin-display-name').textContent=u?.name||'Admin';document.getElementById('admin-display-name').title=u?.email||'';
   document.getElementById('admin-initial').textContent=(u?.name||'A').trim().slice(0,1).toUpperCase();document.getElementById('admin-role').textContent=u?.superAdmin?'Super Admin':'Administrator';
-  const storeLink=document.getElementById('view-store'),storeUrl=safeStoreUrl(s.storeUrl);storeLink.href=storeUrl||'toko.html?v=launch-20260915-r14';storeLink.dataset.configured='true';
+  const storeLink=document.getElementById('view-store'),storeUrl=safeStoreUrl(s.storeUrl);storeLink.href=storeUrl||'toko.html?v=audit-20260920-r17';storeLink.dataset.configured='true';
   const counts=activityCounts(),rows=[['reseller',counts.reseller,'pengajuan reseller menunggu',state.ready.resellers],['retur',counts.claims,'komplain belum selesai',state.ready.claims],['payment',counts.payment,'pembayaran perlu verifikasi',state.ready.orders]];
   document.getElementById('notification-dot').hidden=!rows.some(r=>r[3]&&r[1]>0);
   const panel=document.getElementById('notification-items');panel.innerHTML=rows.filter(r=>r[3]&&r[1]>0).map(r=>`<button data-activity="${r[0]}"><strong>${r[1]}</strong> ${r[2]} <span aria-hidden="true">›</span></button>`).join('')||'<p>Tidak ada tindak lanjut pada data yang sudah tersinkron.</p>';
@@ -977,8 +984,8 @@ function showOperational(module){
   const inspect=()=>{try{const content=frame.contentDocument?.getElementById('content');if(!content||/Memeriksa/.test(content.textContent)){document.getElementById('module-error').hidden=false;}}catch{document.getElementById('module-error').hidden=false;}};
   frame.onload=()=>{try{if(!frame.contentDocument?.getElementById('content'))inspect();}catch{inspect();}};
   const page=module.split('/')[0];
-  if(['messages','shipping','couriers','slots','products','suppliers','webcontent','calculator','neworder','pricing'].includes(page)){frame.src='planning-admin.html?v=launch-20260915-r14&embed=1#'+(({couriers:'shipping/kurir',slots:'shipping/jadwal',pricing:'products/migrasi'})[module]||module);}
-  else frame.src=page==='resellers'?'reseller-admin.html?v=launch-20260915-r14&embed=1#'+(module.split('/')[1]||'ringkasan'):'admin-website.html?v=launch-20260915-r14&embed=1#'+module;
+  if(['messages','shipping','couriers','slots','products','suppliers','webcontent','calculator','neworder','pricing'].includes(page)){frame.src='planning-admin.html?v=audit-20260920-r17&embed=1#'+(({couriers:'shipping/kurir',slots:'shipping/jadwal',pricing:'products/migrasi'})[module]||module);}
+  else frame.src=page==='resellers'?'reseller-admin.html?v=audit-20260920-r17&embed=1#'+(module.split('/')[1]||'ringkasan'):'admin-website.html?v=audit-20260920-r17&embed=1#'+module;
   moduleTimer=setTimeout(inspect,20000);
   document.getElementById('module-retry').onclick=()=>showOperational(module);toggleDrawer(false);
 }
@@ -1007,7 +1014,7 @@ function bindAdminDashboard(){
   document.querySelectorAll('[data-recent]').forEach(b=>b.onclick=()=>{state.recentTab=b.dataset.recent;renderDashboard();});
   document.querySelectorAll('[data-follow]').forEach(b=>b.onclick=()=>followActivity(b.dataset.follow));document.querySelectorAll('[data-module]').forEach(b=>b.onclick=()=>showOperational(b.dataset.module));
   document.getElementById('global-search-form').onsubmit=e=>{e.preventDefault();navigateTo('pencarian');};
-  document.getElementById('export-orders-channel').onclick=async()=>{try{const {csv,CHANNELS,salesChannel}=await import('./planning-domain.js?v=products-20260917-r16');const {download}=await import('./planning-ui.js?v=products-20260917-r16');const q=state.orderSearch.trim().toLowerCase(),rows=state.orders.filter(o=>(state.orderChannel==='semua'||orderChannel(o)===state.orderChannel)&&(state.orderTab==='semua'||o.status===state.orderTab)&&(!q||[o.invoiceNo,o.customerName].some(v=>String(v||'').toLowerCase().includes(q))));download('Pesanan-Sales-Channel.csv',csv(rows,[{key:'id',label:'ID pesanan'},{key:'invoiceNo',label:'No. Invoice'},{key:'customerName',label:'Pelanggan'},{key:'total',label:'Total'},{key:'salesChannel',label:'Sales Channel',value:o=>CHANNELS[salesChannel(o)]},{key:'status',label:'Status'}]));}catch(e){showToast(e.message);}};
+  document.getElementById('export-orders-channel').onclick=async()=>{try{const {csv,CHANNELS,salesChannel}=await import('./planning-domain.js?v=products-20260917-r16');const {download}=await import('./planning-ui.js?v=audit-20260920-r17');const q=state.orderSearch.trim().toLowerCase(),rows=state.orders.filter(o=>(state.orderChannel==='semua'||orderChannel(o)===state.orderChannel)&&(state.orderTab==='semua'||o.status===state.orderTab)&&(!q||[o.invoiceNo,o.customerName].some(v=>String(v||'').toLowerCase().includes(q))));download('Pesanan-Sales-Channel.csv',csv(rows,[{key:'id',label:'ID pesanan'},{key:'invoiceNo',label:'No. Invoice'},{key:'customerName',label:'Pelanggan'},{key:'total',label:'Total'},{key:'salesChannel',label:'Sales Channel',value:o=>CHANNELS[salesChannel(o)]},{key:'status',label:'Status'}]));}catch(e){showToast(e.message);}};
   document.getElementById('order-channel').onchange=e=>{state.orderChannel=e.target.value;renderOrdersView();};
   document.getElementById('view-store').onclick=()=>{};
   document.getElementById('open-menu').onclick=()=>toggleDrawer(true);document.getElementById('close-menu').onclick=()=>toggleDrawer(false);document.getElementById('drawer-backdrop').onclick=()=>toggleDrawer(false);
@@ -3564,7 +3571,7 @@ async function handleOrderAction(order, act) {
     const tracking = trackingInput.disabled ? "" : trackingInput.value.trim();
 
     if (courier === "Diambil di Tempat") {
-      await updateOrder(order.id, { status: "selesai", courier, trackingNumber: "" });
+      if(!await updateOrder(order.id, { status: "selesai", courier, trackingNumber: "" }))return;
       showToast(`${order.invoiceNo} ditandai diambil & selesai.`);
     } else {
       if (courier !== "Kurir Toko" && !tracking) {
@@ -3575,7 +3582,7 @@ async function handleOrderAction(order, act) {
       showToast(`${order.invoiceNo} ditandai dikirim.`);
     }
   } else if (act === "complete") {
-    await updateOrder(order.id, { status: "selesai" });
+    if(!await updateOrder(order.id, { status: "selesai" }))return;
     showToast(`${order.invoiceNo} ditandai selesai.`);
   } else if (act === "cancel") {
     if (!confirm(`Batalkan pesanan ${order.invoiceNo}?`)) return;
@@ -4726,6 +4733,6 @@ function selectCalculatorTab(tab){
  const current=tab==='perbandingan'?'perbandingan':'asli';
  document.querySelectorAll('[data-calculator-tab]').forEach(b=>{const selected=b.dataset.calculatorTab===current;b.classList.toggle('is-active',selected);b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;});
  document.getElementById('calculator-original').hidden=current!=='asli';document.getElementById('calculator-comparison').hidden=current!=='perbandingan';
- const frame=document.getElementById('comparison-frame');if(current==='perbandingan'&&!frame.getAttribute('src'))frame.src='planning-admin.html?v=launch-20260915-r14&embed=1#calculator';
+ const frame=document.getElementById('comparison-frame');if(current==='perbandingan'&&!frame.getAttribute('src'))frame.src='planning-admin.html?v=audit-20260920-r17&embed=1#calculator';
  history.replaceState(null,'','#module/calculator/'+current);
 }
