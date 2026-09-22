@@ -3,7 +3,19 @@ import {check,num,Fault} from './manual-domain.js?v=products-20260917-r16';
 export const VARIANT_FIELDS=['sku','color','size','stock','retail','wholesale','hpp','weight','image'];
 export const variantValue=(v,k)=>['retail','wholesale'].includes(k)?v.pricing?.[k]:v[k];
 export function setVariantValue(v,k,value){if(['retail','wholesale'].includes(k))v.pricing={...v.pricing,[k]:value};else v[k]=value;}
-const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+// Firestore map key order is not an edit. Array order (including photos) is.
+export function same(a,b){
+ if(Object.is(a,b))return true;
+ if(!a||!b||typeof a!=='object'||typeof b!=='object')return false;
+ if(Array.isArray(a)||Array.isArray(b))return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((v,i)=>same(v,b[i]));
+ const keys=Object.keys(a);return keys.length===Object.keys(b).length&&keys.every(k=>Object.hasOwn(b,k)&&same(a[k],b[k]));
+}
+export function imageList(value){
+ const rows=(Array.isArray(value)?value:[]).map(i=>typeof i==='string'?{url:i}:i).filter(i=>i?.url);
+ const primary=rows.some(i=>i.isPrimary===true);
+ return rows.map((i,index)=>({url:String(i.url).trim(),isPrimary:primary?i.isPrimary===true:index===0}));
+}
+const sameField=(a,b,path)=>path.at(-1)==='images'?same(imageList(a),imageList(b)):same(a,b);
 const blank=v=>v==null||String(v).trim()==='';
 export function variantNumber(value,field,{optional=false}={}){
  if(blank(value)){check(optional,field+' wajib diisi.','invalid-argument');return null;}
@@ -28,7 +40,7 @@ export function undoVariantBulk(rows,undo,edited=new Set()){
 const preserveClone=v=>Array.isArray(v)?v.map(preserveClone):v&&Object.getPrototypeOf(v)===Object.prototype?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,preserveClone(x)])):v;
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 function differences(a,b,path=[],out=[]){
- if(same(a,b))return out;
+ if(sameField(a,b,path))return out;
  if(object(a)&&object(b)){for(const key of Object.keys(b))differences(a[key],b[key],[...path,key],out);}
  else out.push({path,value:b});return out;
 }
@@ -48,10 +60,13 @@ export function mergeProductEdits(base,desired,current){
  const next=preserveClone(current),stockConflicts=[],fieldConflicts=[];
  const apply=(before,wanted,latest,destination,prefix)=>{for(const edit of differences(before,wanted)){
   const was=get(before,edit.path),now=get(latest,edit.path);
-  if(!same(was,now)&&!same(edit.value,now))fieldConflicts.push(prefix+edit.path.join('.'));
+  if(!sameField(was,now,edit.path)&&!sameField(edit.value,now,edit.path))fieldConflicts.push({field:prefix+edit.path.join('.'),variantId:prefix?prefix.slice(0,-1):null,path:edit.path,previous:was,current:now,requested:edit.value});
   else put(destination,edit.path,edit.value);
  }};
  const {variants:baseRows,...baseFields}=base,{variants:desiredRows,...desiredFields}=desired,{variants:currentRows,...currentFields}=current;
+ // photoUrl mirrors the primary image for legacy readers. Resolve the actual
+ // image list once; the service rebuilds the mirror from that chosen list.
+ if(!sameField(baseFields.images,desiredFields.images,['images'])){delete baseFields.photoUrl;delete desiredFields.photoUrl;delete currentFields.photoUrl;}
  apply(baseFields,desiredFields,currentFields,next,'');
  const existing=new Map(currentRows.map(v=>[v.id,v]));
  for(const wanted of desiredRows){const before=baseRows.find(v=>v.id===wanted.id),latest=existing.get(wanted.id);
@@ -66,6 +81,18 @@ export function mergeProductEdits(base,desired,current){
   }
  }
  if(stockConflicts.length){const error=new Fault('Data produk atau stok berubah sejak formulir dibuka. Tinjau stok terbaru sebelum menetapkan stok akhir.','stock-conflict');error.conflicts=stockConflicts;throw error;}
- check(!fieldConflicts.length,'Kolom yang Anda edit juga berubah di sesi lain: '+fieldConflicts.join(', ')+'. Muat ulang dan tinjau kembali.','product-conflict');
+ if(fieldConflicts.length){const error=new Fault('Ada perubahan pada kolom yang sama. Bandingkan dan pilih nilai yang ingin disimpan. Draf Anda tetap tersedia.','product-conflict');error.conflicts=fieldConflicts;throw error;}
  return next;
+}
+
+// A resolution acknowledges only the value just reviewed, never a whole document.
+// A later concurrent edit will therefore still conflict in the transaction.
+export function resolveProductConflict(base,desired,conflict,choice){
+ check(['mine','latest'].includes(choice),'Pilih penyelesaian konflik.');
+ const nextBase=preserveClone(base),nextDesired=preserveClone(desired);
+ const target=p=>conflict.variantId?p.variants.find(v=>v.id===conflict.variantId):p;
+ check(target(nextBase)&&target(nextDesired),'Varian tidak tersedia untuk peninjauan.');
+ put(target(nextBase),conflict.path,preserveClone(conflict.current));
+ if(choice==='latest')put(target(nextDesired),conflict.path,preserveClone(conflict.current));
+ return {base:nextBase,desired:nextDesired};
 }
