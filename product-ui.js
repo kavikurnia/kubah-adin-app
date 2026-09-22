@@ -4,7 +4,7 @@ import {CATEGORIES,IMPORT_COLUMNS,IMPORT_LABELS,importPreview,pricingInput,skuId
 import {productService} from './product-service.js?v=variant-options-20260923-r20';
 import {check,num} from './manual-domain.js?v=variant-options-20260923-r20';
 import {movementService,movementOptions,movementStatus,movementLabel,movementRows,movementCounts} from './product-movement.js?v=variant-options-20260923-r20';
-import {mountVariantTable} from './variant-table.js?v=variant-options-20260923-r20';
+import {mountVariantTable} from './variant-table.js?v=variant-options-20260923-r20b';
 import {applyFormChanges,resolveProductConflict,imageList,same} from './variant-draft.js?v=variant-options-20260923-r20';
 import {productDrafts} from './product-edit-draft.js?v=product-save-20260923-r19c';
 let filter={query:'',category:'',status:'',movement:'',publication:'',archive:'normal'};
