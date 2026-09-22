@@ -22,7 +22,7 @@ function show(html){$('#content').innerHTML=html;document.querySelectorAll('[dat
 function requireLogin(){if(S.user)return true;show(authHTML());bindAuth();return false;}
 async function loadCatalog(){const r=await api('catalog');S.products=r.products;S.settings=r.settings;const phone=String(S.settings.whatsapp||'').replace(/\D/g,'').replace(/^0/,'62');$('#help').hidden=!phone;if(phone)$('#help').href='https://wa.me/'+phone;}
 function bindCatalog(){
-  document.querySelectorAll('[data-product]').forEach(b=>b.onclick=()=>busy(b,()=>detail(b.dataset.product)));
+  document.querySelectorAll('[data-product]').forEach(b=>b.onclick=async()=>{b.disabled=true;b.setAttribute('aria-busy','true');try{await busy(null,()=>detail(b.dataset.product));}finally{b.disabled=false;b.removeAttribute('aria-busy');}});
   document.querySelectorAll('[data-wish]').forEach(b=>b.onclick=()=>{const pid=b.dataset.wish;S.wish=S.wish.includes(pid)?S.wish.filter(id=>id!==pid):[...S.wish,pid];save();catalog(S.wishlistView);});
   $('#catalog-filters').onsubmit=e=>{e.preventDefault();const f=formValues(e.currentTarget);Object.assign(S,{category:f.category,sort:f.sort,availability:f.availability,minPrice:f.minPrice,maxPrice:f.maxPrice,material:f.material,size:f.size,onlyWholesale:!!e.currentTarget.elements.onlyWholesale.checked});if(S.minPrice!==''&&S.maxPrice!==''&&Number(S.minPrice)>Number(S.maxPrice)){message('Harga minimum melebihi maksimum.',true);return;}catalog(S.wishlistView);};
   $('#category').onchange=e=>{S.category=e.target.value;S.material='';S.size='';catalog(S.wishlistView);};
