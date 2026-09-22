@@ -1,12 +1,12 @@
 import {productLifecycle} from './product-lifecycle.js?v=products-20260917-r16';
 import {$,esc,money,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download} from './planning-ui.js?v=audit-20260920-r17';
 import {CATEGORIES,IMPORT_COLUMNS,IMPORT_LABELS,importPreview,pricingInput,skuId,csv,unitPrice} from './planning-domain.js?v=products-20260917-r16';
-import {productService} from './product-service.js?v=product-save-20260923-r19b';
+import {productService} from './product-service.js?v=product-save-20260923-r19c';
 import {check,num} from './manual-domain.js?v=products-20260917-r16';
 import {movementService,movementOptions,movementStatus,movementLabel,movementRows,movementCounts} from './product-movement.js?v=products-20260917-r16';
-import {mountVariantTable} from './variant-table.js?v=product-save-20260923-r19b';
-import {applyFormChanges,resolveProductConflict,imageList,same} from './variant-draft.js?v=product-save-20260923-r19b';
-import {productDrafts} from './product-edit-draft.js?v=product-save-20260923-r19b';
+import {mountVariantTable} from './variant-table.js?v=product-save-20260923-r19c';
+import {applyFormChanges,resolveProductConflict,imageList,same} from './variant-draft.js?v=product-save-20260923-r19c';
+import {productDrafts} from './product-edit-draft.js?v=product-save-20260923-r19c';
 let filter={query:'',category:'',status:'',movement:'',publication:'',archive:'normal'};
 const badge=m=>`<span class="movement-badge movement-${movementStatus(m)||'unrated'}">${movementLabel(m)}</span>`;
 const excel=(name,rows)=>{check(globalThis.XLSX,'Pustaka Excel belum termuat. Periksa koneksi lalu coba lagi, atau gunakan CSV.');const sheet=XLSX.utils.json_to_sheet(rows.map(r=>Object.fromEntries(IMPORT_COLUMNS.map((k,i)=>[IMPORT_LABELS[i],r[k]??'']))),{header:IMPORT_LABELS}),book=XLSX.utils.book_new();sheet['!cols']=IMPORT_COLUMNS.map(k=>({wch:['name','description','photos'].includes(k)?36:20}));XLSX.utils.book_append_sheet(book,sheet,'Produk');XLSX.writeFile(book,name);};

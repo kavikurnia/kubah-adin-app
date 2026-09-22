@@ -18,7 +18,8 @@ export function productService(store,{stamp=()=>new Date().toISOString()}={}){
  else if(Object.hasOwn(raw,'photoUrl'))p.photoUrl=safeURL(raw.photoUrl);
  p.createdAt=old?.createdAt||stamp();p.updatedAt=stamp();p.updatedBy=ctx.uid;
    for(const key of locks)tx.set('productSkus/'+hash(key).slice(0,32),{productId:pid,sku:key});
-   tx.set('products/'+pid,p);if(movement)tx.set('productMovements/'+pid,movement);const pub=publicProduct({...p,images:imageList(p.images)},pid);writeAvailability(tx,availability,pid,!!pub,ctx,store.serverTimestamp);if(pub){tx.set('catalog/'+pid,pub);tx.set('resellerPrices/'+pid,{productId:pid,...p.website.reseller});}else{tx.delete('catalog/'+pid);tx.delete('resellerPrices/'+pid);}
+   if(old){const patch=Object.fromEntries(Object.entries(p).filter(([field,value])=>!same(value,old[field])&&(field!=='images'||imagesChanged)));tx.update('products/'+pid,patch);}else tx.set('products/'+pid,p);
+   if(movement)tx.set('productMovements/'+pid,movement);const pub=publicProduct({...p,images:imageList(p.images)},pid);writeAvailability(tx,availability,pid,!!pub,ctx,store.serverTimestamp);if(pub){tx.set('catalog/'+pid,pub);tx.set('resellerPrices/'+pid,{productId:pid,...p.website.reseller});}else{tx.delete('catalog/'+pid);tx.delete('resellerPrices/'+pid);}
    tx.set('productEvents/'+eid,{productId:pid,fingerprint,before:old||null,afterRevision:p.revision,actor:ctx.uid,at:stamp(),reason:d.reason||'Pemetaan harga / impor terkonfirmasi',stockUpdated:!!d.stock});return {id:pid};});
   try{return await commit();}catch(e){if(!String(e.code).includes('permission-denied'))throw e;return commit();}
  },
