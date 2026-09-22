@@ -47,3 +47,42 @@
  .catalog-shop .shop-header .header-action{width:44px;height:44px;padding:0;min-width:44px;min-height:44px}
  .catalog-shop .shop-header #cart-count{position:absolute;top:-2px;right:-1px;min-width:17px;height:17px;font-size:10px;line-height:17px}
 }
+
+/* r18: card typography and gallery only. Product data is unchanged. */
+.catalog-shop .product-body{align-items:stretch;gap:6px;min-width:0}
+.catalog-shop .product-body>.eyebrow,.catalog-shop .product h3,.catalog-shop .product .card-description{width:100%;min-width:0;margin:0;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere}
+.catalog-shop .product-body>.eyebrow{font:500 11px/1.4 system-ui,sans-serif;letter-spacing:.05em;height:2.8em;min-height:2.8em}
+.catalog-shop .product h3{font:650 17px/1.4 system-ui,sans-serif;height:2.8em;min-height:2.8em;color:#2e2420}
+.catalog-shop .product .card-description{font:400 14px/1.5 system-ui,sans-serif;color:#71645d;letter-spacing:normal;text-transform:none;white-space:normal;height:3em;min-height:3em}
+.catalog-shop .card-pricing{display:grid;gap:2px;font-size:20px;min-width:0}
+.catalog-shop .card-pricing>.price{font:600 20px/1.4 Georgia,serif;align-self:start;overflow-wrap:anywhere}
+.catalog-shop .card-pricing>.price-label{font-size:11px;line-height:18px}
+.catalog-shop .card-pricing>.meta{font:400 12px/1.5 system-ui,sans-serif;overflow-wrap:anywhere}
+.catalog-shop .card-pricing{grid-template-rows:18px 2.8em 36px minmax(18px,auto)}
+.catalog-shop .product-body>.meta{font:400 12px/1.5 system-ui,sans-serif;min-height:1.5em;overflow-wrap:anywhere}
+.catalog-shop .product-actions{margin-top:auto;padding-top:6px;gap:6px;align-items:stretch;flex-wrap:nowrap}
+.catalog-shop .product-actions button:first-child{min-width:0}
+.catalog-shop .product-actions button{min-height:44px;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
+.catalog-shop .product-actions [data-wish]{flex:0 0 44px;min-width:44px}
+.catalog-shop .product .badge{align-self:start}
+.product-gallery{min-width:0;max-width:100%}
+.gallery-stage{position:relative;aspect-ratio:1;max-width:100%;background:#f6f1e8;border-radius:12px;touch-action:pan-y pinch-zoom;user-select:none;-webkit-user-select:none;overflow:hidden}
+.gallery-stage:focus-visible{outline:3px solid #6b1428;outline-offset:3px}
+.gallery-stage .gallery-main{display:block;width:100%;height:100%;max-height:none;aspect-ratio:auto;object-fit:contain;object-position:center;pointer-events:none}
+.gallery-arrow{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;min-width:44px;padding:0;border:1px solid #dfd2c3;border-radius:50%;background:rgba(255,252,245,.94);color:#671428;font:32px/1 Georgia,serif;box-shadow:0 2px 6px #0001}
+.gallery-prev{left:7px}.gallery-next{right:7px}
+.gallery-position{margin:8px 0;text-align:center;font:500 13px/1.5 system-ui,sans-serif;color:#6b1428;font-variant-numeric:tabular-nums}
+.product-gallery .gallery-thumbs{display:flex;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;max-width:100%;padding:3px 3px 10px;margin:0;scrollbar-width:thin}
+.product-gallery .gallery-thumbs button{flex:0 0 64px;width:64px;height:74px;padding:3px;border:2px solid transparent;border-radius:8px;background:#f6f1e8}
+.product-gallery .gallery-thumbs img{display:block;width:100%;height:100%;object-fit:contain;border-radius:4px}
+.product-gallery .gallery-thumbs [aria-pressed=true]{border-color:#72172c;background:#f5e6e8}
+.product-gallery .gallery-thumbs button:focus-visible{outline:2px solid #72172c;outline-offset:1px}
+@media(max-width:700px){
+ .catalog-shop .product h3{font-size:15px}
+ .catalog-shop .product .card-description{font-size:14px}
+ .catalog-shop .product-body>.eyebrow{font-size:10px}
+ .catalog-shop .card-pricing{font-size:18px;grid-template-rows:18px 2.8em 33px minmax(17px,auto)}
+ .catalog-shop .card-pricing>.price{font-size:18px}
+ .catalog-shop .card-pricing>.meta,.catalog-shop .product-body>.meta{font-size:11px;line-height:1.5}
+ .catalog-shop .product-actions button{font-size:11px;padding:7px 5px}
+}
