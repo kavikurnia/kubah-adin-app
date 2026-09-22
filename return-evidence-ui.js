@@ -1,6 +1,6 @@
-import {connect,api,esc,busy,message} from './shop-client.js?v=audit-20260920-r17';
-import {documentStorage} from './document-storage.js?v=audit-20260920-r17';
-import {mountClaimUpload,evidenceButtons} from './buyer-document-ui.js?v=audit-20260920-r17';
+import {connect,api,esc,busy,message} from './shop-client.js?v=variant-options-20260923-r20';
+import {documentStorage} from './document-storage.js?v=variant-options-20260923-r20';
+import {mountClaimUpload,evidenceButtons} from './buyer-document-ui.js?v=variant-options-20260923-r20';
 export function mountActivation(host,orders){
  const eligible=orders.filter(o=>o.customerId&&['dikirim','selesai'].includes(o.status));const el=document.createElement('section');el.className='panel';
  el.innerHTML='<h2>Akses lampiran pembeli per pesanan</h2><p>Pilih pesanan untuk menyiapkan langkah aktivasi di lingkungan terpercaya. Tombol ini tidak memberi izin dengan sendirinya. Pemilik diambil dari data pesanan, bukan isian UID.</p><select aria-label="Pesanan untuk aktivasi"><option value="">Pilih pesanan yang diizinkan pemilik toko</option>'+eligible.map(o=>`<option value="${esc(o.id)}">${esc(o.invoiceNo||o.id)}</option>`).join('')+'</select><pre data-activation></pre>';

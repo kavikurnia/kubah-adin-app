@@ -1,9 +1,9 @@
-import {$,esc,input,area,checkbox,tabs,form,bindForm,message,date} from './planning-ui.js?v=audit-20260920-r17';
-import {supplierWorkflow} from './supplier-workflow-service.js?v=products-20260917-r16';
-import {PARTNERSHIP_DEFAULT,APPLICATION_LABELS,applicationNumber} from './supplier-workflow-domain.js?v=products-20260917-r16';
+import {$,esc,input,area,checkbox,tabs,form,bindForm,message,date} from './planning-ui.js?v=variant-options-20260923-r20';
+import {supplierWorkflow} from './supplier-workflow-service.js?v=variant-options-20260923-r20';
+import {PARTNERSHIP_DEFAULT,APPLICATION_LABELS,applicationNumber} from './supplier-workflow-domain.js?v=variant-options-20260923-r20';
 export async function renderWebContent(U){
  const old=await U.store.get('siteContent/supplierPartnership'),content=old||PARTNERSHIP_DEFAULT;if(!U.isCurrent())return;
- $('#content').innerHTML='<h1>Data Web Katalog</h1>'+tabs('webcontent',[['kerjasama','Kerja Sama']],'kerjasama')+'<h2>Menjadi Supplier</h2><p>Konten ini tampil pada bagian Kerja Sama di katalog. Pengajuan diperiksa melalui modul Supplier.</p>'+form('partnership-content',input('title','Judul',content.title,'text','required maxlength="150"')+area('description','Deskripsi',content.description)+area('requirements','Persyaratan kerja sama',content.requirements)+input('buttonText','Teks tombol pendaftaran',content.buttonText,'text','required maxlength="80"')+checkbox('active','Aktifkan pendaftaran Supplier',content.active),'Simpan konten')+'<a href="toko.html?v=audit-20260920-r17#kerjasama" target="_blank">Lihat bagian Kerja Sama di katalog</a>';
+ $('#content').innerHTML='<h1>Data Web Katalog</h1>'+tabs('webcontent',[['kerjasama','Kerja Sama']],'kerjasama')+'<h2>Menjadi Supplier</h2><p>Konten ini tampil pada bagian Kerja Sama di katalog. Pengajuan diperiksa melalui modul Supplier.</p>'+form('partnership-content',input('title','Judul',content.title,'text','required maxlength="150"')+area('description','Deskripsi',content.description)+area('requirements','Persyaratan kerja sama',content.requirements)+input('buttonText','Teks tombol pendaftaran',content.buttonText,'text','required maxlength="80"')+checkbox('active','Aktifkan pendaftaran Supplier',content.active),'Simpan konten')+'<a href="toko.html?v=variant-options-20260923-r20#kerjasama" target="_blank">Lihat bagian Kerja Sama di katalog</a>';
  bindForm('partnership-content',async(d,f)=>{await supplierWorkflow(U.store).configurePartnership(U.ctx,{...d,active:f.elements.active.checked,expectedRevision:old?.revision||0});await U.render();message('Konten Menjadi Supplier tersimpan.');});
 }
 export async function renderSupplierPartnership({store,c,user,isCurrent=()=>true}){

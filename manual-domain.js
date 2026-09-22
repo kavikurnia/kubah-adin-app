@@ -86,7 +86,7 @@ export function publicProduct(p,productId) {
   return {id:productId,name:p.name,category:p.category||'',description:p.description||'',specifications:String(p.specifications||''),sku:p.sku||'',weight:p.weight||0,createdAt:p.createdAt?.toDate?.().toISOString()||(typeof p.createdAt==='string'?p.createdAt:null),material:String(p.material||p.bahan||''),size:String(p.size||''),thickness:String(p.thickness||''),conditions:String(p.conditions||''),
     images:(p.images?.length?p.images:[{url:p.photoUrl}]).filter(i=>safeURL(i.url)).map(i=>({url:safeURL(i.url),isPrimary:!!i.isPrimary})),
     saleUnit:p.saleUnit||'unit',subcategory:p.subcategory||'',collections:p.collections?.includes('paket-grosir')?['paket-grosir']:[],price:w.retail,packPcs:w.packPcs,promo:!!w.promo,tiers:w.tiers,combine:w.combine,group:w.group,
-    variants:p.variants.map(v=>({id:v.id,color:v.color||v.name||'',size:v.size||'',sku:v.sku||'',image:safeURL(v.image),stock:v.stock,weight:v.weight??p.weight??0,pricing:{retail:v.pricing?.retail||null,wholesale:v.pricing?.wholesale||null}}))};
+    variants:p.variants.filter(v=>!v.optionArchived).map(v=>({id:v.id,color:v.color||v.name||'',size:v.size||'',sku:v.sku||'',image:safeURL(v.image),stock:v.stock,weight:v.weight??p.weight??0,pricing:{retail:v.pricing?.retail||null,wholesale:v.pricing?.wholesale||null}}))};
 }
 export function cartInput(items) {
   check(Array.isArray(items)&&items.length>0&&items.length<=60,'Isi 1–60 baris keranjang.','invalid-argument');
@@ -101,7 +101,7 @@ export function priceCart(input,products,mode,reseller,c,voucherCode='',time=Dat
     const millis=v=>v?.toMillis?.()??(v?.toDate?+v.toDate():Date.parse(v));
     const prior=!!p?.deletedAt&&Number.isFinite(millis(priorRequestAt))&&millis(priorRequestAt)<=millis(p.deletedAt);
     check(p&&(prior||p.deleted!==true&&p.status==='aktif'),'Produk sudah tidak tersedia untuk pembelian baru.');const w=validatePricing(p.website);
-    check(prior||w.enabled,'Produk belum tersedia di website.');const v=p.variants.find(v=>v.id===x.variantId);check(v,'Varian sudah tidak tersedia.');
+    check(prior||w.enabled,'Produk belum tersedia di website.');const v=p.variants.find(v=>v.id===x.variantId);check(v,'Varian sudah tidak tersedia.');const priorVariant=!!v.optionArchivedAt&&Number.isFinite(millis(priorRequestAt))&&millis(priorRequestAt)<=millis(v.optionArchivedAt);check(!v.optionArchived||priorVariant,'Kombinasi varian telah diarsipkan dan tidak tersedia untuk pembelian baru.');
     check(!stockCheck||v.stock>=x.qty,`Stok ${p.name} / ${v.color||v.size||v.sku} tidak cukup.`);
     return {...x,p,v,w,pcs:x.qty*w.packPcs};
   });

@@ -1,5 +1,5 @@
-import {check,num,str,hash} from './manual-domain.js?v=products-20260917-r16';
-import {day,wibDay} from './planning-domain.js?v=products-20260917-r16';
+import {check,num,str,hash} from './manual-domain.js?v=variant-options-20260923-r20';
+import {day,wibDay} from './planning-domain.js?v=variant-options-20260923-r20';
 export const MATCH_LABELS={incomplete:'Dokumen Belum Lengkap',matched:'Sesuai',difference:'Ada Selisih',reviewed:'Selesai Ditinjau'};
 export const APPLICATION_LABELS={new:'Pengajuan Baru',reviewing:'Sedang Ditinjau',needs_info:'Perlu Informasi Tambahan',approved:'Disetujui',rejected:'Ditolak'};
 export const PARTNERSHIP_DEFAULT={title:'Menjadi Supplier Kubah Nabawi',description:'Ajukan kerja sama penyediaan produk untuk toko Kubah Nabawi.',requirements:'Cantumkan informasi usaha dan produk yang ditawarkan. Pengajuan ditinjau oleh admin.',buttonText:'Ajukan kerja sama',active:false};

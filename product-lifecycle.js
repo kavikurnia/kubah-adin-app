@@ -1,4 +1,4 @@
-import {check,id,hash} from './manual-domain.js?v=products-20260917-r16';
+import {check,id,hash} from './manual-domain.js?v=variant-options-20260923-r20';
 
 export const AVAILABILITY_PATH='catalogState/availability';
 

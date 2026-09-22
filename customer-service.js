@@ -1,4 +1,4 @@
-import {check,str,hash,id} from './manual-domain.js?v=products-20260917-r16';
+import {check,str,hash,id} from './manual-domain.js?v=variant-options-20260923-r20';
 export function customerService(store){
  const actor=ctx=>{check(ctx?.role==='admin'&&ctx.uid,'Akses admin diperlukan.','permission-denied');return ctx.uid;};
  const fields=d=>({name:str(d.name,150,true),phone:str(d.phone,30,true),address:str(d.address||'',1000)});

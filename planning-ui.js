@@ -1,5 +1,5 @@
-import {esc,money,date,api,formValues,message,busy} from './shop-client.js?v=audit-20260920-r17';
-import {wibDay} from './planning-domain.js?v=products-20260917-r16';
+import {esc,money,date,api,formValues,message,busy} from './shop-client.js?v=variant-options-20260923-r20';
+import {wibDay} from './planning-domain.js?v=variant-options-20260923-r20';
 export {esc,money,date,api,formValues,message,busy};
 export const $=s=>document.querySelector(s);
 export const input=(name,label,value='',type='text',extra='')=>`<label class="field">${esc(label)}<input name="${esc(name)}" type="${type}" value="${esc(value??'')}" ${extra}></label>`;

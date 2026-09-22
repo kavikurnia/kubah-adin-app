@@ -1,4 +1,4 @@
-import {check,num,Fault} from './manual-domain.js?v=products-20260917-r16';
+import {check,num,Fault} from './manual-domain.js?v=variant-options-20260923-r20';
 
 export const VARIANT_FIELDS=['sku','color','size','stock','retail','wholesale','hpp','weight','image'];
 export const variantValue=(v,k)=>['retail','wholesale'].includes(k)?v.pricing?.[k]:v[k];
@@ -50,6 +50,9 @@ function put(obj,path,value){let at=obj;for(const k of path.slice(0,-1))at=at[k]
 export function applyFormChanges(original,initial,current){
  const next=structuredClone(original);
  for(const edit of differences(initial,current).filter(e=>e.path[0]!=='variants'))put(next,edit.path,edit.value);
+ // An old product has no option schema. Its first option edit must include
+ // the derived names/enabled flags, not just the nested field that changed.
+ if(!original.variationOptions&&!same(initial.variationOptions,current.variationOptions))next.variationOptions=structuredClone(current.variationOptions);
  const originalRows=new Map((original.variants||[]).map(v=>[v.id,v]));
  next.variants=current.variants.map(v=>{const old=originalRows.get(v.id),first=initial.variants.find(x=>x.id===v.id);if(!old||!first)return v;const row=structuredClone(old);for(const edit of differences(first,v))put(row,edit.path,edit.value);return row;});
  return next;

@@ -1,12 +1,12 @@
-import {caseId} from './return-domain.js?v=audit-20260920-r17';
-import {policyDraft} from './return-domain.js?v=audit-20260920-r17';
-import {commerce} from './manual-service.js?v=audit-20260920-r17';
-import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=products-20260917-r16';
+import {caseId} from './return-domain.js?v=variant-options-20260923-r20';
+import {policyDraft} from './return-domain.js?v=variant-options-20260923-r20';
+import {commerce} from './manual-service.js?v=variant-options-20260923-r20';
+import {config,validateConfig,check,id,str,num,hash,cartInput,address,priceCart,validateSlot} from './manual-domain.js?v=variant-options-20260923-r20';
 import {manualStore} from './manual-store.js?v=launch-20260915-r14';
 import {manualAccess} from './manual-access.js?v=launch-20260915-r14';
 
-import {catalogEstimate,quoteSignature} from './catalog-domain.js?v=products-20260917-r16';
-import {claimInput,claimEvidence} from './buyer-domain.js?v=audit-20260920-r17';
+import {catalogEstimate,quoteSignature} from './catalog-domain.js?v=variant-options-20260923-r20';
+import {claimInput,claimEvidence} from './buyer-domain.js?v=variant-options-20260923-r20';
 const iso=()=>new Date().toISOString();
 const adminActions=new Set(['savePolicyDraft','adminData','savePayroll','saveConfig','saveProduct','saveSlot','saveCourier','reviewReseller','confirmShipping','verifyPayment','orderAction','reschedule','cancellationRefund','createManualOrder','legacyManualOrder','confirmRequest','rejectRequest','confirmClaimRequest','rejectClaimRequest','expireOrder']);
 export function publicSettings(raw){const c=config(raw||{});return {enabled:c.enabled,whatsapp:c.whatsapp,categories:c.categories,promos:c.promos,warehouse:c.warehouse,shipping:c.shipping,payments:c.payments,banks:c.banks,freeShipping:c.freeShipping,returnPolicy:c.returnPolicy,returnDays:c.returnDays,returnPolicyConfirmed:c.returnPolicyConfirmed===true,operatingDays:c.operatingDays,holidays:c.holidays};}
@@ -25,7 +25,7 @@ async function checkoutReview(reader,p,uid){
 }
 export async function manualApi(c,action,d={}){
   const user=c.a.currentUser,store=manualStore(['catalog','reviews'].includes(action)?{...c,a:null}:{...c,expectedUser:user});
-  const core=commerce(store,{verifyFile:async file=>{const {documentStorage}=await import('./document-storage.js?v=audit-20260920-r17');await documentStorage(c).read(file);}});
+  const core=commerce(store,{verifyFile:async file=>{const {documentStorage}=await import('./document-storage.js?v=variant-options-20260923-r20');await documentStorage(c).read(file);}});
   if(action==='catalog'){return {products:await store.list('catalog'),settings:publicSettings(await store.get('publicSettings/store'))};}
   if(action==='reviews')return store.list('reviews',[['productId','==',id(d.productId)]]);
   check(user,'Silakan masuk.','unauthenticated');const uid=user.uid,ctx={uid,role:'buyer'};

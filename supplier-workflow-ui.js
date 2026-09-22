@@ -1,8 +1,8 @@
-import {$,esc,money,date,input,area,select,checkbox,table,form,bindForm,busy,message,download} from './planning-ui.js?v=audit-20260920-r17';
-import {check} from './manual-domain.js?v=products-20260917-r16';
-import {wibDay} from './planning-domain.js?v=products-20260917-r16';
-import {supplierWorkflow} from './supplier-workflow-service.js?v=products-20260917-r16';
-import {compareDocuments,archiveRows,archiveFilter,MATCH_LABELS,APPLICATION_LABELS,applicationNumber} from './supplier-workflow-domain.js?v=products-20260917-r16';
+import {$,esc,money,date,input,area,select,checkbox,table,form,bindForm,busy,message,download} from './planning-ui.js?v=variant-options-20260923-r20';
+import {check} from './manual-domain.js?v=variant-options-20260923-r20';
+import {wibDay} from './planning-domain.js?v=variant-options-20260923-r20';
+import {supplierWorkflow} from './supplier-workflow-service.js?v=variant-options-20260923-r20';
+import {compareDocuments,archiveRows,archiveFilter,MATCH_LABELS,APPLICATION_LABELS,applicationNumber} from './supplier-workflow-domain.js?v=variant-options-20260923-r20';
 export function lineEditor(node,products,existing=[]){
  node.innerHTML='<div class="purchase-lines"></div><button type="button" class="add-line">Tambah produk</button><p class="muted">Jumlah menggunakan satuan pembelian di setiap baris. Semua perbandingan dikonversi ke pcs.</p><p class="line-total" role="status"></p>';
  const update=()=>{node.querySelector('.line-total').textContent='Total rincian: '+money(read().reduce((n,l)=>n+l.quantity*l.unitPrice,0));};

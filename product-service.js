@@ -1,8 +1,8 @@
-import {AVAILABILITY_PATH,writeAvailability} from './product-lifecycle.js?v=products-20260917-r16';
-import {check,id,hash,normalizeProduct,publicProduct,safeURL} from './manual-domain.js?v=products-20260917-r16';
-import {CATEGORIES,skuKey,skuId} from './planning-domain.js?v=products-20260917-r16';
-import {movementRecord} from './product-movement.js?v=products-20260917-r16';
-import {mergeProductEdits,imageList,same} from './variant-draft.js?v=product-save-20260923-r19';
+import {AVAILABILITY_PATH,writeAvailability} from './product-lifecycle.js?v=variant-options-20260923-r20';
+import {check,id,hash,normalizeProduct,publicProduct,safeURL} from './manual-domain.js?v=variant-options-20260923-r20';
+import {CATEGORIES,skuKey,skuId} from './planning-domain.js?v=variant-options-20260923-r20';
+import {movementRecord} from './product-movement.js?v=variant-options-20260923-r20';
+import {mergeProductEdits,imageList,same} from './variant-draft.js?v=variant-options-20260923-r20';
 export function productService(store,{stamp=()=>new Date().toISOString()}={}){
  return {async save(ctx,d){check(ctx.role==='admin'&&ctx.uid,'Izin admin diperlukan.','permission-denied');const pid=id(d.id),eid='product-'+hash([pid,d.key]),fingerprint=d.importHash||hash({product:d.product,stock:!!d.stock,...(d.movement?{movement:d.movement}:{})});
   const commit=()=>store.run(async tx=>{const event=await tx.get('productEvents/'+eid);if(event){check(event.fingerprint===fingerprint,'Kunci perubahan sudah dipakai.');return {id:pid,reused:true};}const old=await tx.get('products/'+pid);check(!old?.deleted,'Pulihkan produk dari Sampah sebelum mengeditnya.');const availability=await tx.get(AVAILABILITY_PATH);if(!d.base)check((old?.revision||0)===d.expectedRevision,'Produk/stok berubah sejak pratinjau. Muat ulang dan tinjau kembali.');
@@ -16,6 +16,8 @@ export function productService(store,{stamp=()=>new Date().toISOString()}={}){
  if(old&&!imagesChanged)p.images=old.images||[];
  if(imagesChanged)p.photoUrl=imageList(raw.images).find(i=>i.isPrimary)?.url||'';
  else if(Object.hasOwn(raw,'photoUrl'))p.photoUrl=safeURL(raw.photoUrl);
+ for(const v of p.variants){const prev=old?.variants.find(x=>x.id===v.id);if(v.optionArchived&&!prev?.optionArchived){v.optionArchivedAt=stamp();v.optionArchivedBy=ctx.uid;}else if(!v.optionArchived&&prev?.optionArchived){v.optionArchivedAt=null;v.optionRestoredAt=stamp();v.optionRestoredBy=ctx.uid;}}
+ if(!same(raw.variationOptions,old?.variationOptions)){p.optionsUpdatedAt=store.serverTimestamp();p.optionsUpdatedBy=ctx.uid;}
  p.createdAt=old?.createdAt||stamp();p.updatedAt=stamp();p.updatedBy=ctx.uid;
    for(const key of locks)tx.set('productSkus/'+hash(key).slice(0,32),{productId:pid,sku:key});
    if(old){const patch=Object.fromEntries(Object.entries(p).filter(([field,value])=>!same(value,old[field])&&(field!=='images'||imagesChanged)));tx.update('products/'+pid,patch);}else tx.set('products/'+pid,p);

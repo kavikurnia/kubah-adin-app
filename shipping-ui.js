@@ -1,12 +1,12 @@
-import {label} from './shop-client.js?v=audit-20260920-r17';
-import { $,esc,money,date,input,area,select,checkbox,tabs,table,form,bindForm,api,busy,message,download } from './planning-ui.js?v=audit-20260920-r17';
-import {wibDay,unitPrice,salesChannel,CHANNELS,csv} from './planning-domain.js?v=products-20260917-r16';
-import {check,hash} from './manual-domain.js?v=products-20260917-r16';
+import {label} from './shop-client.js?v=variant-options-20260923-r20';
+import { $,esc,money,date,input,area,select,checkbox,tabs,table,form,bindForm,api,busy,message,download } from './planning-ui.js?v=variant-options-20260923-r20';
+import {wibDay,unitPrice,salesChannel,CHANNELS,csv} from './planning-domain.js?v=variant-options-20260923-r20';
+import {check,hash} from './manual-domain.js?v=variant-options-20260923-r20';
 let filters={query:'',status:'',courier:'',date:''};
 const invoice=o=>esc(o.invoiceNo||'Belum ada invoice');
 const orderURL=id=>{const u=new URL('admin-website.html',location.href);u.searchParams.set('v','launch-20260915-r14');if(window.parent!==window)u.searchParams.set('embed','1');u.hash='orders/'+encodeURIComponent(id);return u.href;};
 export async function renderShipping(U){const data=await api('adminData');if(!U.isCurrent())return;const tab=['kelola','kurir','jadwal'].includes(U.tab)?U.tab:'kelola';
- $('#content').innerHTML=`<div class="page-head"><div><h1>Pengiriman & Kurir</h1><p>Kelola pengiriman, kurir, dan jadwal toko.</p></div><a class="button" href="kurir.html?v=audit-20260920-r17" target="_blank">Halaman kurir</a></div>${tabs('shipping',[['kelola','Kelola Pengiriman'],['kurir','Data Kurir'],['jadwal','Jadwal Pengiriman']],tab)}<div id="shipping-body"></div>`;
+ $('#content').innerHTML=`<div class="page-head"><div><h1>Pengiriman & Kurir</h1><p>Kelola pengiriman, kurir, dan jadwal toko.</p></div><a class="button" href="kurir.html?v=variant-options-20260923-r20" target="_blank">Halaman kurir</a></div>${tabs('shipping',[['kelola','Kelola Pengiriman'],['kurir','Data Kurir'],['jadwal','Jadwal Pengiriman']],tab)}<div id="shipping-body"></div>`;
  if(tab==='kelola'&&U.oid)filters.courier=U.oid;const couriers=data.couriers.map(c=>[c.id,c.name+(c.active?'':' · nonaktif')]);
  if(tab==='kelola'){
   $('#shipping-body').innerHTML=`<div class="filters">${input('query','Cari invoice / penerima',filters.query,'search')}${select('status','Status',[['','Semua status'],...[...new Set(data.orders.map(o=>o.status))].map(s=>[s,label(s)])],filters.status)}${select('courier','Kurir',[['','Semua kurir'],...couriers],filters.courier)}${input('date','Tanggal pesanan (WIB)',filters.date,'date')}</div><div id="shipping-table"></div><section id="shipping-detail"></section>`;

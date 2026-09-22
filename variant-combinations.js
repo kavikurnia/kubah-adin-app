@@ -1,4 +1,4 @@
-import {check} from './manual-domain.js?v=products-20260917-r16';
+import {check} from './manual-domain.js?v=variant-options-20260923-r20';
 const key=v=>String(v||'').trim().toLocaleLowerCase('id-ID');
 const pair=(color,size)=>JSON.stringify([key(color),key(size)]);
 const values=text=>[...new Map(String(text).split(/[,\n]/).map(v=>v.trim()).filter(Boolean).map(v=>[key(v),v])).values()];

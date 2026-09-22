@@ -1,6 +1,6 @@
-import {caseId} from './return-domain.js?v=audit-20260920-r17';
-import {documentStorage,storageConfiguration,prepareDocument} from './document-storage.js?v=audit-20260920-r17';
-import {connect,esc} from './shop-client.js?v=audit-20260920-r17';
+import {caseId} from './return-domain.js?v=variant-options-20260923-r20';
+import {documentStorage,storageConfiguration,prepareDocument} from './document-storage.js?v=variant-options-20260923-r20';
+import {connect,esc} from './shop-client.js?v=variant-options-20260923-r20';
 export function evidenceButtons(files=[]){return files.map((file,i)=>'<button type="button" data-evidence="'+esc(typeof file==='object'?JSON.stringify(file):file)+'">Bukti '+(i+1)+'</button>').join('');}
 export async function openBuyerDocument(raw){
  const file=typeof raw==='string'?JSON.parse(raw):raw,c=await connect(),uid=c.a.currentUser?.uid,blob=await documentStorage(c).read(file);
