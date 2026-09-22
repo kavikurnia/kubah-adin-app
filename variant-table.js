@@ -39,7 +39,7 @@ export function mountVariantTable(host,{variants,parent={},c,onChange=()=>{},can
   snapshot(){return structuredClone(rows);},
   queuedPhotos(){return [...photos.keys()];},
   replace(value){rows=structuredClone(value);selected=new Set([...selected].filter(id=>rows.some(v=>v.id===id)));undo=[];edited.clear();paint();},
-  markSaved(){q('[data-dirty]').textContent='Varian tersimpan';q('[data-dirty]').classList.remove('changed');},
+  markSaved(){q('[data-dirty]').textContent='Varian tersimpan';q('[data-dirty]').classList.remove('changed');status('');q('[data-combination-preview]').textContent='';q('[data-add-combinations]').hidden=true;planned=null;for(const el of host.querySelectorAll('[data-bulk]'))el.value='';sync();},
   pending(){return preparing>0;},
   updateParent(value){q('[data-unit]').textContent=(value.saleUnit||'unit')+'; '+(value.packPcs>0?value.packPcs+' pcs per unit':'isi pcs belum ditetapkan');for(const [field,placeholder] of Object.entries({retail:value.retail,wholesale:value.wholesale,weight:value.weight}))for(const el of host.querySelectorAll('[data-field="'+field+'"]'))el.placeholder=placeholder==null||placeholder===''?'Induk':String(number(field,placeholder));},
   setLocked(value){locked=value;host.querySelectorAll('input,select,textarea,button').forEach(el=>el.disabled=value||!canEdit);sync();},

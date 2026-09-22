@@ -1,7 +1,7 @@
 import {connect,ensureAdminAccess,esc,message} from './shop-client.js?v=audit-20260920-r17';
 import {manualStore} from './manual-store.js?v=launch-20260915-r14';
 import {renderShipping,renderNewOrder} from './shipping-ui.js?v=audit-20260920-r17';
-import {renderProducts,renderCalculator} from './product-ui.js?v=product-save-20260923-r19';
+import {renderProducts,renderCalculator} from './product-ui.js?v=product-save-20260923-r19b';
 import {renderSuppliers} from './supplier-ui.js?v=audit-20260920-r17';
 import {renderCustomerMessages} from './customer-message-ui.js?v=audit-20260920-r17';
 

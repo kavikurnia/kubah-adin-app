@@ -984,7 +984,7 @@ function showOperational(module){
   const inspect=()=>{try{const content=frame.contentDocument?.getElementById('content');if(!content||/Memeriksa/.test(content.textContent)){document.getElementById('module-error').hidden=false;}}catch{document.getElementById('module-error').hidden=false;}};
   frame.onload=()=>{try{if(!frame.contentDocument?.getElementById('content'))inspect();}catch{inspect();}};
   const page=module.split('/')[0];
-  if(['messages','shipping','couriers','slots','products','suppliers','webcontent','calculator','neworder','pricing'].includes(page)){frame.src='planning-admin.html?v=product-save-20260923-r19&embed=1#'+(({couriers:'shipping/kurir',slots:'shipping/jadwal',pricing:'products/migrasi'})[module]||module);}
+  if(['messages','shipping','couriers','slots','products','suppliers','webcontent','calculator','neworder','pricing'].includes(page)){frame.src='planning-admin.html?v=product-save-20260923-r19b&embed=1#'+(({couriers:'shipping/kurir',slots:'shipping/jadwal',pricing:'products/migrasi'})[module]||module);}
   else frame.src=page==='resellers'?'reseller-admin.html?v=audit-20260920-r17&embed=1#'+(module.split('/')[1]||'ringkasan'):'admin-website.html?v=audit-20260920-r17&embed=1#'+module;
   moduleTimer=setTimeout(inspect,20000);
   document.getElementById('module-retry').onclick=()=>showOperational(module);toggleDrawer(false);
@@ -4733,6 +4733,6 @@ function selectCalculatorTab(tab){
  const current=tab==='perbandingan'?'perbandingan':'asli';
  document.querySelectorAll('[data-calculator-tab]').forEach(b=>{const selected=b.dataset.calculatorTab===current;b.classList.toggle('is-active',selected);b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;});
  document.getElementById('calculator-original').hidden=current!=='asli';document.getElementById('calculator-comparison').hidden=current!=='perbandingan';
- const frame=document.getElementById('comparison-frame');if(current==='perbandingan'&&!frame.getAttribute('src'))frame.src='planning-admin.html?v=product-save-20260923-r19&embed=1#calculator';
+ const frame=document.getElementById('comparison-frame');if(current==='perbandingan'&&!frame.getAttribute('src'))frame.src='planning-admin.html?v=product-save-20260923-r19b&embed=1#calculator';
  history.replaceState(null,'','#module/calculator/'+current);
 }
