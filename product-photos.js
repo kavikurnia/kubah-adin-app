@@ -1,5 +1,5 @@
-import {check,id} from './manual-domain.js?v=variant-options-20260923-r20';
-import {blobHash,prepareDocument,storageConfiguration} from './document-storage.js?v=variant-options-20260923-r20';
+import {check,id} from './manual-domain.js?v=picker-20260923-r21';
+import {blobHash,prepareDocument,storageConfiguration} from './document-storage.js?v=picker-20260923-r21';
 export async function prepareProductPhoto(file){check(['image/jpeg','image/png'].includes(file?.type),'Pilih foto JPG atau PNG.');const p=await prepareDocument(file);check(p.mime.startsWith('image/'),'Berkas harus berupa foto.');return p;}
 export function productPhotos(c,{config=globalThis.SUPABASE_DOCUMENTS,fetcher=fetch,xhrFactory=()=>new XMLHttpRequest(),configuration=storageConfiguration}={}){
  return {async upload(prepared,{productId,variantId,onProgress=()=>{}}){

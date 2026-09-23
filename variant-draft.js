@@ -1,4 +1,4 @@
-import {check,num,Fault} from './manual-domain.js?v=variant-options-20260923-r20';
+import {check,num,Fault} from './manual-domain.js?v=picker-20260923-r21';
 
 export const VARIANT_FIELDS=['sku','color','size','stock','retail','wholesale','hpp','weight','image'];
 export const variantValue=(v,k)=>['retail','wholesale'].includes(k)?v.pricing?.[k]:v[k];

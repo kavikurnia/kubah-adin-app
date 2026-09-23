@@ -86,7 +86,7 @@ export function publicProduct(p,productId) {
   return {id:productId,name:p.name,category:p.category||'',description:p.description||'',specifications:String(p.specifications||''),sku:p.sku||'',weight:p.weight||0,createdAt:p.createdAt?.toDate?.().toISOString()||(typeof p.createdAt==='string'?p.createdAt:null),material:String(p.material||p.bahan||''),size:String(p.size||''),thickness:String(p.thickness||''),conditions:String(p.conditions||''),
     images:(p.images?.length?p.images:[{url:p.photoUrl}]).filter(i=>safeURL(i.url)).map(i=>({url:safeURL(i.url),isPrimary:!!i.isPrimary})),
     saleUnit:p.saleUnit||'unit',subcategory:p.subcategory||'',collections:p.collections?.includes('paket-grosir')?['paket-grosir']:[],price:w.retail,packPcs:w.packPcs,promo:!!w.promo,tiers:w.tiers,combine:w.combine,group:w.group,
-    variants:p.variants.filter(v=>!v.optionArchived).map(v=>({id:v.id,color:v.color||v.name||'',size:v.size||'',sku:v.sku||'',image:safeURL(v.image),stock:v.stock,weight:v.weight??p.weight??0,pricing:{retail:v.pricing?.retail||null,wholesale:v.pricing?.wholesale||null}}))};
+    variants:p.variants.filter(v=>!v.optionArchived).map(v=>({id:v.id,color:v.color||v.name||'',size:v.size||'',colorLabel:String(p.variationOptions?.color?.name||'Warna').slice(0,50),sizeLabel:String(p.variationOptions?.size?.name||'Ukuran').slice(0,50),sku:v.sku||'',image:safeURL(v.image),stock:v.stock,weight:v.weight??p.weight??0,pricing:{retail:v.pricing?.retail||null,wholesale:v.pricing?.wholesale||null}}))};
 }
 export function cartInput(items) {
   check(Array.isArray(items)&&items.length>0&&items.length<=60,'Isi 1–60 baris keranjang.','invalid-argument');

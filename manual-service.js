@@ -1,9 +1,9 @@
-import {AVAILABILITY_PATH,writeAvailability} from './product-lifecycle.js?v=variant-options-20260923-r20';
-import {RETURN_REASONS,LEGACY_REASONS,stageChange,caseStage} from './return-domain.js?v=variant-options-20260923-r20';
-import {unitPrice} from './planning-domain.js?v=variant-options-20260923-r20';
-import {claimEvidence} from './buyer-domain.js?v=variant-options-20260923-r20';
+import {AVAILABILITY_PATH,writeAvailability} from './product-lifecycle.js?v=picker-20260923-r21';
+import {RETURN_REASONS,LEGACY_REASONS,stageChange,caseStage} from './return-domain.js?v=picker-20260923-r21';
+import {unitPrice} from './planning-domain.js?v=picker-20260923-r21';
+import {claimEvidence} from './buyer-domain.js?v=picker-20260923-r21';
 const randomUUID=()=>crypto.randomUUID();
-import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=variant-options-20260923-r20';
+import {Fault,check,str,num,id,hash,config,validateConfig,normalizeProduct,publicProduct,cartInput,priceCart,shipping,address,validateSlot,validDate,canPay} from './manual-domain.js?v=picker-20260923-r21';
 
 // Store contract: get/list outside a transaction; tx.get(path), tx.set/update/delete inside.
 // Every transaction below completes reads before staging writes. Firestore retries conflicts.

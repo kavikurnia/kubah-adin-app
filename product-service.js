@@ -1,8 +1,8 @@
-import {AVAILABILITY_PATH,writeAvailability} from './product-lifecycle.js?v=variant-options-20260923-r20';
-import {check,id,hash,normalizeProduct,publicProduct,safeURL} from './manual-domain.js?v=variant-options-20260923-r20';
-import {CATEGORIES,skuKey,skuId} from './planning-domain.js?v=variant-options-20260923-r20';
-import {movementRecord} from './product-movement.js?v=variant-options-20260923-r20';
-import {mergeProductEdits,imageList,same} from './variant-draft.js?v=variant-options-20260923-r20';
+import {AVAILABILITY_PATH,writeAvailability} from './product-lifecycle.js?v=picker-20260923-r21';
+import {check,id,hash,normalizeProduct,publicProduct,safeURL} from './manual-domain.js?v=picker-20260923-r21';
+import {CATEGORIES,skuKey,skuId} from './planning-domain.js?v=picker-20260923-r21';
+import {movementRecord} from './product-movement.js?v=picker-20260923-r21';
+import {mergeProductEdits,imageList,same} from './variant-draft.js?v=picker-20260923-r21';
 export function productService(store,{stamp=()=>new Date().toISOString()}={}){
  return {async save(ctx,d){check(ctx.role==='admin'&&ctx.uid,'Izin admin diperlukan.','permission-denied');const pid=id(d.id),eid='product-'+hash([pid,d.key]),fingerprint=d.importHash||hash({product:d.product,stock:!!d.stock,...(d.movement?{movement:d.movement}:{})});
   const commit=()=>store.run(async tx=>{const event=await tx.get('productEvents/'+eid);if(event){check(event.fingerprint===fingerprint,'Kunci perubahan sudah dipakai.');return {id:pid,reused:true};}const old=await tx.get('products/'+pid);check(!old?.deleted,'Pulihkan produk dari Sampah sebelum mengeditnya.');const availability=await tx.get(AVAILABILITY_PATH);if(!d.base)check((old?.revision||0)===d.expectedRevision,'Produk/stok berubah sejak pratinjau. Muat ulang dan tinjau kembali.');

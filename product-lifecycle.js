@@ -1,4 +1,4 @@
-import {check,id,hash} from './manual-domain.js?v=variant-options-20260923-r20';
+import {check,id,hash} from './manual-domain.js?v=picker-20260923-r21';
 
 export const AVAILABILITY_PATH='catalogState/availability';
 

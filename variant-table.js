@@ -1,8 +1,8 @@
-import {esc,money} from './planning-ui.js?v=variant-options-20260923-r20';
-import {check} from './manual-domain.js?v=variant-options-20260923-r20';
-import {applyVariantBulk,undoVariantBulk,variantNumber,variantValue,setVariantValue} from './variant-draft.js?v=variant-options-20260923-r20';
-import {prepareProductPhoto,productPhotos} from './product-photos.js?v=variant-options-20260923-r20';
-import {deriveOptions,reconcileOptions,optionGroups,groupPhotoTargets} from './variant-options.js?v=variant-options-20260923-r20';
+import {esc,money} from './planning-ui.js?v=picker-20260923-r21';
+import {check} from './manual-domain.js?v=picker-20260923-r21';
+import {applyVariantBulk,undoVariantBulk,variantNumber,variantValue,setVariantValue} from './variant-draft.js?v=picker-20260923-r21';
+import {prepareProductPhoto,productPhotos} from './product-photos.js?v=picker-20260923-r21';
+import {deriveOptions,reconcileOptions,optionGroups,groupPhotoTargets} from './variant-options.js?v=picker-20260923-r21';
 
 export function mountVariantTable(host,{variants,parent={},c,onChange=()=>{},canEdit=true}){
  let rows=structuredClone(variants),selected=new Set(),undo=[],edited=new Set(),preparing=0,locked=false;

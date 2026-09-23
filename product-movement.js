@@ -1,4 +1,4 @@
-import {check,id} from './manual-domain.js?v=variant-options-20260923-r20';
+import {check,id} from './manual-domain.js?v=picker-20260923-r21';
 export const MOVEMENTS=[['fast','Fast Moving'],['medium','Medium'],['slow','Slow Moving'],['dead','Dead Stok']];
 export const movementOptions=[['','Belum dinilai'],...MOVEMENTS];
 export const movementStatus=m=>MOVEMENTS.some(([key])=>key===m?.status)?m.status:'';

@@ -1,4 +1,4 @@
-import {check,hash} from './manual-domain.js?v=variant-options-20260923-r20';
+import {check,hash} from './manual-domain.js?v=picker-20260923-r21';
 
 const key=v=>String(v||'').trim().toLocaleLowerCase('id-ID');
 const clone=v=>structuredClone(v);
