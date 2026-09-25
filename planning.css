@@ -32,3 +32,6 @@ main,#content,.panel,.kpis>article{min-width:0}.kpis{grid-template-columns:repea
 
 /* New option text is not an active option until explicitly added. */
 .variant-option-label{display:block;font-size:12px;color:#63554b;margin:10px 0 5px}.variant-option-help{font-size:11px;line-height:1.5;color:#79685a;margin:6px 0}.variant-option-add{margin-top:0;padding:8px;background:#f5eada;border:1px dashed #bb9d79;border-radius:7px}.variant-empty td{white-space:normal;color:#6d2940;background:#fff3df;padding:18px;max-width:100%}.variant-empty p{margin:6px 0;font-size:13px}.variant-option-add button:disabled{opacity:.5;cursor:not-allowed}
+
+/* Product validation: keep the draft visible and identify the rejected field. */
+#product-edit [aria-invalid="true"]{border:2px solid #a42635;background:#fff5f5;outline-color:#a42635} .product-field-error{display:block;color:#922331;font-size:13px;line-height:1.5;white-space:normal;overflow-wrap:anywhere} .variant-archive li{margin-bottom:12px}.variant-archive .variant-cell{max-width:350px;margin-top:6px}

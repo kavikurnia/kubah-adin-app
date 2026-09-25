@@ -1,12 +1,13 @@
 import {productLifecycle} from './product-lifecycle.js?v=picker-20260923-r21';
 import {$,esc,money,input,area,select,checkbox,tabs,table,form,bindForm,busy,message,download} from './planning-ui.js?v=picker-20260923-r21';
 import {CATEGORIES,IMPORT_COLUMNS,IMPORT_LABELS,importPreview,pricingInput,skuId,csv,unitPrice} from './planning-domain.js?v=picker-20260923-r21';
-import {productService} from './product-service.js?v=picker-20260923-r21';
+import {productService} from './product-service.js?v=product-validation-20260925-r23';
 import {check,num} from './manual-domain.js?v=picker-20260923-r21';
 import {movementService,movementOptions,movementStatus,movementLabel,movementRows,movementCounts} from './product-movement.js?v=picker-20260923-r21';
-import {mountVariantTable} from './variant-table.js?v=new-product-20260923-r22';
+import {mountVariantTable} from './variant-table.js?v=product-validation-20260925-r23';
 import {applyFormChanges,resolveProductConflict,imageList,same} from './variant-draft.js?v=picker-20260923-r21';
 import {productDrafts} from './product-edit-draft.js?v=product-save-20260923-r19c';
+import {validateProductFields,productText,fieldFault} from './product-validation.js?v=product-validation-20260925-r23';
 let filter={query:'',category:'',status:'',movement:'',publication:'',archive:'normal'};
 const badge=m=>`<span class="movement-badge movement-${movementStatus(m)||'unrated'}">${movementLabel(m)}</span>`;
 const excel=(name,rows)=>{check(globalThis.XLSX,'Pustaka Excel belum termuat. Periksa koneksi lalu coba lagi, atau gunakan CSV.');const sheet=XLSX.utils.json_to_sheet(rows.map(r=>Object.fromEntries(IMPORT_COLUMNS.map((k,i)=>[IMPORT_LABELS[i],r[k]??'']))),{header:IMPORT_LABELS}),book=XLSX.utils.book_new();sheet['!cols']=IMPORT_COLUMNS.map(k=>({wch:['name','description','photos'].includes(k)?36:20}));XLSX.utils.book_append_sheet(book,sheet,'Produk');XLSX.writeFile(book,name);};
@@ -49,6 +50,14 @@ $('#products-table').innerHTML=`<p>${list.length} produk</p>`+table(['Produk / S
   function draftProduct(d){return {...p,name:d.name,sku:d.sku,category:d.category,subcategory:d.subcategory,saleUnit:d.saleUnit,description:d.description,weight:Number(d.weight),status:d.status,photoUrl:d.photos.split(/\r?\n/).map(s=>s.trim()).filter(Boolean)[0]||'',collections:f.elements.wholesaleCollection.checked?['paket-grosir']:[],images:d.photos.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).map((url,i)=>({url,isPrimary:i===0})),variants:collectVariants(),variationOptions:tableDraft.readOptions(),website:{...w,enabled:d.status==='aktif',retail:Number(d.retail),packPcs:Number(d.packPcs),tiers:d.wholesale?[{minPcs:Number(d.minPcs),price:Number(d.wholesale)},...(w.tiers||[]).slice(1)]:[],reseller:{price:Number(d.resellerPrice||0),minPcs:Number(d.resellerMin||20)},promo:f.elements.promo.checked,combine:d.combine,group:d.group}};}
   let formBaseline=recovered?.initial||draftProduct(Object.fromEntries(new FormData(f)));
   const status=document.createElement('p');status.className='notice full';status.setAttribute('role','status');status.setAttribute('aria-live','polite');f.prepend(status);
+  const clearErrors=()=>{status.classList.remove('error');status.setAttribute('role','status');for(const el of f.querySelectorAll('[aria-invalid]')){el.removeAttribute('aria-invalid');if(el.getAttribute('aria-describedby')==='product-current-field-error')el.removeAttribute('aria-describedby');}for(const el of f.querySelectorAll('[data-field-error]'))el.remove();};
+  function showFieldError(error){
+   status.classList.add('error');status.setAttribute('role','alert');
+   let el=error.variantId?[...f.querySelectorAll('[data-variant-id]')].find(row=>row.dataset.variantId===error.variantId)?.querySelector('[data-field="'+error.field+'"]'):f.elements.namedItem(error.field||'');
+   if(!el&&error.field)el=error.field==='variants'?$('#variants'):null;
+   if(el){el.setAttribute('aria-invalid','true');for(let parent=el.parentElement;parent&&parent!==f;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;const note=document.createElement('small');note.dataset.fieldError='';note.className='product-field-error';note.textContent=error.message;note.id='product-current-field-error';el.setAttribute('aria-describedby',note.id);if(error.variantId)f.querySelector('.variant-table-scroll').before(note);else el.after(note);el.scrollIntoView({block:'center'});el.focus({preventScroll:true});}else status.scrollIntoView({block:'center'});
+  }
+  for(const [name,max]of [['name',250],['sku',100],['description',10000],['group',80]]){const el=f.elements.namedItem(name);el.setAttribute('aria-label',el.closest('label')?.firstChild?.textContent?.trim()||name);el.maxLength=max;const hint=document.createElement('small');hint.className='muted';hint.textContent='Maksimal '+max.toLocaleString('id-ID')+' karakter.';el.after(hint);}
   const saveButton=f.querySelector('button.primary:not([type=button])');
   const readRaw=()=>({fields:Object.fromEntries([...f.elements].filter(el=>el.name&&el.type!=='file').map(el=>[el.name,el.type==='checkbox'?el.checked:el.value])),variants:tableDraft.snapshot(),variationOptions:tableDraft.readOptions(),queuedPhotos:tableDraft.queuedPhotos(),pendingOptions:tableDraft.readPendingOptions()});
   function restoreRaw(raw){for(const [name,value] of Object.entries(raw.fields||{})){const el=f.elements.namedItem(name);if(el){if(el.type==='checkbox')el.checked=!!value;else el.value=value??'';}}tableDraft.replace(raw.variants,raw.variationOptions,raw.pendingOptions);}
@@ -71,20 +80,20 @@ $('#products-table').innerHTML=`<p>${list.length} produk</p>`+table(['Produk / S
    if(host.textContent)host.scrollIntoView({block:'nearest'});
   }
   f.onsubmit=async event=>{
-   event.preventDefault();if(saving)return;saving=true;$('#notice').hidden=true;
+   event.preventDefault();if(saving)return;saving=true;clearErrors();$('#notice').hidden=true;
    let controls=[],disabled=[],attempt=pendingAttempt,committed=false;
    try{
     check(U.c.a.currentUser?.uid===U.ctx.uid,'Masuk kembali dengan akun yang sama untuk melanjutkan draf.','auth/session-changed');
-    check(f.elements.confirmed.checked,'Tinjau rincian lalu centang konfirmasi.');
-    const d=Object.fromEntries(new FormData(f)),pid=p.id||'P-'+skuId(d.sku);
-    if(!attempt){if(!f.reportValidity())return;check(CATEGORIES.includes(d.category),'Petakan kategori lama ke kategori yang tersedia.');const prices=pricingInput(d),vs=collectVariants();check(!vs.some(v=>v.pricing.wholesale&&!prices.wholesale),'Isi harga grosir induk sebelum membuat harga grosir varian.');const photos=d.photos.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);check(photos.every(url=>/^https:\/\//.test(url)),'Foto harus URL HTTPS publik.');check(photos.length<=9,'Maksimal 9 foto.');}
+    if(!f.elements.confirmed.checked)throw fieldFault('confirmed','Konfirmasi pemeriksaan','tinjau rincian lalu centang kotak ini.');
+    const d=Object.fromEntries(new FormData(f));if(!attempt)productText(d.sku,'sku','SKU induk',100,true);const pid=attempt?.request.id||p.id||'P-'+skuId(d.sku);
+    if(!attempt){const invalid=[...f.elements].find(el=>el.willValidate&&!el.validity.valid);if(invalid){const label=invalid.getAttribute('aria-label')||invalid.closest('label')?.firstChild?.textContent?.trim()||invalid.name;throw fieldFault(invalid.dataset.field||invalid.name,label,(invalid.validity.valueMissing?'wajib diisi. Lengkapi kolom ini.':invalid.validationMessage),invalid.closest('[data-variant-id]')?.dataset.variantId);}validateProductFields(draftProduct(d));check(CATEGORIES.includes(d.category),'Petakan kategori lama ke kategori yang tersedia.');const prices=pricingInput(d),vs=collectVariants();check(!vs.some(v=>v.pricing.wholesale&&!prices.wholesale),'Isi harga grosir induk sebelum membuat harga grosir varian.');const photos=d.photos.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);check(photos.every(url=>/^https:\/\//.test(url)),'Foto harus URL HTTPS publik.');check(photos.length<=9,'Maksimal 9 foto.');}
     check(!tableDraft.pending(),'Tunggu pratinjau foto selesai.');
     controls=[...f.querySelectorAll('input,select,textarea,button')];disabled=controls.map(el=>el.disabled);controls.forEach(el=>el.disabled=true);tableDraft.setLocked(true);saveButton.textContent='Menyimpan…';status.textContent=attempt?'Memeriksa dan mencoba kembali penyimpanan sebelumnya…':'Menyimpan…';
     if(!attempt){await tableDraft.upload(pid);const entered=draftProduct(d);attempt={request:{id:pid,product:base?applyFormChanges(base,formBaseline,entered):entered,...(base?{base}:{}),...(d.movementValue!==movementStatus(movements.get(p.id))?{movement:{status:d.movementValue,expectedRevision:movements.get(p.id)?.revision||0}}:{}),expectedRevision:base?.revision||0,key:crypto.randomUUID(),stock:true,reason:d.reason},raw:readRaw()};pendingAttempt=attempt;persist();}
     const service=productService(U.store);await service.save(U.ctx,attempt.request);committed=true;
     const verified=await service.verify(U.ctx,attempt.request);
     if(!verified.catalogSynced){
-     status.textContent='Produk sudah tersimpan, tetapi katalog terbaru belum konsisten. Gunakan Coba sinkronkan katalog; stok dan varian tidak disimpan ulang.';
+     status.classList.add('error');status.setAttribute('role','alert');status.textContent='Produk sudah tersimpan, tetapi katalog terbaru belum konsisten. Gunakan Coba sinkronkan katalog; stok dan varian tidak disimpan ulang.';
      const retry=document.createElement('button');retry.type='button';retry.textContent='Coba sinkronkan katalog';retry.onclick=e=>busy(e.currentTarget,async()=>{await service.syncCatalog(U.ctx,verified.id);const latest=await service.verify(U.ctx,attempt.request);check(latest.catalogSynced,'Sinkronisasi belum terverifikasi. Coba lagi.');retry.remove();await finish(latest,attempt);});status.append(document.createElement('br'),retry);return;
     }
     await finish(verified,attempt);
@@ -92,19 +101,19 @@ $('#products-table').innerHTML=`<p>${list.length} produk</p>`+table(['Produk / S
     if(['product-conflict','stock-conflict','invalid-argument','failed-precondition'].includes(error.code)&&!committed)pendingAttempt=null;
     status.textContent=(committed?'Transaksi diterima server, tetapi pemeriksaan ulang belum selesai. Klik Simpan untuk memeriksa kembali tanpa menggandakan perubahan. ':'')+errorText(error);
     if(!committed&&pendingAttempt)status.textContent+=' Saat dicoba lagi, permintaan sebelumnya diperiksa dahulu; edit tambahan tetap menjadi draf.';
-    showConflicts(error,attempt?.request.id||p.id);persist();
-   }finally{saving=false;controls.forEach((el,i)=>el.disabled=disabled[i]);tableDraft.setLocked(false);saveButton.textContent='Simpan produk & sinkronkan katalog';}
+    showFieldError(error);showConflicts(error,attempt?.request.id||p.id);persist();
+   }finally{saving=false;controls.forEach((el,i)=>el.disabled=disabled[i]);tableDraft.setLocked(false);saveButton.textContent='Simpan produk & sinkronkan katalog';f.querySelector('[aria-invalid]')?.focus({preventScroll:true});}
   };
   async function finish(verified,attempt){
    // Keep edits made after an uncertain failure while rebasing to actual server values.
    const currentRaw=readRaw(),extras=!same(attempt.raw,currentRaw);
    const beforeFields=attempt.raw.fields;const changedFields=Object.fromEntries(Object.entries(currentRaw.fields).filter(([k,v])=>!same(v,beforeFields[k])));
    const remainingRows=applyFormChanges({variants:verified.product.variants},{variants:attempt.raw.variants},{variants:currentRaw.variants}).variants;
-   base={...verified.product,id:verified.id};pendingAttempt=null;
+   base={...verified.product,id:verified.id};pendingAttempt=null;tableDraft.acceptSaved(verified.product.variants);clearErrors();
    if(verified.movement)movements.set(verified.id,verified.movement);
    writeModel(base);f.elements.movementValue.value=movementStatus(verified.movement);formBaseline=draftProduct(Object.fromEntries([...f.elements].filter(el=>el.name).map(el=>[el.name,el.value])));
    if(extras)restoreRaw({fields:changedFields,variants:remainingRows,variationOptions:same(currentRaw.variationOptions,attempt.raw.variationOptions)?verified.product.variationOptions:currentRaw.variationOptions});
-   p.id=verified.id;drafts.remove(draftId);if(extras)persist();else tableDraft.markSaved();f.dataset.dirty=extras?'true':'false';$('#stock-conflict').innerHTML='';preview();
+   p.id=verified.id;const heading=f.querySelector('h2.full');if(heading)heading.textContent='Edit Produk';drafts.remove(draftId);if(extras)persist();else tableDraft.markSaved();f.dataset.dirty=extras?'true':'false';$('#stock-conflict').innerHTML='';preview();
    status.textContent='Produk tersimpan dan katalog terverifikasi. ID '+verified.id+(extras?' Edit tambahan masih berupa draf; tinjau lalu simpan lagi.':' Anda dapat melanjutkan edit atau kembali ke Daftar Produk.');
    message('Produk tersimpan dan katalog terverifikasi.');
   }
