@@ -1,0 +1,23 @@
+# Activate only AFTER domain ownership, DNS and certificate are verified.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name kubahnabawistore.com;
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/lib/kubah-acme;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+    location / { return 301 https://kubahnabawistore.com$request_uri; }
+}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name kubahnabawistore.com;
+    ssl_certificate /etc/letsencrypt/live/kubahnabawistore.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/kubahnabawistore.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:KubahTLS:10m;
+    include /etc/nginx/snippets/kubah-nabawi-routes.conf;
+}

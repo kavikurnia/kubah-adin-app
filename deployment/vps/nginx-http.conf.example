@@ -1,0 +1,13 @@
+# Review listen bindings against existing services before enabling.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name kubahnabawistore.com;
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/lib/kubah-acme;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+    # During preflight only. Enable HTTPS redirect after certificate issuance.
+    include /etc/nginx/snippets/kubah-nabawi-routes.conf;
+}

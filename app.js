@@ -921,7 +921,11 @@ function renderAdminChrome() {
   logo.onerror=()=>{logo.hidden=true;document.getElementById('sidebar-monogram').hidden=false;};
   document.getElementById('admin-display-name').textContent=u?.name||'Admin';document.getElementById('admin-display-name').title=u?.email||'';
   document.getElementById('admin-initial').textContent=(u?.name||'A').trim().slice(0,1).toUpperCase();document.getElementById('admin-role').textContent=u?.superAdmin?'Super Admin':'Administrator';
-  const storeLink=document.getElementById('view-store'),storeUrl=safeStoreUrl(s.storeUrl);storeLink.href=storeUrl||'toko.html?v=picker-20260923-r21';storeLink.dataset.configured='true';
+  const storeLink=document.getElementById('view-store'),storeUrl=safeStoreUrl(s.storeUrl);
+  // Keep the existing setting intact while hosting moves from Pages to the VPS.
+  const migratedHost=['srv2013282.hstgr.cloud','kubahnabawistore.com'].includes(location.hostname);
+  const legacyStore=storeUrl&&new URL(storeUrl).hostname==='kavikurnia.github.io'&&/^\/kubah-adin-app\/(?:toko\.html)?$/.test(new URL(storeUrl).pathname);
+  storeLink.href=migratedHost&&(!storeUrl||legacyStore)?'/katalog':storeUrl||'toko.html?v=picker-20260923-r21';storeLink.dataset.configured='true';
   const counts=activityCounts(),rows=[['reseller',counts.reseller,'pengajuan reseller menunggu',state.ready.resellers],['retur',counts.claims,'komplain belum selesai',state.ready.claims],['payment',counts.payment,'pembayaran perlu verifikasi',state.ready.orders]];
   document.getElementById('notification-dot').hidden=!rows.some(r=>r[3]&&r[1]>0);
   const panel=document.getElementById('notification-items');panel.innerHTML=rows.filter(r=>r[3]&&r[1]>0).map(r=>`<button data-activity="${r[0]}"><strong>${r[1]}</strong> ${r[2]} <span aria-hidden="true">›</span></button>`).join('')||'<p>Tidak ada tindak lanjut pada data yang sudah tersinkron.</p>';
