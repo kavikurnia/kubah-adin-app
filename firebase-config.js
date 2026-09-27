@@ -17,4 +17,4 @@ if (window.KUBAH_EMULATOR) window.FIREBASE_CONFIG = {
 // Versi ini memakai Auth + Firestore; tidak memanggil Cloud Functions/Storage.
 
 window.KUBAH_NO_BLAZE=true;
-window.KUBAH_RELEASE='vps-migration-20260927-r24';
+window.KUBAH_RELEASE='domain-20260927-r25';
